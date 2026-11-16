@@ -35,7 +35,8 @@ Preparing a candidate
 4. Enable Actions if needed. Standard GITHUB_TOKEN read access is sufficient
    for artifact builds; no signing credentials or personal access token needed.
 5. Select "SariaUI desktop release candidates" and run it when a build is
-   wanted; no version input is needed.
+   wanted. Choose linux-x86_64 (default), windows-x64, macos-arm64, or all in
+   the platform dropdown; no version input is needed.
 
 Version naming
 --------------
@@ -62,10 +63,13 @@ signatures. Linux checks the helper inside the extracted AppImage. Windows
 copies an allowlist of runtime files. Licenses and commit/version metadata are
 included; no local user configuration or game dump is packaged.
 
-The final job requires all three packages plus source, verifies per-package
-checksums, and emits SHA256SUMS and release-manifest.json. Failed platform jobs
-prevent a complete candidate. Logs are uploaded separately, including the
-resolved Linux container digest.
+Only the selected platforms receive build jobs. The final job requires each
+selected package plus source, verifies per-package checksums, and emits
+SHA256SUMS and release-manifest.json with the selected platforms recorded.
+The all selection still requires all three packages. Candidate artifact names
+end with the selection (for example, release-candidate-linux-x86_64).
+Failed selected jobs prevent a complete candidate. Logs are uploaded
+separately, including the resolved Linux container digest.
 
 Limits / remaining release work
 ------------------------------

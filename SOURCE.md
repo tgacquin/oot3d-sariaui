@@ -37,7 +37,7 @@ Player builds enable `ENABLE_OOT3D_PRESENTATION` and `ENABLE_OOT3D_PLAYER_MODE`,
 
 The shared version is stored in [resources/oot3d/release-version.txt](resources/oot3d/release-version.txt), initially `1.0.0`. Update and commit that file for each release. The workflow, artifact and package names, application version, and release metadata all use it. Versions such as `1.0.0-beta.1` are also supported. macOS and Windows numeric version fields use the three-part numeric portion; the full version is retained in the application and descriptive metadata.
 
-The workflow is manually dispatched through **Actions → SariaUI desktop release candidates → Run workflow**. There is no separate version input. It creates candidate artifacts, source, checksums, and a release manifest. It does not create a tag or publish a GitHub Release. The inherited MM3D workflows are for DekUI, not SariaUI.
+The workflow is manually dispatched through **Actions → SariaUI desktop release candidates → Run workflow**. Choose **Platform to build**: `linux-x86_64` (the default), `windows-x64`, `macos-arm64`, or `all`. Only the selected platforms are scheduled; `all` builds the three platforms in parallel. Every selection includes matching source, checksums, and a release manifest listing the selected platforms. There is no separate version input. It does not create a tag or publish a GitHub Release. The inherited MM3D workflows are for DekUI, not SariaUI.
 
 See [release preparation notes](tools/oot3d/release/README.txt) for deployment checks, platform limitations, and remaining release validation. macOS packages are ad-hoc signed rather than Apple-notarized; Windows packages are unsigned.
 

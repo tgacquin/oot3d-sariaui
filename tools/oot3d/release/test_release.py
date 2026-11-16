@@ -11,9 +11,51 @@ from export_defaults import export, read
 from package import copy_payload, inspect_tree, smoke
 from preflight import check, private_path, version
 from release_version import release_version
+from platforms import build_matrix
 
 
 class ReleaseChecks(unittest.TestCase):
+    def test_platform_selection_only_schedules_requested_runners(self):
+        expected = [
+            {'platform': 'windows-x64', 'runner': 'windows-2022'},
+            {'platform': 'macos-arm64', 'runner': 'macos-15'},
+            {'platform': 'linux-x86_64', 'runner': 'ubuntu-24.04'},
+        ]
+        self.assertEqual(build_matrix('all'), {'include': expected})
+        for entry in expected:
+            with self.subTest(platform=entry['platform']):
+                self.assertEqual(build_matrix(entry['platform']), {'include': [entry]})
+        with self.assertRaises(ValueError):
+            build_matrix('unknown-platform')
+
+    def test_single_platform_candidate_requires_its_package_and_source(self):
+        for platform, extension in (('windows-x64', 'zip'), ('macos-arm64', 'zip'),
+                                    ('linux-x86_64', 'tar.gz')):
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                version = release_version()
+                commit = 'b' * 40
+                package = root / f'SariaUI-{version}-{platform}.{extension}'
+                package.write_bytes(b'package fixture')
+                checksum = package.with_name(package.name + '.sha256')
+                checksum.write_text(f'{digest(package)}  {package.name}\n')
+                with self.assertRaisesRegex(ValueError, 'Source.tar.gz'):
+                    collect(root, version, commit, platform)
+                source = root / f'SariaUI-{version}-Source.tar.gz'
+                source.write_bytes(b'source fixture')
+                collect(root, version, commit, platform)
+                manifest = json.loads((root / 'release-manifest.json').read_text())
+                self.assertEqual(manifest['platforms'], [platform])
+                self.assertEqual([item['file'] for item in manifest['artifacts']],
+                                 [package.name, source.name])
+                self.assertEqual(len((root / 'SHA256SUMS').read_text().splitlines()), 2)
+                package.write_bytes(b'changed package')
+                with self.assertRaisesRegex(ValueError, 'checksum mismatch'):
+                    collect(root, version, commit, platform)
+                package.unlink()
+                with self.assertRaisesRegex(ValueError, 'Missing/empty'):
+                    collect(root, version, commit, platform)
+
     @unittest.skipUnless(shutil.which('cmake'), 'CMake unavailable')
     def test_cmake_version_and_incremental_refresh(self):
         module = Path(__file__).resolve().parents[3] / 'CMakeModules/GenerateBuildInfo.cmake'
