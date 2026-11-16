@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import tempfile
 import subprocess
@@ -59,33 +60,49 @@ class ReleaseChecks(unittest.TestCase):
     @unittest.skipUnless(shutil.which('cmake'), 'CMake unavailable')
     def test_cmake_version_and_incremental_refresh(self):
         module = Path(__file__).resolve().parents[3] / 'CMakeModules/GenerateBuildInfo.cmake'
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            version_file = root / 'resources/oot3d/release-version.txt'
-            version_file.parent.mkdir(parents=True)
-            version_file.write_text('1.0.0\n')
-            (root / 'GIT-COMMIT').write_text('a'*40+'\n')
-            (root / 'GIT-TAG').write_text('9.9.9\n')
-            (root / 'CMakeLists.txt').write_text(
-                'cmake_minimum_required(VERSION 3.25)\nproject(VersionCheck NONE)\n'
-                f'include("{module.as_posix()}")\ngenerate_build_info()\n'
-                'file(WRITE "${CMAKE_BINARY_DIR}/version.txt" '
-                '"${BUILD_VERSION}|${BUILD_FULLNAME}|${SARIAUI_NUMERIC_VERSION}")\n')
-            build = root / 'build'
-            command = ['cmake', '-S', str(root), '-B', str(build), '-DENABLE_OOT3D_PRESENTATION=ON']
-            subprocess.run(command, check=True, capture_output=True, text=True)
-            self.assertEqual((build / 'version.txt').read_text(), '1.0.0|1.0.0|1.0.0')
-            version_file.write_text('1.2.3-beta.2\n')
-            subprocess.run(['cmake', '--build', str(build)], check=True, capture_output=True, text=True)
-            self.assertEqual((build / 'version.txt').read_text(), '1.2.3-beta.2|1.2.3-beta.2|1.2.3')
-            version_file.write_text('1.02.3\n')
-            result = subprocess.run(command, capture_output=True, text=True)
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn('Invalid SariaUI release version', result.stderr)
-            # Non-OoT builds continue using their existing tag-based version.
-            command[-1] = '-DENABLE_OOT3D_PRESENTATION=OFF'
-            subprocess.run(command, check=True, capture_output=True, text=True)
-            self.assertTrue((build / 'version.txt').read_text().startswith('9.9.9|9.9.9|'))
+        # Exercise the module's real environment-dependent upstream version rules.
+        # A manual GitHub branch build has no tag; an archive outside CI uses GIT-TAG.
+        base_env = {key: value for key, value in os.environ.items() if key not in {
+            'CI', 'GITHUB_ACTIONS', 'GITHUB_REF_TYPE', 'GITHUB_REF_NAME',
+            'CITRA_USE_TAG_AS_VERSION'}}
+        cases = (
+            ('archive', {}, '9.9.9|9.9.9|'),
+            ('github-branch', {'CI': 'true', 'GITHUB_ACTIONS': 'true',
+                               'GITHUB_REF_TYPE': 'branch', 'GITHUB_REF_NAME': 'main'},
+             '0|aaaaaaa|'),
+            ('github-tag', {'CI': 'true', 'GITHUB_ACTIONS': 'true',
+                            'GITHUB_REF_TYPE': 'tag', 'GITHUB_REF_NAME': '8.7.6'},
+             '8.7.6|8.7.6|'),
+        )
+        for label, overrides, upstream_version in cases:
+            env = {**base_env, **overrides}
+            with self.subTest(environment=label), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                version_file = root / 'resources/oot3d/release-version.txt'
+                version_file.parent.mkdir(parents=True)
+                version_file.write_text('1.0.0\n')
+                (root / 'GIT-COMMIT').write_text('a'*40+'\n')
+                (root / 'GIT-TAG').write_text('9.9.9\n')
+                (root / 'CMakeLists.txt').write_text(
+                    'cmake_minimum_required(VERSION 3.25)\nproject(VersionCheck NONE)\n'
+                    f'include("{module.as_posix()}")\ngenerate_build_info()\n'
+                    'file(WRITE "${CMAKE_BINARY_DIR}/version.txt" '
+                    '"${BUILD_VERSION}|${BUILD_FULLNAME}|${SARIAUI_NUMERIC_VERSION}")\n')
+                build = root / 'build'
+                command = ['cmake', '-S', str(root), '-B', str(build), '-DENABLE_OOT3D_PRESENTATION=ON']
+                subprocess.run(command, check=True, capture_output=True, text=True, env=env)
+                self.assertEqual((build / 'version.txt').read_text(), '1.0.0|1.0.0|1.0.0')
+                version_file.write_text('1.2.3-beta.2\n')
+                subprocess.run(['cmake', '--build', str(build)], check=True, capture_output=True, text=True, env=env)
+                self.assertEqual((build / 'version.txt').read_text(), '1.2.3-beta.2|1.2.3-beta.2|1.2.3')
+                version_file.write_text('1.02.3\n')
+                result = subprocess.run(command, capture_output=True, text=True, env=env)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('Invalid SariaUI release version', result.stderr)
+                # Non-OoT builds continue using their existing tag-based version.
+                command[-1] = '-DENABLE_OOT3D_PRESENTATION=OFF'
+                subprocess.run(command, check=True, capture_output=True, text=True, env=env)
+                self.assertTrue((build / 'version.txt').read_text().startswith(upstream_version))
 
     def test_shared_version_and_mismatch(self):
         with tempfile.TemporaryDirectory() as tmp:
