@@ -1,0 +1,4 @@
+Source: https://github.com/gamestabled/OoT3D_Randomizer
+Revision: d695cf5ad78dc1990da200af601b054860d707b8
+Integrated generator and guest runtime; local portability/integration changes are maintained here.
+See LICENSE.md for the upstream copyright and permission notice.

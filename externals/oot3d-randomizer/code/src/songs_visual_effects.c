@@ -1,0 +1,83 @@
+#include "z3D/z3D.h"
+#include "settings.h"
+#include "songs_visual_effects.h"
+#include "icetrap.h"
+#include "savefile.h"
+
+void OceffWipe_Update(Actor* thisx, GlobalContext* globalCtx);
+
+void OceffWipe2_Update(Actor* thisx, GlobalContext* globalCtx);
+
+void OceffWipe3_Update(Actor* thisx, GlobalContext* globalCtx);
+
+void OceffWipe4_Update(Actor* thisx, GlobalContext* globalCtx);
+
+void OceffSpot_Update(Actor* thisx, GlobalContext* globalCtx);
+
+void OceffSpot_End(Actor* thisx, GlobalContext* globalCtx);
+
+void OceffStorm_Update(Actor* thisx, GlobalContext* globalCtx);
+
+// Zelda's Lullaby, Song of Time
+void OceffWipe_rUpdate(Actor* thisx, GlobalContext* globalCtx) {
+    if (gExtSaveData.options[OPTION_SKIPSONGREPLAYS] == SONGREPLAYS_DONT_SKIP) {
+        OceffWipe_Update(thisx, globalCtx);
+    } else {
+        Actor_Kill(thisx);
+    }
+}
+
+// Epona's Song
+void OceffWipe2_rUpdate(Actor* thisx, GlobalContext* globalCtx) {
+    if (gExtSaveData.options[OPTION_SKIPSONGREPLAYS] == SONGREPLAYS_DONT_SKIP) {
+        OceffWipe2_Update(thisx, globalCtx);
+    } else {
+        Actor_Kill(thisx);
+    }
+}
+
+// Saria's Song
+void OceffWipe3_rUpdate(Actor* thisx, GlobalContext* globalCtx) {
+    if (gExtSaveData.options[OPTION_SKIPSONGREPLAYS] == SONGREPLAYS_DONT_SKIP) {
+        OceffWipe3_Update(thisx, globalCtx);
+    } else {
+        Actor_Kill(thisx);
+    }
+}
+
+// Scarecrow's Song
+void OceffWipe4_rUpdate(Actor* thisx, GlobalContext* globalCtx) {
+    if (gExtSaveData.options[OPTION_SKIPSONGREPLAYS] == SONGREPLAYS_DONT_SKIP) {
+        OceffWipe4_Update(thisx, globalCtx);
+    } else {
+        Actor_Kill(thisx);
+    }
+}
+
+// Sun's Song
+void OceffSpot_rUpdate(Actor* thisx, GlobalContext* globalCtx) {
+    if (gExtSaveData.options[OPTION_SKIPSONGREPLAYS] == SONGREPLAYS_DONT_SKIP) {
+        OceffSpot_Update(thisx, globalCtx);
+    }
+    // Wait for a bit before calling OceffSpot_End, otherwise Link and the music staff spots could start waiting
+    // for the Sun's Song light after it's been killed already, causing softlocks and non-functional song switches in MQ
+    // Spirit
+    else if ((gExtSaveData.options[OPTION_SKIPSONGREPLAYS] == SONGREPLAYS_SKIP_KEEP_SFX &&
+              gGlobalContext->msgMode == 0) ||
+             (gExtSaveData.options[OPTION_SKIPSONGREPLAYS] == SONGREPLAYS_SKIP_NO_SFX &&
+              ((PLAYER->stateFlags1 >> 24) & 0x30) != 0x30)) {
+        OceffSpot_End(thisx, globalCtx);
+    }
+}
+
+// Song of Storms
+void OceffStorm_rUpdate(Actor* thisx, GlobalContext* globalCtx) {
+    IceTrap_DispelCurses();
+
+    if (gExtSaveData.options[OPTION_SKIPSONGREPLAYS] == SONGREPLAYS_DONT_SKIP) {
+        OceffStorm_Update(thisx, globalCtx);
+    } else {
+        Flags_SetEnv(globalCtx, 5);
+        Actor_Kill(thisx);
+    }
+}

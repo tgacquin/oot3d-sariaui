@@ -1,0 +1,250 @@
+#include "z3D/z3D.h"
+#include "models.h"
+#include "item_override.h"
+#include "item_table.h"
+#include "objects.h"
+#include "custom_models.h"
+#include "settings.h"
+#include "common.h"
+#include <stddef.h>
+
+void SkeletonAnimationModel_MatrixCopy(SkeletonAnimationModel* glModel, nn_math_MTX34* mtx);
+void SkeletonAnimationModel_Draw(SkeletonAnimationModel* glModel, s32 param_2);
+void Actor_SetModelMatrix(f32 x, f32 y, f32 z, nn_math_MTX34* mtx, ActorShape* shape) __attribute__((pcs("aapcs-vfp")));
+
+#define LOADEDMODELS_MAX 20
+Model ModelContext[LOADEDMODELS_MAX] = { 0 };
+
+void Model_SetAnim(SkeletonAnimationModel* model, s16 objectId, u32 objectAnimIdx) {
+    void* cmabMan = Object_GetCMABByIndex(objectId, objectAnimIdx);
+    MatAnim_Init(model->matAnim, cmabMan);
+}
+
+void Model_Init(Model* model, GlobalContext* globalCtx) {
+    void* ZARBuf = Object_GetEntry(model->objectSlot)->zarInfo.buf;
+
+    // edit the cmbs for custom models
+    CustomModels_EditItemCMB(ZARBuf, model->itemRow->objectId, model->itemRow->special);
+
+    model->saModel =
+        SkeletonAnimationModel_Spawn(model->actor, globalCtx, model->itemRow->objectId, model->itemRow->objectModelIdx);
+
+    if (Object_IsRupeeObject(model->itemRow->objectId)) {
+        // Set the mesh for rupees
+        SkeletonAnimationModel_SetMesh(model->saModel, model->itemRow->special);
+    }
+
+    CustomModels_ApplyItemCMAB(model->saModel, model->itemRow->objectId, model->itemRow->special);
+
+    if (model->itemRow->cmabIndex >= 0) {
+        Model_SetAnim(model->saModel, model->itemRow->objectId, model->itemRow->cmabIndex);
+        model->saModel->matAnim->animSpeed = 2.0f;
+        model->saModel->matAnim->animMode  = 1;
+    }
+
+    if (model->itemRow->objectModelIdx2 >= 0) {
+        model->saModel2 = SkeletonAnimationModel_Spawn(model->actor, globalCtx, model->itemRow->objectId,
+                                                       model->itemRow->objectModelIdx2);
+        if (model->itemRow->cmabIndex2 >= 0) {
+            Model_SetAnim(model->saModel2, model->itemRow->objectId, model->itemRow->cmabIndex2);
+            model->saModel2->matAnim->animSpeed = 2.0f;
+            model->saModel2->matAnim->animMode  = 1;
+        }
+    }
+
+    model->loaded = 1;
+}
+
+void Model_Destroy(Model* model) {
+    if (model->saModel != NULL) {
+        model->saModel->vtbl->destroy(model->saModel);
+        model->saModel = NULL;
+    }
+    if (model->saModel2 != NULL) {
+        model->saModel2->vtbl->destroy(model->saModel2);
+        model->saModel2 = NULL;
+    }
+
+    model->actor   = NULL;
+    model->itemRow = NULL;
+    model->loaded  = 0;
+}
+
+void Model_UpdateAll(GlobalContext* globalCtx) {
+    Model* model;
+
+    for (s32 i = 0; i < LOADEDMODELS_MAX; ++i) {
+        model = &ModelContext[i];
+
+        // No actor, considered unused
+        if (model->actor == NULL) {
+            continue;
+        }
+
+        // Actor has been killed, destroy the model
+        if (model->actor->update == NULL) {
+            Model_Destroy(model);
+            continue;
+        }
+
+        // Actor is alive, model has not been loaded yet
+        if ((model->actor != NULL) && (!model->loaded)) {
+            if (Object_IsLoaded(&globalCtx->objectCtx, model->objectSlot)) {
+                Model_Init(model, globalCtx);
+            }
+        }
+    }
+}
+
+void Model_DrawSAM(Model* model, SkeletonAnimationModel* saModel, Bool mustFaceCamera) {
+    Actor* actor     = model->actor;
+    f32 realShapeYaw = actor->shape.rot.y;
+    Camera* camera   = gGlobalContext->cameraPtrs[gGlobalContext->activeCamera];
+    if (mustFaceCamera && camera != NULL) {
+        actor->shape.rot.y = camera->camDir.y;
+    }
+    // Copy matrix from actor
+    f32 x = actor->world.pos.x;
+    f32 y = actor->world.pos.y + actor->shape.yOffset * actor->scale.y;
+    f32 z = actor->world.pos.z;
+    Actor_SetModelMatrix(x, y, z, &saModel->mtx, &actor->shape);
+
+    // Update scale for all items
+    f32 modelScale = 0.30f;
+    if (actor->id == ACTOR_DEMO_EFFECT) { // Sapphire in Big Octo room
+        modelScale = 0.15f;
+    }
+    nn_math_MTX44 scaleMtx = { 0 };
+    scaleMtx.data[0][0]    = modelScale;
+    scaleMtx.data[1][1]    = modelScale;
+    scaleMtx.data[2][2]    = modelScale;
+    scaleMtx.data[3][3]    = 1.0f;
+    Matrix_Multiply(&saModel->mtx, &saModel->mtx, &scaleMtx);
+
+    // Update matrix for items that use custom models
+    CustomModels_UpdateMatrix(&saModel->mtx, model->itemRow);
+
+    // Draw model
+    saModel->unk_AC = 1;
+    SkeletonAnimationModel_Draw(saModel, 0);
+
+    actor->shape.rot.y = realShapeYaw;
+}
+
+void Model_Draw(Model* model) {
+    if (model->loaded) {
+        Model_DrawSAM(model, model->saModel, CustomModels_MustFaceCamera(model->itemRow));
+        if (model->saModel2 != NULL) {
+            // The second model should always face the camera, except for Skull Token
+            Model_DrawSAM(model, model->saModel2, model->itemRow->objectId != OBJECT_SKULL_TOKEN);
+        }
+    }
+}
+
+void Model_LookupByOverride(Model* model, ItemOverride override) {
+    if (override.key.all != 0) {
+        u16 itemId         = override.value.looksLikeItemId ? override.value.looksLikeItemId : override.value.itemId;
+        u16 resolvedItemId = ItemTable_ResolveUpgrades(itemId);
+        model->itemRow     = ItemTable_GetItemRow(resolvedItemId);
+    }
+}
+
+void Model_InfoLookup(Model* model, Actor* actor, GlobalContext* globalCtx, u16 baseItemId) {
+    ItemOverride override;
+
+    // Special case for bombchu drops
+    if ((actor->id == 0x15) && (actor->params == 5)) {
+        model->itemRow    = ItemTable_GetItemRow(GI_BOMBCHUS_5);
+        model->objectSlot = Object_FindSlotOrSpawn(model->itemRow->objectId);
+        return;
+    }
+
+    // Special lookup for the Zora's Sapphire in the Big Octo room
+    if ((actor->id == 0x8B) && (globalCtx->sceneNum == 0x02)) {
+        ItemOverride_Key key = { .all = 0 };
+        key.scene            = 0xFF;
+        key.type             = OVR_TEMPLE;
+        key.flag             = DUNGEON_JABUJABUS_BELLY;
+        override             = ItemOverride_LookupByKey(key);
+        if (override.key.all != 0) {
+            // Unrotate the Spiritual Stones
+            actor->shape.rot.x = 0;
+        }
+    } else {
+        override = ItemOverride_Lookup(actor, globalCtx->sceneNum, baseItemId);
+    }
+
+    if (override.key.all != 0) {
+        Model_LookupByOverride(model, override);
+        model->objectSlot = Object_FindSlotOrSpawn(model->itemRow->objectId);
+    }
+}
+
+void Model_Create(Model* model, GlobalContext* globalCtx) {
+    Model* newModel = NULL;
+
+    for (s32 i = 0; i < LOADEDMODELS_MAX; ++i) {
+        if ((ModelContext[i].actor == NULL) && (ModelContext[i].saModel == NULL)) {
+            newModel = &ModelContext[i];
+            break;
+        }
+    }
+
+    if (newModel != NULL) {
+        newModel->actor      = model->actor;
+        newModel->itemRow    = model->itemRow;
+        newModel->objectSlot = model->objectSlot;
+        newModel->loaded     = 0;
+        newModel->saModel    = NULL;
+        newModel->saModel2   = NULL;
+    }
+}
+
+void Model_SpawnByActor(Actor* actor, GlobalContext* globalCtx, u16 baseItemId) {
+    Model model = { NULL, NULL, 0, 0, NULL, NULL };
+
+    Model_InfoLookup(&model, actor, globalCtx, baseItemId);
+    if (model.itemRow != NULL) {
+        model.actor = actor;
+        Model_Create(&model, globalCtx);
+    }
+}
+
+void Model_DestroyByActor(Actor* actor) {
+    for (s32 i = 0; i < LOADEDMODELS_MAX; ++i) {
+        if (ModelContext[i].actor == actor) {
+            Model_Destroy(&ModelContext[i]);
+        }
+    }
+}
+
+void Model_DestroyAll(void) {
+    for (s32 i = 0; i < LOADEDMODELS_MAX; ++i) {
+        Model_Destroy(&ModelContext[i]);
+    }
+}
+
+s32 Model_DrawByActor(Actor* actor) {
+    s32 actorDrawn = 0;
+
+    for (s32 i = 0; i < LOADEDMODELS_MAX; ++i) {
+        if (ModelContext[i].actor == actor) {
+            actorDrawn = 1;
+            Model_Draw(&ModelContext[i]);
+        }
+    }
+    return actorDrawn;
+}
+
+u32 Model_OverrideMesh(void* unk, u32 meshGroupIndex) {
+    // When adult Link holds a deku stick, draw unused deku stick instead of shield.
+    if (IsInGameOrBossChallenge() && gSaveContext.linkAge == AGE_ADULT && gSettingsContext.stickAsAdult &&
+        PLAYER->heldItemActionParam == 6 && // holding a deku stick
+        meshGroupIndex == 23 &&             // meshGroupIndex for deku stick in child object and shield in adult object
+        unk == PLAYER->skelAnime.saModel->subSAM14 // check that this is for the player model
+    ) {
+        return 44; // meshGroupIndex for unused deku stick in adult object
+    }
+
+    return meshGroupIndex;
+}

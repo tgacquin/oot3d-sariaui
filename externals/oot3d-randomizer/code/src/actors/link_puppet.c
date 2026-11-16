@@ -1,0 +1,204 @@
+#include <stddef.h>
+#include <string.h>
+
+#include "link_puppet.h"
+#include "objects.h"
+#include "custom_models.h"
+#include "settings.h"
+#include "multiplayer_color.h"
+
+// Draw at most three extra Links. More can cause graphical issues that persist until game restart.
+#define MAX_PUPPETS_AT_ONCE 3
+
+void EnLinkPuppet_Init(Actor* thisx, GlobalContext* globalCtx);
+void EnLinkPuppet_Destroy(Actor* thisx, GlobalContext* globalCtx);
+void EnLinkPuppet_Update(Actor* thisx, GlobalContext* globalCtx);
+void EnLinkPuppet_Draw(Actor* thisx, GlobalContext* globalCtx);
+
+ActorInit EnLinkPuppet_InitVars = {
+    0x1,           // ID
+    ACTORTYPE_NPC, // Type
+    0xFF,          // Room
+    0x2000410,     // Flags
+    21,            // Object ID (20: Adult, 21: Child)
+    sizeof(EnLinkPuppet),
+    EnLinkPuppet_Init,
+    EnLinkPuppet_Destroy,
+    EnLinkPuppet_Update,
+    EnLinkPuppet_Draw,
+};
+
+static ColliderCylinderInit EnLinkPupper_ColliderCylinderInit = {
+    {
+        0x7,
+        0x0,
+        0x9,
+        0x9,
+        0x10,
+        0x1,
+    },
+    {
+        0x1,
+        { 0x0, 0x0, 0x0 },
+        { 0xFFCFFFFF, 0x0, 0x0 },
+        0x0,
+        0x5,
+        0x1,
+    },
+    { 12.0f, 50.0f, 0.0f, { 0.0f, 0.0f, 0.0f } },
+};
+
+void SkelAnime_InitLink(SkelAnime* skelAnime, ZARInfo* zarInfo, GlobalContext* globalCtx, void* cmbMan, void* param_5,
+                        u32 animation, s32 limbBufCount, void* jointTable, void* morphTable);
+
+// When posing the model by copying the joint table, the model for some reason gets raised about 12 units.
+static const f32 childOffsetY = 12.5f;
+
+void EnLinkPuppet_Init(Actor* thisx, GlobalContext* globalCtx) {
+    EnLinkPuppet* this = (EnLinkPuppet*)thisx;
+
+    this->base.room = -1;
+
+    SkelAnime_InitLink(&this->skelAnime, PLAYER->zarInfo, globalCtx, PLAYER->cmbMan, this->base.unk_178, 0, 9,
+                       this->ghostPtr->ghostData.jointTable, NULL);
+
+    // Tunic
+    void* cmabMan = NULL;
+    if (gSettingsContext.customTunicColors == ON || gSettingsContext.mp_Enabled) {
+        cmabMan = Object_GetCMABByIndex(OBJECT_CUSTOM_GENERAL_ASSETS,
+                                        (gSaveContext.linkAge == 0) ? TEXANIM_LINK_BODY : TEXANIM_CHILD_LINK_BODY);
+    } else if (gSaveContext.linkAge == 0) {
+        cmabMan = ZAR_GetCMABByIndex(PLAYER->zarInfo, 2);
+    }
+    if (cmabMan != NULL) {
+        MatAnim_Init(this->skelAnime.saModel->matAnim, cmabMan);
+    }
+    this->skelAnime.saModel->matAnim->animSpeed = 0.0f;
+    this->skelAnime.saModel->matAnim->animMode  = 0;
+
+    // Mesh Groups
+    for (size_t index = 0; index < BIT_COUNT(this->ghostPtr->ghostData.meshGroups1); index++) {
+        Model_DisableMeshGroupByIndex(this->skelAnime.saModel, index);
+    }
+    for (size_t index = 0; index < BIT_COUNT(this->ghostPtr->ghostData.meshGroups2); index++) {
+        Model_DisableMeshGroupByIndex(this->skelAnime.saModel, index + BIT_COUNT(u32));
+    }
+
+    // Collision
+    Collider_InitCylinder(gGlobalContext, &this->collider);
+    Collider_SetCylinder(gGlobalContext, &this->collider, &this->base, &EnLinkPupper_ColliderCylinderInit);
+
+    // Shadow
+    f32 feetShadowScale = (this->ghostPtr->ghostData.age == 0) ? 90.0f : 60.0f;
+    ActorShape_Init(&this->base.shape, 0.0f, ActorShadow_DrawFeet, feetShadowScale);
+}
+
+void EnLinkPuppet_Destroy(Actor* thisx, GlobalContext* globalCtx) {
+    EnLinkPuppet* this = (EnLinkPuppet*)thisx;
+
+    SkelAnime_Destroy(&this->skelAnime);
+}
+
+void EnLinkPuppet_Update(Actor* thisx, GlobalContext* globalCtx) {
+    EnLinkPuppet* this = (EnLinkPuppet*)thisx;
+
+    if (!this->ghostPtr->inUse || !this->ghostPtr->isInGame ||
+        this->ghostPtr->ghostData.currentScene != gGlobalContext->sceneNum) {
+        Actor_Kill(&this->base);
+        return;
+    }
+
+    this->base.world.pos = this->ghostPtr->ghostData.position;
+    this->base.shape.rot = this->ghostPtr->ghostData.rotation;
+    // Overwrite prevPos so model doesn't get stuck to terrain because of Actor_UpdateBgCheckInfo
+    this->base.prevPos = this->base.world.pos;
+
+    // Mesh Groups
+    for (size_t index = 0; index < BIT_COUNT(this->ghostPtr->ghostData.meshGroups1); index++) {
+        if (this->ghostPtr->ghostData.meshGroups1 & (0b1 << index)) {
+            Model_EnableMeshGroupByIndex(this->skelAnime.saModel, index);
+        } else {
+            Model_DisableMeshGroupByIndex(this->skelAnime.saModel, index);
+        }
+    }
+    for (size_t index = 0; index < BIT_COUNT(this->ghostPtr->ghostData.meshGroups2); index++) {
+        if (this->ghostPtr->ghostData.meshGroups2 & (0b1 << index)) {
+            Model_EnableMeshGroupByIndex(this->skelAnime.saModel, index + BIT_COUNT(u32));
+        } else {
+            Model_DisableMeshGroupByIndex(this->skelAnime.saModel, index + BIT_COUNT(u32));
+        }
+    }
+
+    // Tunic
+    this->skelAnime.saModel->matAnim->curFrame = this->ghostPtr->ghostData.currentTunic;
+
+    // Collider
+    Collider_UpdateCylinder(&this->base, &this->collider);
+    CollisionCheck_SetOC(gGlobalContext, &gGlobalContext->colChkCtx, &this->collider);
+    CollisionCheck_SetAC(gGlobalContext, &gGlobalContext->colChkCtx, &this->collider);
+
+    // Shadow
+    f32 ceilingCheckHeight = (this->ghostPtr->ghostData.age == 0) ? 56.0f : 40.0f;
+    Actor_UpdateBgCheckInfo(gGlobalContext, (Actor*)this, 26.0f, 6.0f, ceilingCheckHeight, 7);
+
+    // Child Y position workaround
+    if (this->ghostPtr->ghostData.age != 0) {
+        this->base.world.pos.y -= childOffsetY;
+    }
+}
+
+void EnLinkPuppet_PostLimbDraw(GlobalContext* globalCtx, s32 limbIndex, nn_math_MTX34* mtx, EnLinkPuppet* this) {
+    extern Vec3f Vec3f_PlayerFeet_unk[];
+    if (limbIndex != 0x15) {
+        Actor_SetFeetPos((Actor*)this, mtx, limbIndex, 5, &Vec3f_PlayerFeet_unk[gSaveContext.linkAge], 8,
+                         &Vec3f_PlayerFeet_unk[gSaveContext.linkAge]);
+    }
+}
+
+void SkelAnime_DrawOpa(SkelAnime* skelAnime, nn_math_MTX34* modelMtx, void* overrideLimbDraw, void* postLimbDraw,
+                       Actor* param_5, u32 param_6);
+
+void EnLinkPuppet_Draw(Actor* thisx, GlobalContext* globalCtx) {
+    EnLinkPuppet* this = (EnLinkPuppet*)thisx;
+
+    // Check how many Link puppets already exist before this one.
+    u8 linkPuppetCount = 0;
+    Actor* firstActor  = gGlobalContext->actorCtx.actorList[EnLinkPuppet_InitVars.type].first;
+    for (Actor* actor = firstActor; actor != NULL; actor = actor->next) {
+        if (actor == &this->base) {
+            break;
+        }
+        if (actor->id == EnLinkPuppet_InitVars.id) {
+            linkPuppetCount++;
+        }
+    }
+
+    if (linkPuppetCount < MAX_PUPPETS_AT_ONCE && this->ghostPtr->ghostData.age == gSaveContext.linkAge) {
+        MultiplayerTunicScope color;
+        MultiplayerTunic_Begin(&color, this->skelAnime.saModel->matAnim,
+                              MultiplayerTunic_ResolveColor(this->ghostPtr->tunicColor,
+                                  gSaveContext.linkAge == AGE_CHILD ? 0 : this->ghostPtr->ghostData.currentTunic),
+                              gSaveContext.linkAge == AGE_CHILD);
+        SkelAnime_DrawOpa(&this->skelAnime, &this->base.modelMtx, NULL, EnLinkPuppet_PostLimbDraw, &this->base, 0);
+        MultiplayerTunic_End(&color);
+        return;
+    }
+
+    // Only draw flames every 4th frame
+    if (rGameplayFrames % 4 == 0) {
+        static Vec3f vecEmpty;
+        static f32 colorR[] = { 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.5 };
+        static f32 colorG[] = { 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.5, 0.0 };
+        static f32 colorB[] = { 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0 };
+
+        s16 envR = 100 * colorR[(this->base.params - 1) % ARRAY_SIZE(colorR)];
+        s16 envG = 100 * colorG[(this->base.params - 1) % ARRAY_SIZE(colorG)];
+        s16 envB = 100 * colorB[(this->base.params - 1) % ARRAY_SIZE(colorB)];
+
+        Vec3f spawnPos = this->base.world.pos;
+        spawnPos.y += (this->ghostPtr->ghostData.age == 0) ? 50 : (35 + childOffsetY);
+        EffectSsDeadDb_Spawn(gGlobalContext, &spawnPos, &vecEmpty, &vecEmpty,
+                             this->ghostPtr->ghostData.age == 0 ? 100 : 70, -1, 80, 80, 80, 0xFF, envR, envG, envB, 1,
+                             8, 0);
+    }
+}

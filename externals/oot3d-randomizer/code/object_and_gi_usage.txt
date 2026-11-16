@@ -1,0 +1,29 @@
+The following custom objectIds are currently being used:
+4: Double Defense
+5: Child Songs
+16: Adult Songs
+17: Forest Small Key
+58: Fire Small Key
+120: Water Small Key
+121: Shadow Small Key
+122: BotW Small Key
+123: Spirit Small Key
+125: Fortress Small Key
+126: GTG Small Key
+127: Ganon Small Key
+128: Boss Keys
+131: Rupoor
+132: Unbottled Big Poe
+228: Enemy Souls
+291: Ocarina Note Buttons
+366: Triforce Piece
+
+To use a custom asset, currently:
+    - choose an unused objectId to be repurposed for the custom item
+    - in Actor_Init, edit the unused entry in the gObjectTable to be a copy of another object (which will be the base for the modifications)
+    - in CustomModels_EditItemCMB, add a case for the objectId and make a function to edit the CMB model inside the ZAR object file
+    - if you need to apply a custom texture to the model:
+        - add a CMAB file with the new texture in the custom archive (romfs/zelda_gi_melody.zar)
+        - in CustomModels_ApplyItemCMAB, add a case for the objectId
+    - if you need to edit the scale or position of the model, add a case in CustomModels_UpdateMatrix
+    - add the objectId to this txt file

@@ -1,0 +1,59 @@
+{
+  "base": 9437184,
+  "runtime": "ba30b13024a141fcb27903e5ed908bb5f42ecfa45eb03665e6fbb367f9ca84c6",
+  "symbols": {
+    "Descriptor": 9437184,
+    "Clear": 9437496,
+    "Rewards_Headroom": 9437620,
+    "Rewards_Valid": 9437956,
+    "Rewards_Matrix": 9438312,
+    "Rewards_Send": 9439040,
+    "Rewards_Receive": 9439480,
+    "Rewards_Draw": 9439664,
+    "Rewards_Destroy": 9441192,
+    "Rewards_Shutdown": 9441288,
+    "Original_Matrix": 9441420,
+    "Original_Send": 9441428,
+    "Original_Receive": 9441436,
+    "Original_Draw": 9441444,
+    "Original_Destroy": 9441452,
+    "Original_Shutdown": 9441460,
+    "local": 9441472,
+    "local_tick": 9441588,
+    "peers": 9441596,
+    "displays": 9443516,
+    "end": 9450884
+  },
+  "hooks": [
+    {
+      "address": 6171828,
+      "instruction": 3852410980,
+      "target": 9438312
+    },
+    {
+      "address": 6237628,
+      "instruction": 3912057328,
+      "target": 9439040
+    },
+    {
+      "address": 6181452,
+      "instruction": 3912056880,
+      "target": 9439480
+    },
+    {
+      "address": 6085688,
+      "instruction": 3912056880,
+      "target": 9439664
+    },
+    {
+      "address": 6085252,
+      "instruction": 3800043370,
+      "target": 9441192
+    },
+    {
+      "address": 6194424,
+      "instruction": 3912056944,
+      "target": 9441288
+    }
+  ]
+}

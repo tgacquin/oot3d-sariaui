@@ -1,0 +1,201 @@
+#include "z3D/z3D.h"
+#include "settings.h"
+#include "colors.h"
+#include "objects.h"
+#include "icetrap.h"
+
+static const u8 sSwordTrailDurationValues[] = {
+    [TRAILDURATION_DISABLED]     = 0,   //
+    [TRAILDURATION_VERYSHORT]    = 3,   //
+    [TRAILDURATION_VANILLA]      = 6,   //
+    [TRAILDURATION_LONG]         = 16,  //
+    [TRAILDURATION_VERYLONG]     = 24,  //
+    [TRAILDURATION_LIGHTSABER]   = 32,  //
+    [TRAILDURATION_SPACETEARING] = 255, //
+};
+
+static const u8 sBoomerangTrailDurationValues[] = {
+    [TRAILDURATION_DISABLED]   = 0,  //
+    [TRAILDURATION_VERYSHORT]  = 4,  //
+    [TRAILDURATION_VANILLA]    = 9,  //
+    [TRAILDURATION_LONG]       = 16, //
+    [TRAILDURATION_VERYLONG]   = 32, //
+    [TRAILDURATION_LIGHTSABER] = 64, //
+};
+
+static const u8 sBombchuTrailDurationValues[] = {
+    [TRAILDURATION_DISABLED]   = 0,   //
+    [TRAILDURATION_VERYSHORT]  = 8,   //
+    [TRAILDURATION_VANILLA]    = 16,  //
+    [TRAILDURATION_LONG]       = 32,  //
+    [TRAILDURATION_VERYLONG]   = 64,  //
+    [TRAILDURATION_LIGHTSABER] = 128, //
+};
+
+void Effects_Init(void) {
+    // Blood effect color for Ganondorf and Ganon defeat cutscenes
+    typedef struct {
+        Color_RGBA8 primary;
+        Color_RGBA8 environ;
+    } BloodCol;
+    extern BloodCol gGanondorfBlood, gGanonBlood;
+    Color_RGBA8 col = gSettingsContext.ganonBloodColor;
+    gGanondorfBlood = gGanonBlood = (BloodCol){ col, col };
+}
+
+void Effects_UpdateSwordTrailDuration(void) {
+    u8 duration;
+    if (IceTrap_ActiveCurse == ICETRAP_CURSE_SWORD) {
+        // Don't draw slash effect during sword curse.
+        duration = sSwordTrailDurationValues[TRAILDURATION_DISABLED];
+    } else {
+        duration = sSwordTrailDurationValues[gSettingsContext.swordTrailDuration];
+    }
+
+    Player_SwordBlureEffectInitParams.elemDuration = duration;
+
+    if (PLAYER != NULL) {
+        EffectBlure* swordTrail = Effect_GetByIndex(PLAYER->meleeWeaponEffectIndex);
+        if (swordTrail != NULL) {
+            swordTrail->elemDuration = duration;
+        }
+    }
+}
+
+// This function is called when a new effect element tries to spawn but there's no space left.
+// The vanilla game simply fails to spawn the new element, but with the randomizer extended duration setting,
+// it is best to clear the oldest element to make space instead.
+s32 forceTrailEffectUpdate(EffectBlure* effect) {
+    if (effect->numElements >= 16) {
+        effect->elements[0].state = 0;
+        EffectBlure_Update(effect);
+    }
+
+    return effect->numElements;
+}
+
+#define SWORD_CYCLE_FRAMES_INNER 18
+#define SWORD_CYCLE_FRAMES_OUTER 15
+void updateSwordTrailColors(EffectBlure* effect) {
+    if (gSettingsContext.rainbowSwordTrailInnerColor) {
+        Colors_ChangeRainbowColorRGBA8(&effect->p2StartColor, SWORD_CYCLE_FRAMES_INNER, 0);
+        Colors_ChangeRainbowColorRGBA8(&effect->p2EndColor, SWORD_CYCLE_FRAMES_INNER, 0);
+    }
+    if (gSettingsContext.rainbowSwordTrailOuterColor) {
+        Colors_ChangeRainbowColorRGBA8(&effect->p1StartColor, SWORD_CYCLE_FRAMES_OUTER, 0);
+        Colors_ChangeRainbowColorRGBA8(&effect->p1EndColor, SWORD_CYCLE_FRAMES_OUTER, 0);
+    }
+}
+
+// This function is used to extend the duration of trails by drawing them less frequently.
+s32 handleLongTrails(u8 durationSetting, EffectBlure* effect, Vec3f* p1, Vec3f* p2) {
+    if (durationSetting <= TRAILDURATION_VANILLA || effect->elements[0].timer % (effect->elemDuration / 16) == 0) {
+        return 1;
+    } else {
+        // If not drawing a new trail element, "pull" the most recent one to the new position
+        for (s32 i = 15; i > 0; i--) {
+            if (effect->elements[i].state == 1) {
+                effect->elements[i].p1.x = p1->x;
+                effect->elements[i].p1.y = p1->y;
+                effect->elements[i].p1.z = p1->z;
+                effect->elements[i].p2.x = p2->x;
+                effect->elements[i].p2.y = p2->y;
+                effect->elements[i].p2.z = p2->z;
+                return 0;
+            }
+        }
+        // For the first trail element, create a copy so that one stays in place and the other can be "pulled"
+        effect->elements[1] = effect->elements[0];
+        effect->numElements++;
+    }
+    return 0;
+}
+
+#define BOOM_CYCLE_FRAMES_INNER 9
+#define BOOM_CYCLE_FRAMES_OUTER 7
+u32 updateBoomerangTrailEffect(EffectBlure* effect, Vec3f* p1, Vec3f* p2) {
+    u8 isRainbow = gSettingsContext.boomerangTrailColorMode == TRAILCOLOR_RAINBOW ||
+                   gSettingsContext.boomerangTrailColorMode == TRAILCOLOR_RAINBOW_SIMPLEMODE;
+    u8 isSimpleMode = gSettingsContext.boomerangTrailColorMode == TRAILCOLOR_FORCEDSIMPLEMODE ||
+                      gSettingsContext.boomerangTrailColorMode == TRAILCOLOR_RAINBOW_SIMPLEMODE;
+
+    if (gSettingsContext.customTrailEffects == OFF)
+        return 1;
+
+    if (effect->elemDuration == 8) { // using duration as a "flag" to set the colors only once (8 is vanilla)
+        effect->elemDuration = sBoomerangTrailDurationValues[gSettingsContext.boomerangTrailDuration];
+
+        effect->p1StartColor.r = gSettingsContext.boomerangTrailColor.r;
+        effect->p1StartColor.g = gSettingsContext.boomerangTrailColor.g;
+        effect->p1StartColor.b = gSettingsContext.boomerangTrailColor.b;
+        effect->p1StartColor.a = isSimpleMode ? 0xFA : 0xFF;
+
+        effect->p2StartColor.r = gSettingsContext.boomerangTrailColor.r;
+        effect->p2StartColor.g = gSettingsContext.boomerangTrailColor.g;
+        effect->p2StartColor.b = gSettingsContext.boomerangTrailColor.b;
+        effect->p2StartColor.a = isSimpleMode ? 0x82 : 0xFF;
+
+        effect->p1EndColor.r = gSettingsContext.boomerangTrailColor.r;
+        effect->p1EndColor.g = gSettingsContext.boomerangTrailColor.g;
+        effect->p1EndColor.b = gSettingsContext.boomerangTrailColor.b;
+        effect->p1EndColor.a = isSimpleMode ? 0x10 : 0xFF;
+
+        effect->p2EndColor.r = gSettingsContext.boomerangTrailColor.r;
+        effect->p2EndColor.g = gSettingsContext.boomerangTrailColor.g;
+        effect->p2EndColor.b = gSettingsContext.boomerangTrailColor.b;
+        effect->p2EndColor.a = isSimpleMode ? 0x10 : 0xFF;
+    }
+
+    if (isRainbow) {
+        Colors_ChangeRainbowColorRGBA8(&effect->p2StartColor, BOOM_CYCLE_FRAMES_INNER, 0);
+        Colors_ChangeRainbowColorRGBA8(&effect->p2EndColor, BOOM_CYCLE_FRAMES_INNER, 2);
+        Colors_ChangeRainbowColorRGBA8(&effect->p1StartColor, BOOM_CYCLE_FRAMES_OUTER, 0);
+        Colors_ChangeRainbowColorRGBA8(&effect->p1EndColor, BOOM_CYCLE_FRAMES_OUTER, 2);
+    }
+
+    return handleLongTrails(gSettingsContext.boomerangTrailDuration, effect, p1, p2);
+}
+
+#define BOMBCHU_CYCLE_FRAMES_INNER 12
+#define BOMBCHU_CYCLE_FRAMES_OUTER 9
+u32 updateChuTrailColors(EffectBlure* effect, Vec3f* p1, Vec3f* p2) {
+
+    if (gSettingsContext.rainbowChuTrailInnerColor) {
+        Colors_ChangeRainbowColorRGBA8(&effect->p2StartColor, BOMBCHU_CYCLE_FRAMES_INNER, 0);
+        Colors_ChangeRainbowColorRGBA8(&effect->p2EndColor, BOMBCHU_CYCLE_FRAMES_INNER, 2);
+    }
+    if (gSettingsContext.rainbowChuTrailOuterColor) {
+        Colors_ChangeRainbowColorRGBA8(&effect->p1StartColor, BOMBCHU_CYCLE_FRAMES_OUTER, 0);
+        Colors_ChangeRainbowColorRGBA8(&effect->p1EndColor, BOMBCHU_CYCLE_FRAMES_OUTER, 2);
+    }
+
+    effect->elemDuration = sBombchuTrailDurationValues[gSettingsContext.bombchuTrailDuration];
+
+    return handleLongTrails(gSettingsContext.bombchuTrailDuration, effect, p1, p2);
+}
+
+void EffectSs_ClearAllWithMissingObject(void) {
+    for (u32 i = 0; i < gEffectSsInfo.tableSize; i++) {
+        EffectSs* effectSs = &gEffectSsInfo.table[i];
+        s16 objRegIdx      = -1;
+
+        switch (effectSs->type) {
+            case EFFECT_SS_D_FIRE:
+                objRegIdx = 10;
+                break;
+            case EFFECT_SS_HAHEN:
+                objRegIdx = 5;
+                break;
+            case EFFECT_SS_KAKERA:
+                objRegIdx = 11;
+                break;
+            case EFFECT_SS_ICE_SMOKE:
+                objRegIdx = 0;
+                break;
+        }
+
+        if (objRegIdx >= 0 && !Object_IsLoaded(&gGlobalContext->objectCtx, effectSs->regs[objRegIdx])) {
+            EffectSs_Delete(effectSs);
+        }
+    }
+}

@@ -1,0 +1,28 @@
+#ifndef _Z3DEQUIPMENT_H_
+#define _Z3DEQUIPMENT_H_
+
+typedef enum EquipmentType {
+    EQUIP_TYPE_SWORD,
+    EQUIP_TYPE_SHIELD,
+    EQUIP_TYPE_TUNIC,
+    EQUIP_TYPE_BOOTS,
+    EQUIP_TYPE_MAX,
+} EquipmentType;
+
+typedef enum EquipValueShield {
+    EQUIP_VALUE_SHIELD_NONE,
+    EQUIP_VALUE_SHIELD_DEKU,
+    EQUIP_VALUE_SHIELD_HYLIAN,
+    EQUIP_VALUE_SHIELD_MIRROR,
+    EQUIP_VALUE_SHIELD_MAX,
+} EquipValueShield;
+
+typedef enum EquipValueBoots {
+    EQUIP_VALUE_BOOTS_NONE,
+    EQUIP_VALUE_BOOTS_KOKIRI,
+    EQUIP_VALUE_BOOTS_IRON,
+    EQUIP_VALUE_BOOTS_HOVER,
+    EQUIP_VALUE_BOOTS_MAX,
+} EquipValueBoots;
+
+#endif //_Z3DEQUIPMENT_H_

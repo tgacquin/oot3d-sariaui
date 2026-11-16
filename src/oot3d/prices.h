@@ -1,0 +1,154 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+#pragma once
+#include "oot3d/difficulty.h"
+#include "oot3d/title_hooks.h"
+
+namespace OOT3D::Prices {
+using TitleScreen::U32;
+// This family has 100 sites. Keep it outside the smaller font, boss and shop
+// ranges; the former 0xfff240 base overlapped all three in production dispatch.
+constexpr U32 FirstSVC=0xfff500, Wallet=0x5879a0, ChangeRupees=0x376a60;
+// Audited USA Rev 1 purchase checks and charge calls only. Rewards, item sales,
+// enemy theft, wallet limits and Happy Mask Shop loan repayments stay native.
+constexpr unsigned FundsCount=52;
+constexpr std::array<TitleScreen::Site,100> Sites{{
+    {0x100298,0xe1d004f8,0xe19110f4},
+    {0x1002ec,0xe1d004f8,0xe1500001},
+    {0x1003c8,0xe1d204f8,0xe1d11dfc},
+    {0x103234,0xe1d004f8,0xe1500001},
+    {0x10328c,0xe1d004f8,0xe1500001},
+    {0x1033b8,0xe1d004f8,0xe1d11dfc},
+    {0x1041c0,0xe1d004f8,0xe1500001},
+    {0x111a0c,0xe1d004f8,0xe350000a},
+    {0x112eb8,0xe1d004f8,0xe1500001},
+    {0x112f4c,0xe1d204f8,0xe1d11dfc},
+    {0x1141c4,0xe1d004f8,0xe1500001},
+    {0x114c88,0xe1d004f8,0xe1500001},
+    {0x130060,0xe1d004f8,0xe1d11dfc},
+    {0x1300cc,0xe1d304f8,0xe1d11dfc},
+    {0x130d90,0xe1d004f8,0xe1500001},
+    {0x1317a4,0xe1d004f8,0xe1d11dfc},
+    {0x149368,0xe1d004f8,0xe1d11dfc},
+    {0x149464,0xe1d114f8,0xe1d000f0},
+    {0x1494f8,0xe1d214f8,0xe1d000f0},
+    {0x1495a8,0xe1d214f8,0xe1d000f0},
+    {0x14da08,0xe1d004f8,0xe1d11dfc},
+    {0x14ee88,0xe1d004f8,0xe19110d2},
+    {0x16101c,0xe1d004f8,0xe3500064},
+    {0x161760,0xe1d004f8,0xe1d110f0},
+    {0x1617e8,0xe1d214f8,0xe1d000f0},
+    {0x16c994,0xe1d004f8,0xe35000c8},
+    {0x1714d0,0xe1da04f8,0xe3500032},
+    {0x1714fc,0xe1da04f8,0xe350000a},
+    {0x171570,0xe1da04f8,0xe3500032},
+    {0x1865e8,0xe1d004f8,0xe350000a},
+    {0x18964c,0xe1d114f8,0xe1d000f0},
+    {0x18968c,0xe1d004f8,0xe1d110f0},
+    {0x1896cc,0xe1d114f8,0xe1d000f0},
+    {0x195a2c,0xe1d004f8,0xe3500032},
+    {0x1c3704,0xe1d004f8,0xe3500014},
+    {0x1cd15c,0xe1d004f8,0xe3500014},
+    {0x206834,0xe1d004f8,0xe350001e},
+    {0x206fe0,0xe1d004f8,0xe350000a},
+    {0x239814,0xe1d004f8,0xe3500014},
+    {0x27452c,0xe1d004f8,0xe350000a},
+    {0x3c2bd4,0xe1d004f8,0xe3500014},
+    {0x3c2f74,0xe1d004f8,0xe350000a},
+    {0x3c5740,0xe1d004f8,0xe3500032},
+    {0x3cd360,0xe1d104f8,0xe350001e},
+    {0x3cd408,0xe1d104f8,0xe350000a},
+    {0x3cd5a8,0xe1d004f8,0xe1500006},
+    {0x3ce854,0xe1d004f8,0xe1d11dfc},
+    {0x3ceb5c,0xe1d004f8,0xe1500001},
+    {0x3cebb4,0xe1d004f8,0xe1500001},
+    {0x3cfca8,0xe1d004f8,0xe1d11dfc},
+    {0x3cffc4,0xe1d004f8,0xe1500001},
+    {0x3f94f8,0xe1d004f8,0xe35000c8},
+    {0x10042c,0xea09d98b,0x00588858},
+    {0x103790,0xea09ccb2,0xe590123c},
+    {0x104214,0xea09ca11,0xe92d40f0},
+    {0x111a30,0xeb09940a,0xe320f000},
+    {0x112fa0,0xea098eae,0xe59f101c},
+    {0x112fc4,0xea098ea5,0x00588858},
+    {0x113730,0xea098cca,0xe92d4010},
+    {0x113760,0xea098cbe,0x00587958},
+    {0x11492c,0xea09884b,0xed9f0a90},
+    {0x114c54,0xea098781,0xe1d40dbc},
+    {0x114c68,0xea09877c,0x00588858},
+    {0x1167c8,0xea0980a4,0xe92d4070},
+    {0x12e0e8,0xea09225c,0xe59f2020},
+    {0x12e25c,0xea0921ff,0x00588858},
+    {0x130c9c,0xea09176f,0xe92d4070},
+    {0x1345c4,0xeb090925,0xe5940004},
+    {0x14eda8,0xeb089f2c,0xe3a00000},
+    {0x161070,0xeb08567a,0xe5940004},
+    {0x1615f8,0xea085518,0xe3a02000},
+    {0x16c91c,0xeb08284f,0xe59f0004},
+    {0x171480,0xeb081576,0xe1c481b6},
+    {0x17160c,0xeb081513,0xe1a01008},
+    {0x186628,0xeb07c10c,0xe1d502ba},
+    {0x188dc4,0xea07b725,0x00588858},
+    {0x1c02b4,0xeb06d9e9,0xe3e00000},
+    {0x1c27c0,0xea06d0a6,0xe92d4030},
+    {0x1c33f0,0xea06cd9a,0xe92d4030},
+    {0x1c3714,0xeb06ccd1,0xe59f126c},
+    {0x1cd16c,0xeb06a63b,0xe59f0054},
+    {0x20684c,0xeb05c083,0xe3a00001},
+    {0x206ffc,0xeb05be97,0xe3a00001},
+    {0x239830,0xeb04f48a,0xe3a00001},
+    {0x274548,0xeb040944,0xe59f0030},
+    {0x3c2bfc,0xebfecf97,0xe59f10ac},
+    {0x3c2f9c,0xebfeceaf,0xe59f1030},
+    {0x3c3bd8,0xeafecba0,0xe5900208},
+    {0x3c3bec,0xeafecb9b,0xe5900208},
+    {0x3c3c00,0xeafecb96,0xe92d4010},
+    {0x3c41a4,0xeafeca2d,0xe92d4030},
+    {0x3cd3e0,0xebfea59e,0xeddf0a2d},
+    {0x3cd418,0xebfea590,0xe59f0084},
+    {0x3cd5dc,0xebfea51f,0xe59f006c},
+    {0x3ce7e4,0xeafea09d,0xe59f0080},
+    {0x3ce914,0xeafea051,0xe5900208},
+    {0x3ce928,0xeafea04c,0xe92d4070},
+    {0x3cf3c0,0xeafe9da6,0xe92d4010},
+    {0x3cf528,0xeafe9d4c,0xe5901240},
+    {0x3f9554,0xebfdf541,0xe59f0024},
+}};
+inline unsigned Factor() {
+    return Difficulty::price_text_ready.load()?Difficulty::active_price_multiplier.load():1;
+}
+inline int Cost(int native,unsigned factor) {
+    return factor<=1?native:std::min(500,native*int(std::min(factor,3u)));
+}
+inline int Funds(int wallet,unsigned factor) {
+    if(factor<=1)return wallet;
+    // The native check compares against the unscaled cost. At the cap, every
+    // supported purchase is affordable; below it, division preserves >= exactly.
+    return wallet>=500?32767:wallet/int(std::min(factor,3u));
+}
+inline U32 Instruction(U32 pc,U32 word) {
+    for(unsigned i=0;i<Sites.size();++i)
+        if(pc==Sites[i].pc && word==Sites[i].instruction)
+            return (word&0xf0000000)|0x0f000000|(FirstSVC+i);
+    return word;
+}
+template<class M> bool CodeMatches(M& m) {
+    for(const auto& site:Sites)
+        if(m.Read(site.pc)!=site.instruction || m.Read(site.pc+4)!=site.following)return false;
+    return m.Read(ChangeRupees)==0xe59f100c && m.Read(ChangeRupees+0x14)==0x588e58;
+}
+template<class M,class R> void Handle(M& m,R& r,unsigned index) {
+    const auto& site=Sites[index];
+    if(index<FundsCount) {
+        const unsigned base=(site.instruction>>16)&15,dest=(site.instruction>>12)&15;
+        const U32 address=r[base]+0x48;
+        const auto value=m.Read(address&~3u);
+        const int native=std::int16_t(value.value_or(0)>>((address&2)*8));
+        r[dest]=U32(address==Wallet?Funds(native,Factor()):native);
+    } else {
+        const auto native=std::bit_cast<std::int32_t>(r[0]);
+        if(native<0 && native>=-32768)r[0]=U32(-Cost(-native,Factor()));
+        if(site.instruction&0x01000000)r[14]=site.pc+4; // BL; B preserves caller LR.
+        r[15]=ChangeRupees;
+    }
+}
+}

@@ -1,0 +1,28 @@
+cmake_minimum_required(VERSION 3.22)
+set(CMAKE_CXX_STANDARD 20)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    project(oot3d_seed_generator LANGUAGES C CXX)
+    find_package(Qt6 REQUIRED COMPONENTS Core)
+    set(CMAKE_AUTORCC ON)
+    add_library(oot3d_randomizer_data STATIC
+        ../../../src/oot3d/randomizer/data.cpp
+        ../../../src/oot3d/randomizer/oot_randomizer_assets.qrc)
+    target_include_directories(oot3d_randomizer_data PUBLIC ../../../src)
+    target_link_libraries(oot3d_randomizer_data PUBLIC Qt6::Core)
+endif()
+set(CMAKE_CXX_STANDARD 20)
+set(RANDO_SOURCE "${CMAKE_CURRENT_LIST_DIR}/../../../externals/oot3d-randomizer")
+file(GLOB_RECURSE GENERATOR_SOURCES CONFIGURE_DEPENDS "${RANDO_SOURCE}/source/*.cpp")
+list(FILTER GENERATOR_SOURCES EXCLUDE REGEX "/(main|menu|music|patch|preset|utils|globals)\\.cpp$")
+list(FILTER GENERATOR_SOURCES EXCLUDE REGEX "/custom_music/")
+add_executable(oot3d-seed ${GENERATOR_SOURCES} host/main.cpp host/platform.cpp "${RANDO_SOURCE}/shared/shared_data.c")
+target_include_directories(oot3d-seed PRIVATE host "${RANDO_SOURCE}/source" "${RANDO_SOURCE}/shared")
+if(MSVC)
+    target_compile_options(oot3d-seed PRIVATE /O2)
+else()
+    target_compile_options(oot3d-seed PRIVATE -Wno-format -Wno-error -O2)
+endif()
+
+target_compile_definitions(oot3d-seed PRIVATE OOTR_HOST)
+
+target_link_libraries(oot3d-seed PRIVATE oot3d_randomizer_data)

@@ -1,0 +1,65 @@
+#include "z3D/z3D.h"
+#include "settings.h"
+#include "sfx.h"
+#include "savefile.h"
+#include "common.h"
+#include "multiplayer.h"
+
+SFXData rSfxData = { 0 };
+
+u8 SeqTypeIsMovement(SeqType type) {
+    return type == SEQ_WALK || type == SEQ_WALK_LOUD || type == SEQ_JUMP || type == SEQ_LAND || type == SEQ_SLIP ||
+           type == SEQ_SLIP_LOOP || type == SEQ_BOUND || type == SEQ_CRAWL;
+}
+
+u32 SetSFX(u32 original) {
+    // Hack for hookshot as child (adult voice -> child voice)
+    if (original == NA_SE_VO_LI_LASH_KID && gSaveContext.linkAge == 1) {
+        original = NA_SE_VO_LI_SWORD_N_KID;
+    }
+    if (original < SFX_BASE || original >= SFX_BASE + SFX_COUNT) return original;
+    u16 sfxID    = original - SFX_BASE;
+    SeqType type = rSfxData.rSeqTypesSFX[sfxID];
+
+    // Send SFX
+    if (!mp_duplicateSendProtection) {
+        if (IsInGameOrBossChallenge() && sfxID >= 1258 && sfxID <= 1321) {
+            Multiplayer_Send_LinkSFX(original);
+        }
+    }
+    mp_duplicateSendProtection = false;
+
+    static const u16 GET_BOXITEM_ID = 1205; // Treat GET_BOXITEM as a fanfare
+    if (IsInGameOrBossChallenge() && ((!gExtSaveData.options[OPTION_ENABLESFX] && sfxID != GET_BOXITEM_ID) ||
+                                      (!gExtSaveData.options[OPTION_ENABLEBGM] && sfxID == GET_BOXITEM_ID))) {
+        return SEQ_AUDIO_BLANK;
+    }
+
+    // Check for invalid sound effect
+    if (original < SFX_BASE || original >= SFX_BASE + SFX_COUNT || type >= SEQTYPE_COUNT ||
+        gSettingsContext.shuffleSFX == SHUFFLESFX_OFF ||
+        (!gSettingsContext.shuffleSFXFootsteps && SeqTypeIsMovement(type)) ||
+        (!gSettingsContext.shuffleSFXLinkVoice && sfxID >= 1258 && sfxID <= 1321)) {
+        return original;
+    }
+
+    if (gSettingsContext.shuffleSFX == SHUFFLESFX_SCENESPECIFIC && !gGlobalContext) return original;
+    if (gSettingsContext.shuffleSFXCategorically) {
+        if (!rSfxData.rSeqCounts[type] || rSfxData.rSeqCounts[type] > 100) return original;
+        if (gSettingsContext.shuffleSFX == SHUFFLESFX_SCENESPECIFIC) {
+            return rSfxData.rSFXOverrides_Types[type][(sfxID + gGlobalContext->sceneNum) % rSfxData.rSeqCounts[type]];
+        } else if (gSettingsContext.shuffleSFX == SHUFFLESFX_CHAOS) {
+            return rSfxData.rSFXOverrides_Types[type][(sfxID + gRandInt) % rSfxData.rSeqCounts[type]];
+        }
+    } else {
+        if (!rSfxData.rSFXOverrides_TrimmedCount || rSfxData.rSFXOverrides_TrimmedCount > SFX_COUNT) return original;
+        if (gSettingsContext.shuffleSFX == SHUFFLESFX_SCENESPECIFIC) {
+            return rSfxData
+                .rSFXOverrides_AllTrimmed[(sfxID + gGlobalContext->sceneNum) % rSfxData.rSFXOverrides_TrimmedCount];
+        } else if (gSettingsContext.shuffleSFX == SHUFFLESFX_CHAOS) {
+            return rSfxData.rSFXOverrides_AllTrimmed[(sfxID + gRandInt) % rSfxData.rSFXOverrides_TrimmedCount];
+        }
+    }
+
+    return rSfxData.rSFXOverrides_All[sfxID];
+}

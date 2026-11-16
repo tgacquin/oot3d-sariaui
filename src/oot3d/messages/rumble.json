@@ -1,0 +1,76 @@
+[
+  {
+    "language": "English",
+    "language_slot": 1,
+    "messages": {
+      "0068": {
+        "edits": [
+          {
+            "find": "resonates",
+            "replace": "vibrates"
+          }
+        ]
+      },
+      "076F": {
+        "edits": [
+          {
+            "find": "resonates",
+            "replace": "vibrates"
+          },
+          {
+            "find": "hear it",
+            "replace": "feel it"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "language": "French",
+    "language_slot": 5,
+    "messages": {
+      "0068": {
+        "edits": [
+          {
+            "find": "Ce cristal vous signalera\nla présence d'objets cachés.",
+            "replace": "Ce cristal vibre près\nd'objets cachés."
+          }
+        ]
+      },
+      "076F": {
+        "edits": [
+          {
+            "find": "résonne",
+            "replace": "vibre"
+          },
+          {
+            "find": "Tendez bien l'oreille!",
+            "replace": "Soyez attentif aux vibrations!"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "language": "Spanish",
+    "language_slot": 7,
+    "messages": {
+      "0068": {
+        "edits": [
+          {
+            "find": "De este misterioso cristal escapará\nun ruido si hay cerca un objeto\noculto o algún secreto...",
+            "replace": "Este misterioso cristal vibrará\nsi hay cerca un objeto oculto\no algún secreto..."
+          }
+        ]
+      },
+      "076F": {
+        "edits": [
+          {
+            "find": "Esta piedra emite un tintineo cuando\n{02:10}hay algo oculto cerca. Si lo oyes,",
+            "replace": "Esta piedra vibra cuando hay algo\n{02:10}oculto cerca. Si lo sientes,"
+          }
+        ]
+      }
+    }
+  }
+]

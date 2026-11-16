@@ -1,0 +1,396 @@
+// Copyright 2022-2025 Citra Emulator Project / Azahar Emulator Project
+// Licensed under GPLv2 or any later version
+// Refer to the license.txt file included.
+
+#pragma once
+#ifdef ENABLE_OOT3D_PRESENTATION
+#include "oot3d/interpolation_replay.h"
+#include "oot3d/interpolation_pose.h"
+#include "oot3d/heart_pulse.h"
+#include "oot3d/carrot_animation.h"
+#include "oot3d/ammo_backdrop.h"
+#include "oot3d/magic_meter.h"
+#include "oot3d/surface_effects.h"
+#include "oot3d/song_visual_interpolation.h"
+#include "oot3d/model_effect_interpolation.h"
+#include "oot3d/storm_clouds.h"
+#include "oot3d/waterfall_interpolation.h"
+#include "oot3d/fairy_glow_interpolation.h"
+#include "oot3d/ocarina_slide.h"
+#include "oot3d/textbox_interpolation.h"
+#include "oot3d/circle_wipe_interpolation.h"
+#include "oot3d/sun_visibility.h"
+#include "video_core/renderer_vulkan/vk_visibility_depth.h"
+#include "mm3d/prompt_layer.h"
+#endif
+#include "mm3d/glare_interpolation.h"
+#include "mm3d/water_model_interpolation.h"
+#include "mm3d/moving_effect_interpolation.h"
+#ifdef ENABLE_MM3D_PRESENTATION
+#include <map>
+#include "mm3d/profiles.h"
+#include "mm3d/atlas_render.h"
+#include "mm3d/camera_midpoint.h"
+#include "mm3d/world_map_interpolation.h"
+#include "mm3d/link_interpolation.h"
+#include "mm3d/ripple_interpolation.h"
+#include "mm3d/forest_particle_interpolation.h"
+#include "mm3d/snow_interpolation.h"
+#include "mm3d/fire_impact_interpolation.h"
+#include "mm3d/torch_interpolation.h"
+#include "mm3d/water_particle_interpolation.h"
+#include "mm3d/burst_particle_interpolation.h"
+#include "mm3d/spark_interpolation.h"
+#include "mm3d/firework_interpolation.h"
+#include "mm3d/chest_particle_interpolation.h"
+#include "mm3d/sword_trail_interpolation.h"
+#include "mm3d/shockwave_interpolation.h"
+#include "mm3d/bubble_interpolation.h"
+#include "mm3d/leaf_particle_interpolation.h"
+#include "mm3d/moth_interpolation.h"
+#include "mm3d/message_interpolation.h"
+#include "mm3d/item_slide_interpolation.h"
+#include "mm3d/file_select_interpolation.h"
+#include "mm3d/inventory_interpolation.h"
+#include "mm3d/banner_interpolation.h"
+#include "mm3d/magic_meter_interpolation.h"
+#include "mm3d/lens_interpolation.h"
+#include "mm3d/letterbox_interpolation.h"
+#include "mm3d/heart_interpolation.h"
+#include "mm3d/splash_interpolation.h"
+#include "mm3d/song_effect_interpolation.h"
+#include "mm3d/pause_capture.h"
+#include "mm3d/visibility_depth.h"
+#include "video_core/renderer_vulkan/vk_visibility_depth.h"
+#endif
+
+#include "video_core/rasterizer_accelerated.h"
+#include "video_core/renderer_vulkan/vk_descriptor_update_queue.h"
+#include "video_core/renderer_vulkan/vk_pipeline_cache.h"
+#include "video_core/renderer_vulkan/vk_render_manager.h"
+#include "video_core/renderer_vulkan/vk_stream_buffer.h"
+#include "video_core/renderer_vulkan/vk_texture_runtime.h"
+#ifdef ENABLE_OOT3D_PRESENTATION
+#include "video_core/renderer_vulkan/vk_hd_font.h"
+#include "video_core/renderer_vulkan/vk_remote_names.h"
+#endif
+
+namespace Frontend {
+class EmuWindow;
+}
+
+namespace MM3D { class PromptLayer; }
+
+namespace VideoCore {
+class CustomTexManager;
+class RendererBase;
+} // namespace VideoCore
+
+namespace Pica {
+struct DisplayTransferConfig;
+struct MemoryFillConfig;
+struct FramebufferConfig;
+} // namespace Pica
+
+namespace Vulkan {
+
+struct ScreenInfo;
+
+class Instance;
+class Scheduler;
+class RenderManager;
+
+class RasterizerVulkan : public VideoCore::RasterizerAccelerated
+#ifdef ENABLE_OOT3D_PRESENTATION
+    , public OOT3D::SunVisibility::Backend
+#endif
+#ifdef ENABLE_MM3D_PRESENTATION
+    , public MM3D::PauseCapture::Backend, public MM3D::VisibilityDepth::Backend
+#endif
+{
+public:
+    explicit RasterizerVulkan(Memory::MemorySystem& memory, Pica::PicaCore& pica,
+                              VideoCore::CustomTexManager& custom_tex_manager,
+                              VideoCore::RendererBase& renderer, Frontend::EmuWindow& emu_window,
+                              const Instance& instance, Scheduler& scheduler,
+                              RenderManager& renderpass_cache, DescriptorUpdateQueue& update_queue,
+                              u32 image_count);
+    ~RasterizerVulkan() override;
+
+    void TickFrame();
+#ifdef ENABLE_MM3D_PRESENTATION
+    void EndGuestFrame() override;
+    const auto& PromptOverlays() const { return prompt_layers; }
+    MM3D::CameraMidpoint::PresentationStatus MidpointStatus(u64 completed) const {
+        using namespace MM3D::CameraMidpoint;
+        if(!midpoint_target_frame)return PresentationStatus::WaitingScene;
+        if(!IsCompletedCapture(midpoint_target_frame,completed))return PresentationStatus::FrameMismatch;
+        if(!midpoint_frame_interpolated)return PresentationStatus::NoMidpoint;
+        if(midpoint_hud_frame!=midpoint_target_frame)return PresentationStatus::NoHud;
+        if(midpoint_hud_failed || midpoint_scene_clear.Pending(*midpoint_target_frame))
+            return PresentationStatus::UnsupportedHud;
+        return PresentationStatus::Active;
+    }
+    std::optional<u32> ReadVisibilityDepth(u32 address, const MM3D::VisibilityDepth::Context& context) override;
+    void ResetVisibilityDepth() override;
+    void CapturePause(u32 source,unsigned eye) override;
+    void BindPause(u32 texture,unsigned eye,const MM3D::PauseCapture::Probes& probes) override;
+    void ResetPause() override;
+#endif
+    void LoadDefaultDiskResources(const std::atomic_bool& stop_loading,
+                                  const VideoCore::DiskResourceLoadCallback& callback) override;
+
+    void DrawTriangles() override;
+#ifdef ENABLE_OOT3D_PRESENTATION
+    std::optional<OOT3D::SunVisibility::Sample> ReadSunDepth(
+        u32 address, const OOT3D::SunVisibility::Context& context) override;
+    void ResetSunDepth() override;
+    std::optional<std::pair<unsigned, bool>> OotHudMesh(bool* rupees=nullptr);
+    bool OotMidpointReady() const {
+        return oot_replay_frame.Complete(OOT3D::Interpolation::guest_frames.load()) &&
+            oot_replay_slots[0].layer && oot_replay_slots[0].layer->Visible();
+    }
+    MM3D::PromptLayer* OotMidpointLayer(unsigned slot=0) const {return oot_replay_slots[slot].layer.get();}
+    const OOT3D::Interpolation::RatePlan& OotRatePlan() const {return oot_rate_plan;}
+#endif
+    void FlushAll() override;
+    void FlushRegion(PAddr addr, u32 size) override;
+    void InvalidateRegion(PAddr addr, u32 size) override;
+    void FlushAndInvalidateRegion(PAddr addr, u32 size) override;
+    void ClearAll(bool flush) override;
+    bool AccelerateDisplayTransfer(const Pica::DisplayTransferConfig& config) override;
+    bool AccelerateTextureCopy(const Pica::DisplayTransferConfig& config) override;
+    bool AccelerateFill(const Pica::MemoryFillConfig& config) override;
+    bool AccelerateDisplay(const Pica::FramebufferConfig& config, PAddr framebuffer_addr,
+                           u32 pixel_stride, ScreenInfo& screen_info);
+    bool AccelerateDrawBatch(bool is_indexed) override;
+
+    /// Switches the disk resources to the specified title
+    void SwitchDiskResources(u64 title_id) override;
+
+private:
+#ifdef ENABLE_OOT3D_PRESENTATION
+    std::unique_ptr<VisibilityDepthCache> oot_sun_depth;
+    std::unique_ptr<RemoteNameRenderer> oot_name_renderer;
+    struct OotNameScene {
+        OOT3D::RemoteNames::Scene scene;
+        u64 frame=~u64{};
+        u32 color{},depth{};
+        vk::CompareOp compare=vk::CompareOp::eLessOrEqual;
+        vk::Viewport viewport{};
+        vk::Rect2D scissor{};
+        bool drawn=false;
+    } oot_name_scene;
+
+    struct OotReplaySlot {
+        std::unique_ptr<MM3D::PromptLayer> layer;
+        OOT3D::Interpolation::ReplayCamera camera;
+        OotNameScene names;
+        OOT3D::TextboxInterpolation::History<HardwareVertex> textboxes;
+        OOT3D::CircleWipe::History<HardwareVertex> circle_wipe;
+        OOT3D::Interpolation::SurfaceEffects::History effects;
+        OOT3D::Interpolation::Debris::History debris;
+        OOT3D::Interpolation::Waterfall::History waterfall;
+        OOT3D::Interpolation::FairyGlow::History fairy;
+        OOT3D::Interpolation::SongVisual::History songs;
+        OOT3D::Interpolation::ModelEffects::History models;
+        void Reset() {
+            names={};camera.Reset();textboxes.Reset();circle_wipe.Reset();effects.Reset();
+            debris.Reset();waterfall.Reset();fairy.Reset();songs.Reset();models.Reset();
+            if(layer)layer->NextFrame();
+        }
+    };
+    std::array<OotReplaySlot,OOT3D::Interpolation::MaxRateSamples> oot_replay_slots;
+    OOT3D::Interpolation::RateClock oot_rate_clock;
+    OOT3D::Interpolation::RatePlan oot_rate_plan;
+    OOT3D::Interpolation::ReplayFrame oot_replay_frame;
+    OOT3D::Interpolation::ColorClears oot_color_clears;
+    std::optional<OOT3D::Interpolation::Matrix> oot_replay_projection;
+    OOT3D::Interpolation::Pose::Replay oot_pose_replay;
+    std::optional<OOT3D::Interpolation::Pose::Override> oot_pose_override;
+    unsigned oot_replay_generation{};
+    std::optional<std::array<float,3>> OotSongSlide();
+    std::optional<std::pair<std::uint64_t,unsigned>> OotUIMeshHash(unsigned max_vertices, bool allow_strip = false);
+    std::optional<std::array<float,3>> oot_song_slide;
+    OOT3D::HeartPulse::History<HardwareVertex> oot_heart_history;
+    OOT3D::CarrotAnimation::History<HardwareVertex> oot_carrot_history;
+    OOT3D::MagicMeter::History<HardwareVertex> oot_magic_history;
+    std::optional<OOT3D::Interpolation::Waterfall::UV> oot_waterfall_uv;
+    std::optional<OOT3D::Interpolation::FairyGlow::Override> oot_fairy_glow;
+    std::optional<OOT3D::Interpolation::SongVisual::Sample> oot_song_visual;
+    std::optional<OOT3D::Interpolation::ModelEffects::Sample> oot_model_effect;
+    vk::DescriptorSet oot_native_texture_set{};
+    std::optional<std::array<float,4>> oot_sparkle_color;
+    OOT3D::Interpolation::SongVisual::Layer oot_song_visual_layer{};
+    std::vector<HardwareVertex> oot_hud_midpoint;
+    std::optional<OOT3D::HUD::AmmoBackdrop> oot_number_backdrop;
+#endif
+#ifdef ENABLE_MM3D_PRESENTATION
+    std::map<std::string,std::unique_ptr<MM3D::PromptLayer>> prompt_layers;
+    std::vector<MM3D::Profiles::Profile> mm3d_draw_profiles;
+    bool panel_excluded = false;
+    std::vector<MM3D::Profiles::Rule> panel_draw_identities;
+    MM3D::Atlas::Uniforms atlas_uniforms{};
+    MM3D::CameraMidpoint::History midpoint_history;
+    MM3D::WorldMapInterpolation::History world_map_history;
+    MM3D::CameraMidpoint::ColorClears midpoint_color_clears;
+    // CPU replay uploads into the stream buffer before deferred commands are
+    // recorded; those commands never retain pointers into this scratch storage.
+    std::vector<HardwareVertex> midpoint_cpu_vertices;
+    MM3D::LinkInterpolation::History link_history;
+    MM3D::SongEffectInterpolation::History song_history;
+    std::optional<MM3D::SongEffectInterpolation::Values> song_overrides;
+    MM3D::LinkInterpolation::Overrides link_overrides{};
+    std::vector<MM3D::LinkPoseCapture::LivePose> link_poses;
+    std::optional<u64> link_frame;
+    unsigned link_generation{};
+    std::optional<MM3D::CameraMidpoint::Matrix> midpoint_projection;
+    unsigned midpoint_generation{};
+    unsigned midpoint_width{}, midpoint_height{};
+    unsigned midpoint_copies{}, midpoint_rejected{}, midpoint_fallback{};
+    std::optional<u64> midpoint_target_frame, midpoint_fade_frame, midpoint_hud_frame, midpoint_title_depth_frame;
+    std::optional<u64> midpoint_world_frame;
+    std::optional<u64> midpoint_opaque_world_frame;
+    std::optional<u64> midpoint_stencil_frame;
+    bool midpoint_hud_failed{}, midpoint_frame_interpolated{};
+    std::array<u64,6> midpoint_rejection_logged{};
+    std::array<u64,2> midpoint_transfer_logged{};
+    u64 glare_trace_session{}, glare_trace_frame{};
+    unsigned glare_trace_samples{};
+    bool visibility_depth_enabled{};
+    bool visibility_depth_refresh_enabled{};
+    std::unique_ptr<VisibilityDepthCache> visibility_depth;
+    MM3D::WaterModelInterpolation::History water_model_history;
+    MM3D::MovingEffectInterpolation::History moving_effect_history;
+    std::optional<MM3D::MovingEffectInterpolation::Colors> moving_effect_colors;
+    std::optional<std::pair<unsigned,float>> water_model_alpha_override;
+    MM3D::GlareInterpolation glare_history;
+    MM3D::GlareInterpolation::ScreenHistory glare_cpu_history;
+    std::optional<float> glare_alpha_override;
+    MM3D::RippleInterpolation::History ripple_history;
+    MM3D::ForestParticleInterpolation::History forest_particle_history;
+    MM3D::SnowInterpolation::History snow_history;
+    MM3D::FireImpactInterpolation::History fire_impact_history;
+    MM3D::LeafParticleInterpolation::History leaf_particle_history;
+    MM3D::MothInterpolation::History moth_history;
+    MM3D::MessageInterpolation::History message_history;
+    MM3D::ItemSlideInterpolation::History item_slide_history;
+    std::optional<MM3D::ItemSlideInterpolation::Pose> item_slide_override;
+    MM3D::InventoryInterpolation::History inventory_history;
+    MM3D::BannerInterpolation::History banner_history;
+    MM3D::MagicMeterInterpolation::History magic_meter_history;
+    MM3D::HeartInterpolation::History heart_history;
+    MM3D::LensInterpolation::History lens_history;
+    MM3D::LetterboxInterpolation::History letterbox_history;
+    std::optional<MM3D::InventoryInterpolation::Pose> inventory_override;
+    MM3D::FileSelectInterpolation::History file_select_history;
+    std::optional<MM3D::FileSelectInterpolation::Pose> file_select_override;
+    std::optional<MM3D::MessageInterpolation::Pose> message_override;
+    MM3D::TorchInterpolation::History torch_history;
+    MM3D::WaterParticleInterpolation::History water_particle_history;
+    MM3D::BurstParticleInterpolation::History burst_particle_history;
+    MM3D::SparkInterpolation::History spark_history;
+    MM3D::FireworkInterpolation::History firework_history;
+    MM3D::ChestParticleInterpolation::History chest_particle_history;
+    MM3D::SwordTrailInterpolation::History sword_trail_history;
+    MM3D::ShockwaveInterpolation::History shockwave_history;
+    MM3D::BubbleInterpolation::History bubble_history;
+    MM3D::SplashInterpolation::History splash_history, splash_cpu_history;
+    std::optional<std::array<u32,3>> splash_offsets;
+    bool splash_blend{};
+    std::optional<std::array<u32,2>> ripple_offsets;
+    std::optional<u32> glare_vertex_offset;
+    MM3D::CameraMidpoint::SceneCopies midpoint_scene_copies;
+    MM3D::CameraMidpoint::SceneClearPair midpoint_scene_clear;
+    s64 midpoint_last_draw_ms{};
+#endif
+    /// Syncs pipeline state from PICA registers
+    void SyncDrawState();
+
+    /// Syncs and uploads the lighting, fog and proctex LUTs
+    void SyncAndUploadLUTs();
+    void SyncAndUploadLUTsLF();
+
+    /// Syncs all enabled PICA texture units
+    void SyncTextureUnits(const Framebuffer* framebuffer);
+
+    /// Syncs all utility textures in the fragment shader.
+    void SyncUtilityTextures(const Framebuffer* framebuffer);
+
+    /// Binds the PICA shadow cube required for shadow mapping
+    void BindShadowCube(const Pica::TexturingRegs::FullTextureConfig& texture,
+                        vk::DescriptorSet texture_set);
+
+    /// Binds a texture cube to texture unit 0
+    void BindTextureCube(const Pica::TexturingRegs::FullTextureConfig& texture,
+                         vk::DescriptorSet texture_set);
+
+    /// Upload the uniform blocks to the uniform buffer object
+    void UploadUniforms(bool accelerate_draw);
+
+    /// Generic draw function for DrawTriangles and AccelerateDrawBatch
+    bool Draw(bool accelerate, bool is_indexed);
+
+    /// Internal implementation for AccelerateDrawBatch
+    bool AccelerateDrawBatchInternal(bool is_indexed);
+
+    /// Setup index array for AccelerateDrawBatch
+    void SetupIndexArray();
+
+    /// Setup vertex array for AccelerateDrawBatch
+    void SetupVertexArray();
+
+    /// Setup the fixed attribute emulation in vulkan
+    void SetupFixedAttribs();
+
+    /// Setup vertex shader for AccelerateDrawBatch
+    bool SetupVertexShader();
+
+    /// Setup geometry shader for AccelerateDrawBatch
+    bool SetupGeometryShader();
+
+    /// Creates the vertex layout struct used for software shader pipelines
+    void MakeSoftwareVertexLayout();
+
+private:
+    const Instance& instance;
+    Scheduler& scheduler;
+    RenderManager& renderpass_cache;
+    DescriptorUpdateQueue& update_queue;
+    PipelineCache pipeline_cache;
+    TextureRuntime runtime;
+    RasterizerCache res_cache;
+#ifdef ENABLE_OOT3D_PRESENTATION
+    HDFontCache hd_fonts;
+#endif
+#ifdef ENABLE_MM3D_PRESENTATION
+    std::array<std::unique_ptr<Surface>,2> pause_images;
+    std::array<u32,2> pause_textures{};
+    std::array<unsigned,2> pause_orientation{};
+    std::array<int,4> pause_draw{};
+#endif
+
+    VertexLayout software_layout;
+    std::array<u32, 16> binding_offsets{};
+    std::array<bool, 16> enable_attributes{};
+    std::array<vk::Buffer, 16> vertex_buffers;
+    u32 replay_index_offset{};
+    vk::IndexType replay_index_type{};
+    VertexArrayInfo vertex_info;
+    PipelineInfo pipeline_info{};
+
+    StreamBuffer stream_buffer;     ///< Vertex+Index buffer
+    StreamBuffer uniform_buffer;    ///< Uniform buffer
+    StreamBuffer texture_buffer;    ///< Texture buffer
+    StreamBuffer texture_lf_buffer; ///< Texture Light-Fog buffer
+    vk::UniqueBufferView texture_lf_view;
+    vk::UniqueBufferView texture_rg_view;
+    vk::UniqueBufferView texture_rgba_view;
+    vk::DeviceSize uniform_buffer_alignment;
+    u32 uniform_size_aligned_vs_pica;
+    u32 uniform_size_aligned_vs;
+    u32 uniform_size_aligned_fs;
+    bool async_shaders{false};
+};
+
+} // namespace Vulkan

@@ -1,0 +1,63 @@
+{
+  "language": "Spanish",
+  "language_slot": 7,
+  "notes": [
+    "Navi uses D-pad Up; the right-stick click controls first-person view. Only these related tutorials are translated here."
+  ],
+  "messages": {
+    "0101": {
+      "edits": [
+        {
+          "find": "{19}{1d:44}¡Mira, mira, {0b}!\n¡Puedes ver qué hay bajo esa {1d:00}telaraña\n{1d:44}con {1d:00}{1d:44}{1d:44}{24:18}{1d:44}!{1d:00}{00}",
+          "replace": "{19}{1d:44}¡Mira, mira, {0b}!\nPulsa el stick derecho para ver\nqué hay bajo esa {1d:00}telaraña{1d:44}.{1d:00}{00}"
+        }
+      ]
+    },
+    "1017": {
+      "edits": [
+        {
+          "find": "Cuando {1d:44}Navi {1d:00}hable, usa {24:17} y presta mucha\natención a lo que dice, {0b}.",
+          "replace": "Cuando {1d:44}Navi {1d:00}hable, pulsa arriba en\nla cruz de control y escucha bien,\n{0b}."
+        }
+      ],
+      "requires": "NaviUp"
+    },
+    "103E": {
+      "edits": [
+        {
+          "find": "¿Quieres aprender a usar {24:18}?\n\n{1a:ffffffff}{1d:42}Sí\nNo{1d:00}{00}",
+          "replace": "¿Quieres aprender a mirar\na tu alrededor?\n{1a:ffffffff}{1d:42}Sí\nNo{1d:00}{00}"
+        }
+      ]
+    },
+    "103F": {
+      "edits": [
+        {
+          "find": "Si tocas {24:18}, podrás controlar hacia\ndónde miras.",
+          "replace": "Pulsa el stick derecho para mirar\na tu alrededor."
+        },
+        {
+          "find": "Cuando se muestra {24:17} en lugar de {24:18},\nsignifica que Navi tiene algo que decirte.\n¡Usa {24:17} para escucharla!",
+          "replace": "Cuando Navi tenga algo que decirte,\npulsa arriba en la cruz de control\npara escucharla."
+        }
+      ],
+      "requires": "NaviUp"
+    },
+    "10D8": {
+      "edits": [
+        {
+          "find": "¡Mira! ¿No es un paisaje hermoso?\nPuedes cambiar el punto de vista con {24:18}\npara admirar el bosque con {24:00}.{00}",
+          "replace": "¡Mira! ¿No es un paisaje hermoso?\nPulsa el stick derecho y admira\nel bosque con {24:00}.{00}"
+        }
+      ]
+    },
+    "5056": {
+      "edits": [
+        {
+          "find": "Para echar un buen vistazo, toca {24:18} y\nmira los alrededores con {24:00}.{00}",
+          "replace": "Para echar un buen vistazo, pulsa\nel stick derecho y mira a tu\nalrededor con {24:00}.{00}"
+        }
+      ]
+    }
+  }
+}

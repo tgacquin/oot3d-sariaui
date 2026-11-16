@@ -1,0 +1,34 @@
+#ifndef _COMMON_H_
+#define _COMMON_H_
+
+#include "s_types.h"
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
+#define BIT_COUNT(x) (sizeof(x) * 8)
+#define ABS(x) ((x) >= 0 ? (x) : -(x))
+#define MIN(x, y) (x < y ? x : y)
+#define MAX(x, y) (x > y ? x : y)
+#define TMP_ZEROED_BUFFER(size) ((char[size]){ 0 })
+
+#define TICKS_PER_SEC 268123480
+#define SEQ_AUDIO_BLANK NA_SE_IT_YOBI19
+
+typedef enum Bool : u8 {
+    FALSE = 0,
+    TRUE  = 1,
+} Bool;
+
+extern u8 playingOnCitra;
+extern u32 rGameplayFrames; // globalCtx->gameplayFrames is not accurate, it doesn't increment on file 3
+
+/// Returns 1 if the bit is set in value1 but not in value2, -1 if vice versa, and 0 if they're the same
+s8 BitCompare(u32 value1, u32 value2, u8 bit);
+
+u32 Hash(u32);
+u8 Bias(u32);
+
+u8 IsInGame(void);
+u8 IsInGameOrBossChallenge(void);
+void CitraPrint(const char*, ...);
+
+#endif //_COMMON_H_

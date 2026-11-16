@@ -1,0 +1,8 @@
+<RCC><qresource prefix="/oot3d/randomizer">
+  <file alias="guest.bin">assets/guest.bin</file>
+  <file alias="guest.json">assets/guest.json</file>
+  <file alias="rewards.bin">assets/rewards.bin</file>
+  <file alias="rewards.json">assets/rewards.json</file>
+  <file alias="options.json">assets/options.json</file>
+  <file alias="assets.zar">../../../externals/oot3d-randomizer/romfs/zelda_gi_melody.zar</file>
+</qresource></RCC>

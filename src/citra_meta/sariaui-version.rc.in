@@ -1,0 +1,28 @@
+#include <winresrc.h>
+
+1 VERSIONINFO
+ FILEVERSION @SARIAUI_RESOURCE_VERSION@,0
+ PRODUCTVERSION @SARIAUI_RESOURCE_VERSION@,0
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+ FILEFLAGS 0
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE 0
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "FileDescription", "SariaUI\0"
+            VALUE "FileVersion", "@SARIAUI_VERSION@\0"
+            VALUE "InternalName", "SariaUI\0"
+            VALUE "OriginalFilename", "@SARIAUI_OUTPUT_NAME@.exe\0"
+            VALUE "ProductName", "SariaUI\0"
+            VALUE "ProductVersion", "@SARIAUI_VERSION@\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

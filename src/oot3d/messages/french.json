@@ -1,0 +1,63 @@
+{
+  "language": "French",
+  "language_slot": 5,
+  "notes": [
+    "Navi uses D-pad Up; the right-stick click controls first-person view. Only these related tutorials are translated here."
+  ],
+  "messages": {
+    "0101": {
+      "edits": [
+        {
+          "find": "{19}{1d:44}Hé! Regarde, {0b}!\nTu peux voir à travers cette {1d:00}toile\nd'araignée {1d:44}en utilisant {1d:00}{1d:44}{24:18}!{1d:00}{00}",
+          "replace": "{19}{1d:44}Hé! Regarde, {0b}!\nAppuie sur le stick droit pour voir\nà travers cette {1d:00}toile d'araignée{1d:44}!{1d:00}{00}"
+        }
+      ]
+    },
+    "1017": {
+      "edits": [
+        {
+          "find": "désirera te parler, utilise {1d:46}{24:17} {1d:00}pour\nécouter ses conseils avisés...",
+          "replace": "désirera te parler, appuie sur le haut\nde la croix directionnelle pour\nécouter ses conseils avisés..."
+        }
+      ],
+      "requires": "NaviUp"
+    },
+    "103E": {
+      "edits": [
+        {
+          "find": "Veux-tu savoir comment utiliser {24:18}?\n\n{1a:ffffffff}{1d:42}Oui\nNon{1d:00}{00}",
+          "replace": "Veux-tu savoir comment regarder\nautour de toi?\n{1a:ffffffff}{1d:42}Oui\nNon{1d:00}{00}"
+        }
+      ]
+    },
+    "103F": {
+      "edits": [
+        {
+          "find": "Touche {24:18} pour changer de vue.",
+          "replace": "Appuie sur le stick droit pour\nchanger de vue."
+        },
+        {
+          "find": "Si {24:17} est affiché à la place de {24:18}, ta fée a\nquelque chose à te dire! Touche alors {24:17}\npour l'écouter!",
+          "replace": "Quand Navi veut te parler,\nappuie sur le haut de la croix\ndirectionnelle pour l'écouter!"
+        }
+      ],
+      "requires": "NaviUp"
+    },
+    "10D8": {
+      "edits": [
+        {
+          "find": "Regarde! Belle vue, non? Tu peux changer\nde vue avec {24:18} et ainsi admirer la forêt\navec {24:00}.{00}",
+          "replace": "Regarde! Belle vue, non? Appuie sur\nle stick droit, puis admire la forêt\navec {24:00}.{00}"
+        }
+      ]
+    },
+    "5056": {
+      "edits": [
+        {
+          "find": "Pour admirer les environs, touche {24:18} et\nregarde autour de toi avec {24:00}.{00}",
+          "replace": "Pour admirer les environs, appuie sur\nle stick droit, puis regarde autour\nde toi avec {24:00}.{00}"
+        }
+      ]
+    }
+  }
+}

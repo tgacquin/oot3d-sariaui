@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=SariaUI
+Comment=Play Ocarina of Time 3D on one screen
+Comment[fr]=Jouez à Ocarina of Time 3D sur un seul écran
+Comment[es]=Juega a Ocarina of Time 3D en una sola pantalla
+Icon=io.github.tgacquin.sariaui
+TryExec=SariaUI
+Exec=SariaUI
+Categories=Game;
+Keywords=Zelda;Ocarina of Time;
+StartupWMClass=io.github.tgacquin.sariaui

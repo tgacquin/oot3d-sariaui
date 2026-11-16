@@ -1,0 +1,31 @@
+SariaUI preview package
+
+Place exactly one supported Ocarina of Time 3D game dump (.cci or .3ds) beside
+the application, then launch SariaUI. It opens the game automatically and exits
+silently if the game is missing or multiple dumps are present. No game, saves,
+keys, multiplayer profiles or developer settings are included. Saves, settings,
+custom textures and randomizer data are stored in a user folder beside the
+application (beside SariaUI.app on macOS, not inside it). Keep the release in
+a writable folder. To update, close SariaUI, back up user, extract the new
+release separately, then copy your entire user folder and game beside the
+new application.
+
+F1 opens player settings. F2 and the developer editor are unavailable.
+Controllers are configured automatically; custom bindings are preserved.
+Use F1 > Controls > Controller / keyboard to adjust bindings.
+
+Windows x64: extract the entire folder and run SariaUI.exe. Keep the DLLs,
+plugins and oot3d-seed.exe alongside it.
+
+macOS Apple Silicon: extract the archive and launch SariaUI.app. Keep your
+game dump beside the app, outside its Contents folder.
+The app includes its randomizer helper. Preview builds are ad-hoc signed,
+not Apple-notarized; macOS may require approval through Privacy & Security.
+
+Linux x86_64: extract the archive and run SariaUI.AppImage. If necessary, mark
+it executable. A system Vulkan driver is required. Systems without AppImage
+FUSE support can use: ./SariaUI.AppImage --appimage-extract-and-run
+
+Packages extract to a SariaUI folder. release.json records the exact source
+commit, version and platform. The matching Source archive contains
+the project and its pinned submodules. See LICENSE.txt and licenses/.

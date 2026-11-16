@@ -1,0 +1,471 @@
+{
+  "language": "English",
+  "language_slot": 1,
+  "notes": [
+    "Matching Navi and View tutorials are maintained in the separate French (slot 5) and Spanish (slot 7) catalogs.",
+    "Only the audited message IDs are changed. Controls use hexadecimal QM markup.",
+    "L/R in these menu instructions do not alter native targeting, shielding or music controls.",
+    "NaviUp and SongListStart tutorials are active alongside their implemented controls."
+  ],
+  "common": [
+    {
+      "find": "{24:1c}",
+      "replace": "ZL"
+    },
+    {
+      "find": "{24:1d}",
+      "replace": "ZR"
+    },
+    {
+      "find": "subscreen",
+      "replace": "page"
+    }
+  ],
+  "messages": {
+    "0002": {
+      "edits": []
+    },
+    "0003": {
+      "edits": []
+    },
+    "0004": {
+      "edits": []
+    },
+    "0005": {
+      "edits": []
+    },
+    "0008": {
+      "edits": []
+    },
+    "0009": {
+      "edits": []
+    },
+    "000D": {
+      "edits": []
+    },
+    "000E": {
+      "edits": []
+    },
+    "0010": {
+      "edits": []
+    },
+    "0011": {
+      "edits": []
+    },
+    "0012": {
+      "edits": []
+    },
+    "0013": {
+      "edits": []
+    },
+    "0014": {
+      "edits": []
+    },
+    "0015": {
+      "edits": []
+    },
+    "0016": {
+      "edits": []
+    },
+    "0017": {
+      "edits": []
+    },
+    "001C": {
+      "edits": [
+        {
+          "find": "Set them to {24:1c}, {24:1e}, {24:1f}, or {24:1d}. You can't\nbuy bombs without a bomb bag.",
+          "replace": "Set them to {24:1c}, {24:1e}, {24:1f}, or {24:1d}.\nYou need a bomb bag to buy them."
+        }
+      ]
+    },
+    "001D": {
+      "edits": [
+        {
+          "find": "Set them to {24:1c}, {24:1e}, {24:1f}, or {24:1d}. You can't\nbuy bombs without a bomb bag.",
+          "replace": "Set them to {24:1c}, {24:1e}, {24:1f}, or {24:1d}.\nYou need a bomb bag to buy them."
+        }
+      ]
+    },
+    "0026": {
+      "edits": []
+    },
+    "0030": {
+      "edits": [
+        {
+          "find": "Tap {24:1a} on the lower screen to open\nthe {1d:43}Items subscreen{1d:00}, and set it to\n{24:1c}, {24:1e}, {24:1f}, or {24:1d}.",
+          "replace": "Press SELECT to open {1d:43}Items{1d:00}.\nChoose the item and press\n{24:1e}, {24:1f}, ZL, or ZR to assign it."
+        }
+      ]
+    },
+    "0031": {
+      "edits": []
+    },
+    "0032": {
+      "edits": []
+    },
+    "0033": {
+      "edits": []
+    },
+    "0034": {
+      "edits": [
+        {
+          "find": "Tap {24:1a} on the lower screen to open\nthe {1d:43}Items subscreen{1d:00}, then set them\nto {24:1c}, {24:1e}, {24:1f}, or {24:1d}.",
+          "replace": "Press SELECT to open {1d:43}Items{1d:00}.\nChoose the item and press\n{24:1e}, {24:1f}, ZL, or ZR to assign it."
+        }
+      ]
+    },
+    "0035": {
+      "edits": []
+    },
+    "0036": {
+      "edits": []
+    },
+    "0037": {
+      "edits": [
+        {
+          "find": "Tap {24:1a} on the lower screen to open\nthe {1d:43}Items subscreen{1d:00}, then set it to\n{24:1c}, {24:1e}, {24:1f}, or {24:1d}.",
+          "replace": "Press SELECT to open {1d:43}Items{1d:00}.\nChoose the item and press\n{24:1e}, {24:1f}, ZL, or ZR to assign it."
+        }
+      ]
+    },
+    "0038": {
+      "edits": []
+    },
+    "0039": {
+      "edits": []
+    },
+    "0042": {
+      "edits": []
+    },
+    "0043": {
+      "edits": []
+    },
+    "0044": {
+      "edits": []
+    },
+    "0045": {
+      "edits": []
+    },
+    "0046": {
+      "edits": []
+    },
+    "0047": {
+      "edits": []
+    },
+    "0048": {
+      "edits": []
+    },
+    "004A": {
+      "edits": [
+        {
+          "find": "Tap {24:16} on the lower screen to\nstart playing it!",
+          "replace": "Press D-pad Right to\nstart playing it!"
+        }
+      ]
+    },
+    "004C": {
+      "edits": [
+        {
+          "find": "Switch to the {1d:42}Gear subscreen {1d:00}and\ntap the shield to equip it, or select\nit with {24:00} and press {24:06} to equip it.",
+          "replace": "Press SELECT, then {24:0a} for {1d:42}Gear{1d:00}.\nChoose the shield with {24:00}\nand press {24:06} to equip it."
+        }
+      ]
+    },
+    "004D": {
+      "edits": [
+        {
+          "find": "Switch to the {1d:42}Gear subscreen{1d:00} and\ntap the shield to equip it.",
+          "replace": "Press SELECT, then {24:0a} for {1d:42}Gear{1d:00}.\nChoose the shield and press {24:06}\nto equip it."
+        }
+      ]
+    },
+    "0058": {
+      "edits": []
+    },
+    "005D": {
+      "edits": []
+    },
+    "0066": {
+      "edits": [
+        {
+          "find": "Tap {24:1b} on the lower screen to look\nat the detailed map.",
+          "replace": "Press SELECT, then {24:0b} to open\nthe detailed {1d:41}Map{1d:00}."
+        },
+        {
+          "find": "Tap floor numbers to select a floor\nto view.",
+          "replace": "Use the Circle Pad to choose\na floor."
+        }
+      ]
+    },
+    "0069": {
+      "edits": []
+    },
+    "007A": {
+      "edits": []
+    },
+    "0098": {
+      "edits": []
+    },
+    "0099": {
+      "edits": []
+    },
+    "009A": {
+      "edits": []
+    },
+    "00A3": {
+      "edits": [
+        {
+          "find": "Set to {24:1c}, {24:1e}, {24:1f}, or {24:1d} to use. You can't\nbuy them without a bomb bag.",
+          "replace": "Set to {24:1c}, {24:1e}, {24:1f}, or {24:1d} to use.\nYou need a bomb bag to buy them."
+        }
+      ]
+    },
+    "00A4": {
+      "edits": [
+        {
+          "find": "Tap {24:19} on the lower screen to open\nthe {1d:42}Gear subscreen{1d:00}, and then tap\nthe weapon to equip it.",
+          "replace": "Press SELECT, then {24:0a} for {1d:42}Gear{1d:00}.\nChoose the sword and press {24:06}\nto equip it."
+        }
+      ]
+    },
+    "00AD": {
+      "edits": []
+    },
+    "00AE": {
+      "edits": []
+    },
+    "00AF": {
+      "edits": []
+    },
+    "00B1": {
+      "edits": [
+        {
+          "find": "Set to {24:1c}, {24:1e}, {24:1f}, or {24:1d} to use. You can't\nbuy them without a bomb bag.",
+          "replace": "Set to {24:1c}, {24:1e}, {24:1f}, or {24:1d} to use.\nYou need a bomb bag to buy them."
+        }
+      ]
+    },
+    "00CB": {
+      "edits": [
+        {
+          "find": "Set to {24:1c}, {24:1e}, {24:1f}, or {24:1d} to use. You can't\nbuy them without a bomb bag.",
+          "replace": "Set to {24:1c}, {24:1e}, {24:1f}, or {24:1d} to use.\nYou need a bomb bag to buy them."
+        }
+      ]
+    },
+    "0101": {
+      "edits": [
+        {
+          "find": "see down below this {1d:00}web {1d:44}using {24:18}!",
+          "replace": "look below this {1d:00}web{1d:44} by\nclicking the right stick!"
+        }
+      ]
+    },
+    "0103": {
+      "edits": [
+        {
+          "find": "says. That's the {1d:00}A Button icon{1d:44} on the\nupper screen!",
+          "replace": "says. That's your {1d:00}A Button icon{1d:44}!"
+        }
+      ]
+    },
+    "1017": {
+      "edits": [
+        {
+          "find": "speaks, use {24:17} to listen well to her words\nof wisdom...",
+          "replace": "speaks, press D-pad Up to\nlisten well to her words of wisdom..."
+        }
+      ],
+      "requires": "NaviUp"
+    },
+    "1025": {
+      "edits": []
+    },
+    "1035": {
+      "edits": [
+        {
+          "find": "Icons on right side of lower screen\nUpper-screen icon",
+          "replace": "Item buttons\nAction button"
+        }
+      ]
+    },
+    "1036": {
+      "edits": [
+        {
+          "find": "The {24:1c}, {24:1e}, {24:1f}, and {24:1d} icons on the lower\nscreen are your {1d:43}item slots{1d:00}.",
+          "replace": "Your {1d:43}item slots{1d:00} use {24:1e}, {24:1f}, ZL, and ZR.\nZL uses slot I, and ZR uses slot II."
+        },
+        {
+          "find": "To use an item you've found, first tap {24:1a}\non the lower screen to open the {1d:43}Items\nsubscreen{1d:00}. Tap the item, and then tap\na slot to assign it. It's as easy as that!",
+          "replace": "Press SELECT to open {1d:43}Items{1d:00}.\nChoose an item with the Circle Pad,\nthen press {24:1e}, {24:1f}, ZL, or ZR to assign it."
+        },
+        {
+          "find": "To use the item, tap {24:1c}, {24:1e}, {24:1f}, or {24:1d}.",
+          "replace": "During your adventure, press the\nassigned button to use the item."
+        },
+        {
+          "find": "Assign items you use often to {24:1e} or {24:1f}\nso you can use them at the press of a\nbutton. You'll find it pretty handy!",
+          "replace": "All four slots have their own buttons.\nKeep your favorite items ready!\nYou'll find it pretty handy!"
+        }
+      ]
+    },
+    "1037": {
+      "edits": [
+        {
+          "find": "The upper-screen icon with an \"A\" on it is",
+          "replace": "The button icon with an \"A\" on it is"
+        }
+      ]
+    },
+    "1039": {
+      "edits": [
+        {
+          "find": "There is a {1d:41}map{1d:00} shown at the bottom left of\nthe upper screen.",
+          "replace": "The {1d:41}minimap{1d:00} shows the area around you."
+        },
+        {
+          "find": "Hold {24:04} to turn off the map display. To turn\nit back on, press {24:01} in any direction.",
+          "replace": "Press L3 (click the left stick) to hide\nthe minimap. Press it again to show it."
+        },
+        {
+          "find": "In the middle of the lower screen is the\noverall map of your current area.",
+          "replace": "You can rebind Toggle Minimap in the\nemulator's Controller Hotkeys settings."
+        },
+        {
+          "find": "Tap {24:1b} on the lower screen to see the map\nwith area names.",
+          "replace": "Press SELECT, then {24:0b} to open {1d:41}Map{1d:00}\nand see the area names.\nPress {24:0a} to return to Items."
+        }
+      ]
+    },
+    "103A": {
+      "edits": [
+        {
+          "find": "Usable items can be set to {24:1c}, {24:1e}, {24:1f},\nand {24:1d}. They are used by tapping the\nassigned button or icon.",
+          "replace": "Usable items can be assigned to\n{24:1e}, {24:1f}, ZL, or ZR. Press the assigned\nbutton to use an item."
+        },
+        {
+          "find": "If you want to change gear, tap {24:19} on the\nlower screen to open the {1d:42}Gear s{1d:00}{1d:42}ubscreen{1d:00}.",
+          "replace": "Press SELECT to open Items, then {24:0a}\nto open {1d:42}Gear{1d:00}. Press {24:0b} to return to Items."
+        },
+        {
+          "find": "To equip an item of gear, simply tap it.",
+          "replace": "Choose your gear with the Circle Pad\nand press {24:06} to equip it."
+        },
+        {
+          "find": "To assign items to your item slots, tap {24:1a}\nto open the {1d:43}Items subscreen{1d:00}. Tap the item\nyou want to assign, and then tap {24:1c}, {24:1e}, {24:1f},\nor {24:1d} to set it to that slot.",
+          "replace": "On the {1d:43}Items page{1d:00}, choose an item\nand press {24:1e}, {24:1f}, ZL, or ZR to assign it.\nZL assigns to I; ZR assigns to II."
+        }
+      ]
+    },
+    "103D": {
+      "edits": [
+        {
+          "find": "When you get the shield, tap {24:19} to get into\nthe {1d:42}Gear subscreen{1d:00}.",
+          "replace": "When you get the shield, press SELECT,\nthen {24:0a} to open {1d:42}Gear{1d:00}."
+        },
+        {
+          "find": "On the {1d:42}Gear subscreen{1d:00}, tap the shield to\nequip it. You can also select it with {24:00} and\npress {24:06} to equip it.",
+          "replace": "On the {1d:42}Gear page{1d:00}, choose the shield\nwith {24:00} and press {24:06} to equip it."
+        }
+      ]
+    },
+    "103E": {
+      "edits": [
+        {
+          "find": "Do you want to know how to use {24:18}?",
+          "replace": "Want to know how to look around?"
+        }
+      ]
+    },
+    "103F": {
+      "edits": [
+        {
+          "find": "If you tap {24:18}, you can change your view.",
+          "replace": "Click the right stick to look around."
+        },
+        {
+          "find": "Also, when {24:17} is displayed in place of {24:18},\nthat means Navi the fairy wants to talk to\nyou. Use {24:17} to listen to her!",
+          "replace": "When Navi the fairy calls to you,\npress D-pad Up to listen to her!"
+        }
+      ],
+      "requires": "NaviUp"
+    },
+    "10C5": {
+      "edits": [
+        {
+          "find": "If you hold the ocarina with {24:16} where a\nmelody is necessary, a {1d:41}musical staff {1d:00}will\nappear.",
+          "replace": "Press D-pad Right to take out your\nocarina. Where a melody is necessary,\na {1d:41}musical staff{1d:00} will appear."
+        }
+      ]
+    },
+    "10C7": {
+      "edits": [
+        {
+          "find": "To view the list of melodies you've learned,\nopen the {1d:44}Ocarina subscreen{1d:00} and tap the\nicon in the bottom-right corner.",
+          "replace": "To view the melodies you've learned,\ntake out your ocarina with D-pad Right,\nthen press START to open the song list."
+        }
+      ],
+      "requires": "SongListStart"
+    },
+    "10D8": {
+      "edits": [
+        {
+          "find": "Look! Isn't this view pretty? Change your\nviewpoint with {24:18} so you can look around\nthe forest with {24:00}.",
+          "replace": "Look! Isn't this view pretty?\nClick the right stick, then look around\nthe forest with {24:00}."
+        }
+      ]
+    },
+    "2044": {
+      "edits": []
+    },
+    "2065": {
+      "edits": [
+        {
+          "find": "on the map. Tap {24:1b} on the lower screen\nto open the {1d:41}Map subscreen{1d:00}.",
+          "replace": "on the map. Press SELECT, then {24:0b}\nto open the {1d:41}Map page{1d:00}."
+        }
+      ]
+    },
+    "2071": {
+      "edits": [
+        {
+          "find": "map, tap {24:1b} to open the {1d:41}Map subscreen{1d:00}.",
+          "replace": "map, press SELECT, then {24:0b}\nto open the {1d:41}Map page{1d:00}."
+        }
+      ]
+    },
+    "4003": {
+      "edits": [
+        {
+          "find": "You should touch {24:1b} to look at the {1d:41}Map\nsubscreen {1d:00}sometimes.",
+          "replace": "Press SELECT, then {24:0b} to look at the\n{1d:41}Map page{1d:00} sometimes."
+        }
+      ]
+    },
+    "406A": {
+      "edits": [
+        {
+          "find": "Set a bean to {24:1c}, {24:1e}, {24:1f}, or {24:1d}, and use\nit on the dirt right here.",
+          "replace": "Set a bean to {24:1c}, {24:1e}, {24:1f}, or {24:1d},\nand use it on the dirt right here."
+        }
+      ]
+    },
+    "5056": {
+      "edits": [
+        {
+          "find": "To get a good view, tap {24:18} and look around\nwith {24:00}.",
+          "replace": "To get a good view, click the right stick\nand look around with {24:00}."
+        }
+      ]
+    },
+    "700C": {
+      "edits": []
+    },
+    "70A3": {
+      "edits": []
+    },
+    "70ED": {
+      "edits": []
+    }
+  }
+}
