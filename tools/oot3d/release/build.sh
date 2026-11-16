@@ -18,8 +18,10 @@ case "$platform" in
     ;;
   linux-x86_64)
     test "$(uname -m)" = x86_64
+    # SDL otherwise auto-enables the image's ccache, whose default directories
+    # may be inaccessible to the mapped runner UID. This job does not persist it.
     flags+=(-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-            -DCMAKE_LINKER=/etc/bin/ld.lld)
+            -DCMAKE_LINKER=/etc/bin/ld.lld -DSDL_CCACHE=OFF)
     export EXTRA_QT_PLUGINS=waylandcompositor
     export EXTRA_PLATFORM_PLUGINS='libqwayland-egl.so;libqwayland-generic.so'
     ;;
