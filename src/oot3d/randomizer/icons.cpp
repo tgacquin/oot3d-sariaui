@@ -26,7 +26,7 @@ struct IconAtlas::Impl {
         throw std::runtime_error("No memory type for map source preview");
     }
     void Upload() {
-        const auto next = std::atomic_load(&icon_pixels);
+        const auto next = icon_pixels.load();
         if(next == source) return;
         std::scoped_lock lock{submit_mutex, instance.PresentQueueMutex()};
         auto device = instance.GetDevice();

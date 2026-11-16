@@ -283,7 +283,7 @@ int main(int argc,char**argv) {
     m.words[OOT3D::HUD::Action+0x20]=action_model;
     m.words[OOT3D::HUD::Main+0xc]=sword_model;m.words[controller+8]=item_model;
     const auto native=m.words;
-    std::atomic_store(&P::assets,std::shared_ptr<const P::Assets>(std::make_shared<P::Assets>(*assets)));
+    P::assets.store(std::shared_ptr<const P::Assets>(std::make_shared<P::Assets>(*assets)));
     B::SetLayout({},false);
     B::Hook hook;std::array<U32,16> regs{};regs[15]=0x2fea3c;regs[14]=0x2fe000;
     const auto saved=regs;hook.Begin(m,regs,0x2fea38,1);assert(hook.Pending());

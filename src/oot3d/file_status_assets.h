@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/pause_prompts.h"
 #include <optional>
 #include <string>
@@ -16,8 +17,8 @@ struct Assets {
         return nullptr;
     }
 };
-inline std::shared_ptr<const Assets> assets;
-inline auto GetAssets() {return std::atomic_load(&assets);}
+inline Common::AtomicSharedPtr<const Assets> assets;
+inline auto GetAssets() {return assets.load();}
 constexpr unsigned Tiled(unsigned x,unsigned y) {
     unsigned m=0;
     for(unsigned b=0;b<3;++b)m|=((x>>b)&1)<<(2*b)|((y>>b)&1)<<(2*b+1);

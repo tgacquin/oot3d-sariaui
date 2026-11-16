@@ -26,7 +26,7 @@ int main(int argc,char** argv) {
         assert(!DecodeBossTimerAtlas({},decode));
         bytes[48]^=1;assert(!DecodeBossTimerAtlas(bytes,decode));
         source->hash=++language;
-        std::atomic_store(&boss_timer_atlases[language-1],std::shared_ptr<const RupeeAtlas>(source));
+        boss_timer_atlases[language-1].store(std::shared_ptr<const RupeeAtlas>(source));
         const auto atlas=StyledBossTimerAtlas(source->hash,{});assert(atlas);
         assert(atlas==StyledBossTimerAtlas(source->hash,{}));
         const auto bold=StyledBossTimerAtlas(source->hash,{},true);

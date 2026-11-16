@@ -38,7 +38,7 @@ template<class F> bool Spin(F done, int ms = 6000) {
     } while(clock.elapsed()<ms);
     const bool result=done();
     if(!result && ms>=6000) {
-        if(const auto request=std::atomic_load(&J::request))
+        if(const auto request=J::request.load())
             std::cerr<<"Timed out: "<<J::Label(request->status.load())<<" cancelled="<<request->cancelled.load()
                 <<" lost="<<request->connection_lost.load()<<" member-state="
                 <<int(Network::GetRoomMember().lock()->GetState())<<"\n";
@@ -50,7 +50,7 @@ quint16 FreePort() {
 }
 std::shared_ptr<const J::Request> Begin(std::u16string name,J::Intent intent=J::Intent::New,
     std::string id={}) {
-    J::Begin(1,0);J::name=std::move(name);J::intent=intent;J::game_id=std::move(id);J::Wait(1,false);return std::atomic_load(&J::request);
+    J::Begin(1,0);J::name=std::move(name);J::intent=intent;J::game_id=std::move(id);J::Wait(1,false);return J::request.load();
 }
 
 int main(int argc,char** argv) {
@@ -202,7 +202,7 @@ int main(int argc,char** argv) {
         host.write("D",1);assert(host.waitForBytesWritten(1000));
         assert(Spin([&]{return A::Visible().size()==2;}));assert(A::Visible()[1].text=="Host died.");
         A::Emit(0,8);assert(Spin([&]{return A::Visible().size()==3;}));
-        assert(A::Visible()[2].text=="Link got Hookshot!");
+        assert(A::Visible()[2].text=="Link got the Hookshot!");
         Spin([]{return false;},250);assert(A::Visible().size()==3); // One server echo per event.
         occupied.Join("Visitor", "visitor-id", "127.0.0.1", port, 0, Network::NoPreferredMac);
         assert(Spin([&]{return A::Visible().size()==4;}));
@@ -301,8 +301,8 @@ int main(int argc,char** argv) {
         auto invalid=options;invalid.host_address="not an IP";assert(!service.Configure(invalid));
         unsigned iteration=0;
         for(bool accept:{false,true,true}) {
-            std::atomic_store(&J::profiles[1],std::make_shared<const J::Profile>(J::Profile{"ba7ab566-c1e4-4933-9e6d-efdc6251a7bb",false}));
-            J::BeginHost(1);auto request=std::atomic_load(&J::request);
+            J::profiles[1].store(std::make_shared<const J::Profile>(J::Profile{"ba7ab566-c1e4-4933-9e6d-efdc6251a7bb",false}));
+            J::BeginHost(1);auto request=J::request.load();
             assert(!J::Active() && request->inline_host && request->name.empty());
             assert(Spin([&]{return request->status==J::Status::Connected;}));
             assert(J::hosting && room->GetState()==Network::Room::State::Open && member->GetNickname()=="Épona");

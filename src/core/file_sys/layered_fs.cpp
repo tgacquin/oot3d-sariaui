@@ -124,7 +124,7 @@ void LayeredFS::ApplyPresentationText() {
     OOT3D::ShardText::Reset();
     OOT3D::ControlSwap::ResetText();
     OOT3D::Difficulty::price_text_ready=false;
-    std::atomic_store(&OOT3D::LoadingPrompt::entry,std::shared_ptr<const OOT3D::LoadingPrompt::Entry>{});
+    OOT3D::LoadingPrompt::entry.store(std::shared_ptr<const OOT3D::LoadingPrompt::Entry>{});
     const auto found=file_path_map.find("/message/us/us.qm");
     if(found==file_path_map.end())return;
     auto& relocation=found->second->relocation;

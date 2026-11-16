@@ -9,7 +9,7 @@ namespace OOT3D::HDFont {
 std::shared_ptr<const RupeeAtlas> StyledBossTimerAtlas(std::uint64_t hash,RupeeShadow shadow,bool bold) {
     std::shared_ptr<const RupeeAtlas> source;
     for(const auto& entry:boss_timer_atlases) {
-        auto candidate=std::atomic_load(&entry);
+        auto candidate=entry.load();
         if(candidate && candidate->hash==hash) {source=std::move(candidate);break;}
     }
     if(!source)return {};

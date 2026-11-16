@@ -35,7 +35,7 @@ int main(int argc,char** argv) {
     const auto soft=MakeRupeeAtlas(native,shadow);
     assert(soft.size()==image.size() && soft!=image && soft!=plain);
     auto source=std::make_shared<RupeeAtlas>();source->hash=123;source->native=native;source->rgba=image;
-    std::atomic_store(&rupee_atlas,std::shared_ptr<const RupeeAtlas>(source));
+    rupee_atlas.store(std::shared_ptr<const RupeeAtlas>(source));
     assert(StyledRupeeAtlas({})==source);
     const auto styled=StyledRupeeAtlas(shadow);
     assert(styled->rgba==soft && styled->variant && StyledRupeeAtlas(shadow)==styled);

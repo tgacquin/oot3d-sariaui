@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/price_text.h"
 #include "oot3d/loading_prompt.h"
 #include "oot3d/shard_text.h"
@@ -14,7 +15,7 @@ struct TextVariants {
     U32 signature=0;
     std::unordered_map<U32,std::array<U32,3>> entries;
 };
-inline std::shared_ptr<const TextVariants> text_variants;
+inline Common::AtomicSharedPtr<const TextVariants> text_variants;
 inline unsigned RequestedFactor() {
     return Difficulty::increase_prices.load()?unsigned(std::clamp(Difficulty::price_multiplier.load(),2,3)):1;
 }
@@ -24,7 +25,7 @@ inline bool PrepareTextVariants(std::vector<std::uint8_t>& bytes, unsigned ordin
     auto variants=std::make_shared<TextVariants>();
     auto twice=bytes,thrice=bytes;
     if(!ApplyText(twice,2) || !ApplyText(thrice,3)) {
-        std::atomic_store(&text_variants,std::shared_ptr<const TextVariants>{});return false;
+        text_variants.store(std::shared_ptr<const TextVariants>{});return false;
     }
     using Messages::Read32;using Messages::Write32;
     auto result=bytes;
@@ -65,7 +66,7 @@ inline bool PrepareTextVariants(std::vector<std::uint8_t>& bytes, unsigned ordin
     for(auto word:{0x50544f4fu,0x32454349u})
         for(unsigned i=0;i<4;++i)result.push_back(word>>(i*8));
     bytes.swap(result);
-    std::atomic_store(&text_variants,std::shared_ptr<const TextVariants>(std::move(variants)));
+    text_variants.store(std::shared_ptr<const TextVariants>(std::move(variants)));
     return true;
 }
 template<class M> bool TextCodeMatches(M& m) {
@@ -74,7 +75,7 @@ template<class M> bool TextCodeMatches(M& m) {
 }
 template<class M,class R> void SelectText(M& m,R& r) {
     if(LoadingPrompt::Select(m,r) || ShardText::Select(m,r) || ControlSwap::SelectText(m,r))return;
-    const auto variants=std::atomic_load(&text_variants);
+    const auto variants=text_variants.load();
     const auto base=m.Read(r[0]+4).value_or(0);
     const bool valid=Difficulty::file_rules.load() && variants && base && m.Read(base)==0x4d51 &&
         m.Read(base+variants->signature)==0x50544f4f &&

@@ -63,9 +63,9 @@ struct RoomImport {
         if(stage==Stage::Waiting) {
             stage=Stage::Polled;Call(r,Poll);r[0]=job;r[1]=0;return true;
         }
-        const auto next=std::atomic_load(&RoomJoin::request);
+        const auto next=RoomJoin::request.load();
         if(!next || next->cancelled.load() || next->status!=RoomJoin::Status::ReadyToSave)return false;
-        request=next;file=std::atomic_load(&next->file);
+        request=next;file=next->file.load();
         if(next->slot>=3 || Occupied(m,next->slot)){Fail(m,RoomJoin::Status::SlotOccupied);return false;}
         if(!file || !ValidRoomSave(file->native_save) || !Supported(m) ||
            m.Read(Owner+0x10)!=3 || m.Read(0x50bb58).value_or(1)!=0) {

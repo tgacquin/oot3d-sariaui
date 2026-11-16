@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/message_patch.h"
 #include "oot3d/randomizer/file_status.h"
 #include "oot3d/randomizer/generation_progress.h"
@@ -61,12 +62,12 @@ struct Entry {
     std::array<std::uint32_t,NoticeCount> notice_offsets{};
     std::array<std::uint32_t,RetryCount> retry_offsets{};
 };
-inline std::shared_ptr<const Entry> entry;
-inline bool Ready() {return bool(std::atomic_load(&entry));}
+inline Common::AtomicSharedPtr<const Entry> entry;
+inline bool Ready() {return bool(entry.load());}
 // Append a private message entry without changing any native table indices.
 // The ordinary prompt renderer retains its font, spacing, centering and shadow.
 inline bool Prepare(std::vector<std::uint8_t>& bytes) {
-    std::atomic_store(&entry,std::shared_ptr<const Entry>{});
+    entry.store(std::shared_ptr<const Entry>{});
     using Messages::Read32;using Messages::Write32;
     if(bytes.size()<16 || Read32(bytes,0)!=0x4d51 || Read32(bytes,4)!=4)return false;
     const auto count=Read32(bytes,8);
@@ -196,12 +197,12 @@ inline bool Prepare(std::vector<std::uint8_t>& bytes) {
     for(auto word:{0x4c544f4fu,0x504d4f52u})
         for(unsigned i=0;i<4;++i)result.push_back(word>>(i*8));
     bytes.swap(result);
-    std::atomic_store(&entry,std::make_shared<const Entry>(Entry{offset,signature,error_offset,room_offsets[0],room_offsets,file_error_offsets,starting_offset,notice_offsets,retry_offsets}));
+    entry.store(std::make_shared<const Entry>(Entry{offset,signature,error_offset,room_offsets[0],room_offsets,file_error_offsets,starting_offset,notice_offsets,retry_offsets}));
     return true;
 }
 template<class M,class R> bool Select(M& m,R& r) {
     if(r[1]!=MessageId && r[1]!=ErrorMessageId && r[1]!=StartingMessageId && !RoomMessage(r[1]) && !FileErrorMessage(r[1]) && !RetryMessage(r[1]))return false;
-    const auto selected=std::atomic_load(&entry);
+    const auto selected=entry.load();
     const auto base=m.Read(r[0]+4).value_or(0);
     if(!selected || !base || m.Read(base)!=0x4d51 ||
        m.Read(base+selected->signature)!=0x4c544f4f ||

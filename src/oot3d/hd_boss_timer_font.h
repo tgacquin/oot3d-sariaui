@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/hd_rupee_font.h"
 #include "oot3d/map_frame_asset.h"
 
 namespace OOT3D::HDFont {
 // challenge00 has its own 12x21 digits at (336,208), and punctuation
 // one 24-pixel row below. Keep all other challenge artwork unchanged.
-inline std::array<std::shared_ptr<const RupeeAtlas>,3> boss_timer_atlases;
+inline std::array<Common::AtomicSharedPtr<const RupeeAtlas>,3> boss_timer_atlases;
 std::vector<std::uint8_t> MakeBossTimerAtlas(std::span<const std::uint8_t> rgba,RupeeShadow shadow={},bool bold=false);
 std::shared_ptr<const RupeeAtlas> StyledBossTimerAtlas(std::uint64_t hash,RupeeShadow shadow,bool bold=false);
 template<class Decode> std::shared_ptr<RupeeAtlas> DecodeBossTimerAtlas(

@@ -269,14 +269,14 @@ struct Hook {
         if(start_error!=FileError::None)
             start_shake_us=std::clamp(now_us-start_shake_started_us,std::int64_t{0},ShakeUs);
         const auto edges=buttons&~profile_buttons;profile_buttons=buttons;
-        if(const auto request=std::atomic_load(&RoomJoin::request);request && request->inline_host) {
+        if(const auto request=RoomJoin::request.load();request && request->inline_host) {
             const auto status=request->status.load();
             if(status==RoomJoin::Status::Connected && !request->cancelled.load()) {
                 request->accepted=true;RoomJoin::host_opening=false;
-                std::atomic_store(&RoomJoin::request,std::shared_ptr<const RoomJoin::Request>{});
+                RoomJoin::request.store(std::shared_ptr<const RoomJoin::Request>{});
             } else if(request->cancelled.load() || (status!=RoomJoin::Status::Searching && status!=RoomJoin::Status::Connecting)) {
                 RoomJoin::host_opening=false;RoomJoin::host_error=!request->cancelled.load();
-                std::atomic_store(&RoomJoin::request,std::shared_ptr<const RoomJoin::Request>{});
+                RoomJoin::request.store(std::shared_ptr<const RoomJoin::Request>{});
             }
         }
         if(RoomJoin::profile_visible.load()) {
@@ -344,7 +344,7 @@ struct Hook {
             if(p==RoomJoin::Phase::Reopen) {
                 const unsigned selected=RoomJoin::slot;
                 if(Occupied(m,selected) && files.Open(m,selected)) {
-                    const auto request=std::atomic_load(&RoomJoin::request);
+                    const auto request=RoomJoin::request.load();
                     const bool is_host=request && request->intent==RoomJoin::Intent::Host;
                     if(request)request->accepted=true;
                     RoomJoin::Reset();Reset();modal=false;slot=3;confirmed=false;awaiting_name=false;
@@ -355,7 +355,7 @@ struct Hook {
                     r[15]=Sites[2].pc+4;return true; // Native selection with one completion chime.
                 }
                 RoomJoin::phase=RoomJoin::Phase::Waiting;RoomJoin::opacity=1;
-                if(const auto request=std::atomic_load(&RoomJoin::request)) {
+                if(const auto request=RoomJoin::request.load()) {
                     request->committing=false;request->accepted=false;request->status=RoomJoin::Status::SaveFailed;
                 }
             }
@@ -374,8 +374,8 @@ struct Hook {
                         RoomJoin::exit_opacity=RoomJoin::opacity.load();
                         RoomJoin::phase=RoomJoin::Phase::Leaving;
                         RoomJoin::started_us=now_us;
-                        if(const auto request=std::atomic_load(&RoomJoin::request))request->cancelled=true;
-                        std::atomic_store(&RoomJoin::request,std::shared_ptr<const RoomJoin::Request>{});
+                        if(const auto request=RoomJoin::request.load())request->cancelled=true;
+                        RoomJoin::request.store(std::shared_ptr<const RoomJoin::Request>{});
                         sound_only=Sound::Back;r[15]=0x430138;
                         RoomJoin::back_held=back;return true;
                     }
@@ -392,7 +392,7 @@ struct Hook {
                 }
             }
             if(p==RoomJoin::Phase::Naming || RoomJoin::phase.load()==RoomJoin::Phase::Leaving) {
-                if(const auto request=std::atomic_load(&RoomJoin::request);request && request->saved.load() &&
+                if(const auto request=RoomJoin::request.load();request && request->saved.load() &&
                    (request->status==RoomJoin::Status::Connected || request->status==RoomJoin::Status::SavedDisconnected)) {
                     // Rebuild native file models from the completed disk write,
                     // then select the imported file without another A press.

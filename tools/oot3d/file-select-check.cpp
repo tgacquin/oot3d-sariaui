@@ -101,9 +101,8 @@ int main(int argc,char** argv) {
         Memory pulse;const U32 controller=0x18600000,model=0x18610000,alpha=0x18500000;
         pulse.words[0x55b548+6*4]=controller;pulse.words[controller+0x40]=2;
         for(unsigned i=0;i<9;++i)pulse.words[controller+0x10+4*i]=model+0x200*i;
-        const auto entry=std::atomic_load(&OOT3D::LoadingPrompt::entry);
-        std::atomic_store(&OOT3D::LoadingPrompt::entry,
-            std::make_shared<const OOT3D::LoadingPrompt::Entry>(OOT3D::LoadingPrompt::Entry{0,0}));
+        const auto entry=OOT3D::LoadingPrompt::entry.load();
+        OOT3D::LoadingPrompt::entry.store(std::make_shared<const OOT3D::LoadingPrompt::Entry>(OOT3D::LoadingPrompt::Entry{0,0}));
         OOT3D::MasterQuest::loading_label=true;OOT3D::MasterQuest::cursor_us=1000000;
         auto h=std::make_unique<F::Hook>();h->stage=F::Hook::Stage::Native;h->quest_frame=true;
         for(unsigned i=0;i<9;++i) {
@@ -114,7 +113,7 @@ int main(int argc,char** argv) {
         assert(std::bit_cast<float>(pulse.words[alpha])==.8f);
         OOT3D::MasterQuest::loading_label=false;h->Material(pulse,alpha,model);
         assert(std::bit_cast<float>(pulse.words[alpha])==.8f);
-        OOT3D::MasterQuest::cursor_us=0;std::atomic_store(&OOT3D::LoadingPrompt::entry,entry);
+        OOT3D::MasterQuest::cursor_us=0;OOT3D::LoadingPrompt::entry.store(entry);
     }
     // Seed backing follows actual glyph bounds, including wrapped seeds, and
     // contains no crossed quads or opacity compounded by overlapping fills.
@@ -993,7 +992,7 @@ int main(int argc,char** argv) {
     }
     for(unsigned i=24;i<48;++i)assert(edited.positions[i]==normal.positions[i]);
     panels.backgrounds_enabled=false;assert(!F::Backgrounds(panels).count);
-    std::atomic_store(&BG::pixels,std::shared_ptr<const BG::Pixels>(std::make_shared<BG::Pixels>(*background)));
+    BG::pixels.store(std::shared_ptr<const BG::Pixels>(std::make_shared<BG::Pixels>(*background)));
     F::Hook decorated;F::SetLayout({},false);
     regs=saved;decorated.Begin(m,regs,0x300568,true);
     assert(decorated.stage==F::Hook::Stage::Background && !decorated.top.Pending());
@@ -1040,7 +1039,7 @@ int main(int argc,char** argv) {
         m.words[OOT3D::MasterQuest::Exists]=1;
         m.words[OOT3D::MasterQuest::Exists+4]=m.words[OOT3D::MasterQuest::Exists+8]=0;
         m.words[(OOT3D::MasterQuest::Saves+OOT3D::MasterQuest::ModeOffset)&~3u]=0x10000;
-        std::atomic_store(&OOT3D::DPad::textures[1],std::shared_ptr<const OOT3D::DPad::Pixels>(
+        OOT3D::DPad::textures[1].store(std::shared_ptr<const OOT3D::DPad::Pixels>(
             std::make_shared<OOT3D::DPad::Pixels>()));
         F::Hook badged;regs=saved;badged.Begin(m,regs,0x300568,true);
         assert(badged.stage==F::Hook::Stage::Atlas && badged.badge_geometry.count==1);
@@ -1064,15 +1063,14 @@ int main(int argc,char** argv) {
         }
         assert(badged.NativeDrawing() && regs[15]==0x41f2e4 && bh.Owned(m));
         badged.Resume(m,regs);assert(!badged.Pending() && regs==saved);
-        std::atomic_store(&OOT3D::DPad::textures[1],std::shared_ptr<const OOT3D::DPad::Pixels>{});
+        OOT3D::DPad::textures[1].store(std::shared_ptr<const OOT3D::DPad::Pixels>{});
         m.words=before;F::SetLayout(before_layout,false);
     }
     // The quest dialog replaces the file cards, uses the original atlas, and
     // returns to the same top pass without drawing native names/cursor over it.
     const auto quest_pixels=OOT3D::QuestChoice::MakePixels(
         Read(std::string(argv[2])+"/misc/us/english/ura.ctxb"));assert(quest_pixels);
-    std::atomic_store(&OOT3D::QuestChoice::pixels,
-        std::shared_ptr<const OOT3D::QuestChoice::Pixels>(
+    OOT3D::QuestChoice::pixels.store(std::shared_ptr<const OOT3D::QuestChoice::Pixels>(
             std::make_shared<OOT3D::QuestChoice::Pixels>(*quest_pixels)));
     auto dialog_layout=F::GetLayout();dialog_layout.backgrounds_enabled=false;
     F::SetLayout(dialog_layout,false);OOT3D::MasterQuest::choosing=true;

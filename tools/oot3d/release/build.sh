@@ -27,7 +27,7 @@ case "$platform" in
     ;;
   *) echo "Unsupported platform: $platform" >&2; exit 2 ;;
 esac
-checks=(oot3d_interpolation_rate_check oot3d_file_copy_check oot3d_uds_rejoin_check
+checks=(oot3d_atomic_shared_ptr_check oot3d_interpolation_rate_check oot3d_file_copy_check oot3d_uds_rejoin_check
         oot3d_release_defaults_check oot3d_player_controls_check)
 cmake -S . -B "$build_dir" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release -DENABLE_OOT3D_PRESENTATION=ON \
@@ -38,6 +38,8 @@ cmake -S . -B "$build_dir" -G Ninja \
   -DENABLE_SDL2_FRONTEND=OFF -DENABLE_TESTS=OFF \
   -DENABLE_DISCORD_RPC=OFF -DENABLE_QT_UPDATE_CHECKER=OFF \
   -DENABLE_NATIVE_OPTIMIZATION=OFF "${flags[@]}"
+# Check the standalone presentation library before compiling the large dependencies.
+cmake --build "$build_dir" --target oot3d_hd_font oot3d_atomic_shared_ptr_check --parallel 3
 cmake --build "$build_dir" --target citra_meta "${checks[@]}" --parallel 3
 for check in "${checks[@]}"; do
   suffix=''; if [[ "$platform" == windows-x64 ]]; then suffix=.exe; fi

@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/shop_hint_assets.h"
 #include "oot3d/ui_language.h"
 
 namespace OOT3D::BossTitle {
 constexpr unsigned Width=256,Height=512;
 using Pixels=std::array<std::uint32_t,Width*Height>;
-inline std::shared_ptr<const Pixels> pixels;
-inline auto GetPixels() {return std::atomic_load(&pixels);}
+inline Common::AtomicSharedPtr<const Pixels> pixels;
+inline auto GetPixels() {return pixels.load();}
 constexpr std::array<std::u16string_view,8> Archives{u"zelda_goma.zar",u"zelda_kdodongo.zar",
     u"zelda_bv.zar",u"zelda_fantomHG.zar",u"zelda_fd.zar",u"zelda_mo.zar",u"zelda_sst.zar",u"zelda_tw.zar"};
 constexpr std::array<std::string_view,8> Names{"tex/g_boss_name1_usen.ctxb","tex/g_boss_name2_usen.ctxb",

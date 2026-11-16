@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include <atomic>
 #include <memory>
 #include <string>
@@ -36,11 +37,11 @@ struct Notice {
     std::shared_ptr<const std::atomic<bool>> cancellation;
     bool Cancelled() const {return cancellation && cancellation->load();}
 };
-inline std::shared_ptr<const Notice> notice;
+inline Common::AtomicSharedPtr<const Notice> notice;
 inline void Report(Error error,std::shared_ptr<const std::atomic<bool>> cancellation={}) {
-    std::atomic_store(&notice,std::make_shared<const Notice>(Notice{error,std::move(cancellation)}));
+    notice.store(std::make_shared<const Notice>(Notice{error,std::move(cancellation)}));
 }
-inline auto LatestNotice() {return std::atomic_load(&notice);}
+inline auto LatestNotice() {return notice.load();}
 inline Error GeneratorError(std::string_view detail) {
     if(detail.find("No beatable placement")!=detail.npos)return Error::Placement;
     if(detail.find("Triforce pieces required")!=detail.npos || detail.find("Adult start requires")!=detail.npos ||
@@ -51,19 +52,19 @@ inline Error GeneratorError(std::string_view detail) {
 // Presentation snapshots: no disk access or Qt dependency in the native draw.
 inline std::atomic<bool> enabled{false};
 struct Selection {unsigned slot=3;std::string seed,game_id;};
-inline std::shared_ptr<const Selection> selection;
+inline Common::AtomicSharedPtr<const Selection> selection;
 inline void Publish(unsigned slot=3,std::string seed={},std::string game_id={}) {
-    std::atomic_store(&selection,std::make_shared<const Selection>(Selection{slot,std::move(seed),std::move(game_id)}));
+    selection.store(std::make_shared<const Selection>(Selection{slot,std::move(seed),std::move(game_id)}));
 }
 inline std::string ShortRoomId(unsigned slot) {
-    const auto value=std::atomic_load(&selection);
+    const auto value=selection.load();
     if(!value || value->slot!=slot || value->game_id.size()!=36)return {};
     auto id=value->game_id.substr(0,8);
     for(auto& c:id)if(c>='a' && c<='f')c-=('a'-'A');
     return id;
 }
 inline std::string Seed(unsigned slot) {
-    const auto value=std::atomic_load(&selection);
+    const auto value=selection.load();
     return value && value->slot==slot?value->seed:std::string{};
 }
 }

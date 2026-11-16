@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/pause_prompts.h"
 #include "oot3d/map_frame_asset.h"
 
 namespace OOT3D::ShopHint {
 constexpr unsigned Width=64,Height=32;
 using Pixels=std::array<std::uint32_t,Width*Height>;
-inline std::shared_ptr<const Pixels> pixels;
-inline auto GetPixels() {return std::atomic_load(&pixels);}
+inline Common::AtomicSharedPtr<const Pixels> pixels;
+inline auto GetPixels() {return pixels.load();}
 constexpr unsigned Tiled(unsigned x,unsigned y,unsigned width) {
     unsigned m=0;for(unsigned bit=0;bit<3;++bit)
         m|=((x>>bit)&1)<<(2*bit)|((y>>bit)&1)<<(2*bit+1);

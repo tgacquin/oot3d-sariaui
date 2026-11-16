@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/file_particle_settings.h"
 #include "oot3d/pause_prompts.h"
 #include "oot3d/map_frame_asset.h"
@@ -11,8 +12,8 @@ constexpr unsigned SpriteSize=64, Width=128, Height=64, MaxParticles=64;
 using Pixels=std::array<std::uint32_t,Width*Height>;
 template<unsigned Limit> using GeometryFor=PausePrompts::QuadGeometry<Limit*5>;
 using Geometry=GeometryFor<MaxParticles>;
-inline std::shared_ptr<const Pixels> pixels;
-inline auto GetPixels() {return std::atomic_load(&pixels);}
+inline Common::AtomicSharedPtr<const Pixels> pixels;
+inline auto GetPixels() {return pixels.load();}
 
 constexpr unsigned Tiled(unsigned x,unsigned y,unsigned width=Width) {
     unsigned morton=0;

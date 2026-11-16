@@ -17,7 +17,7 @@ int main(int argc,char** argv) {
     std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(in),{}};
     assert(Messages::ApplyAll(bytes));const auto original=bytes;
     assert(ShardText::Prepare(bytes));assert(std::equal(original.begin(),original.end(),bytes.begin()));
-    Memory memory{bytes};const auto variants=std::atomic_load(&ShardText::variants);
+    Memory memory{bytes};const auto variants=ShardText::variants.load();
     for(auto id:{0x68u,0x76fu})for(bool rumble:{false,true}) {
         std::array<std::uint32_t,16> r{};r[0]=0x800000;r[1]=id;r[14]=0x900000;
         const auto before=r;Rumble::enabled=rumble;

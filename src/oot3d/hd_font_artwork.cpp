@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/hd_font_artwork.h"
 #include "oot3d/hd_font.h"
 #include "oot3d/hd_font_data.h"
@@ -19,7 +20,7 @@ struct Face {
     std::vector<Glyph> glyphs;
     std::unordered_multimap<U64, unsigned> by_hash;
 };
-std::shared_ptr<const Face> artwork;
+Common::AtomicSharedPtr<const Face> artwork;
 std::atomic<U64> generation{0};
 struct TextAtlas {
     unsigned width, height;
@@ -49,12 +50,12 @@ bool TextSizeSupported(unsigned width, unsigned height) {
 void ClearArtwork() {
     ClearSystemArtwork();
     { std::lock_guard lock(text_mutex); text_atlases.clear(); }
-    std::atomic_store(&artwork, std::shared_ptr<const Face>{});
+    artwork.store(std::shared_ptr<const Face>{});
     ++generation;
 }
 U64 ArtworkGeneration() { return (generation.load()+SystemArtworkGeneration())*2+thin.load(); }
 unsigned ArtworkGlyphCount() {
-    const auto face = std::atomic_load(&artwork);
+    const auto face = artwork.load();
     return face ? unsigned(face->glyphs.size()) : 0;
 }
 bool LoadArtwork(std::span<const std::uint8_t> qbf) {
@@ -106,7 +107,7 @@ bool LoadArtwork(std::span<const std::uint8_t> qbf) {
         face->glyphs.push_back(std::move(g));
     }
     if (face->glyphs.empty()) return false;
-    std::atomic_store(&artwork, std::shared_ptr<const Face>(std::move(face)));
+    artwork.store(std::shared_ptr<const Face>(std::move(face)));
     ++generation;
     return true;
 }
@@ -147,7 +148,7 @@ std::shared_ptr<const std::vector<std::uint8_t>> FindTextAtlas(
 
 std::vector<std::uint8_t> MakeTextAtlas(std::span<const std::uint8_t> qbf,
     unsigned width, unsigned height, std::span<const TextGlyph> glyphs, bool use_thin) {
-    const auto face = std::atomic_load(&artwork);
+    const auto face = artwork.load();
     if (!face || !TextSizeSupported(width, height) ||
         width % 8 || height % 8 || glyphs.empty() || glyphs.size() > 4096 ||
         qbf.size() < 16 || qbf[0] != 'Q' || qbf[1] != 'B' || qbf[2] != 'F' ||
@@ -210,7 +211,7 @@ std::vector<std::uint8_t> MakeTextAtlas(std::span<const std::uint8_t> qbf,
 
 std::vector<std::uint8_t> Redraw(std::span<const std::uint8_t> alpha,
                                unsigned width, unsigned height) {
-    const auto face = std::atomic_load(&artwork);
+    const auto face = artwork.load();
     if (!face || width < Cell || height < Cell || width > 512 || height > 512 ||
         width % 8 || height % 8 || alpha.size() != width * height) return {};
     struct Match { unsigned x, y, glyph; };

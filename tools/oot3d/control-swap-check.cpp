@@ -14,7 +14,7 @@ int main(int argc,char** argv) {
     std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(f),{}};
     assert(Messages::ApplyAll(bytes)==90);const auto original=bytes;
     assert(ControlSwap::PrepareText(bytes));
-    const auto v=std::atomic_load(&ControlSwap::variants);assert(v && v->entries.size()>10);
+    const auto v=ControlSwap::variants.load();assert(v && v->entries.size()>10);
     assert(std::equal(original.begin(),original.end(),bytes.begin()));
     const auto count=Messages::Read32(bytes,8);
     unsigned replacements=0;

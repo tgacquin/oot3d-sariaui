@@ -8,7 +8,7 @@
 
 namespace OOT3D::HDFont {
 std::shared_ptr<const RupeeAtlas> StyledRupeeAtlas(RupeeShadow shadow,bool timer,bool backdrop,bool bold) {
-    const auto source=std::atomic_load(&rupee_atlas);
+    const auto source=rupee_atlas.load();
     if(!source || (!bold && !timer && !backdrop && shadow==RupeeShadow{}))return source;
     static std::mutex mutex;
     static std::array<std::shared_ptr<const RupeeAtlas>,4> previous,result;

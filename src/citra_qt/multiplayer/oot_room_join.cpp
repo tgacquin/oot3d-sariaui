@@ -201,7 +201,7 @@ void OotRoomJoin::Poll() {
         advertiser.close();
     }
 
-    const auto request = std::atomic_load(&J::request);
+    const auto request = J::request.load();
     if (request != current) {
         if (current && !current->accepted.load())
             current->cancelled = true;
@@ -274,7 +274,7 @@ void OotRoomJoin::Receive() {
         const auto packet = browser.receiveDatagram(1025);
         const auto reply = Decode(packet);
         const int port = reply.value(QStringLiteral("port")).toInt();
-        if (!current || current != std::atomic_load(&J::request) || current->cancelled.load() ||
+        if (!current || current != J::request.load() || current->cancelled.load() ||
             current->status != J::Status::Searching || reply.value(QStringLiteral("type")) != QStringLiteral("room") ||
             reply.value(QStringLiteral("nonce")) != nonce ||
             reply.value(QStringLiteral("version")).toInt(-1) != int(Network::network_version) ||
@@ -335,17 +335,17 @@ void OotRoomJoin::Join(const QHostAddress& address, quint16 port) {
                 request->status=J::Status::Receiving;
                 static std::atomic<u64> next_token{0};
                 const auto token=++next_token;
-                auto reply=std::make_shared<std::shared_ptr<const Network::SessionData>>();
+                auto reply=std::make_shared<Common::AtomicSharedPtr<const Network::SessionData>>();
                 const auto callback=member->BindOnSessionData([reply,token](const auto& data) {
-                    if(data.token==token)std::atomic_store(reply.get(),std::make_shared<const Network::SessionData>(data));
+                    if(data.token==token)reply->store(std::make_shared<const Network::SessionData>(data));
                 });
                 member->RequestSessionData(token);
                 const auto transfer_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(30);
                 while(!request->cancelled.load() && member->IsConnected() &&
-                      !std::atomic_load(reply.get()) && std::chrono::steady_clock::now()<transfer_deadline)
+                      !reply->load() && std::chrono::steady_clock::now()<transfer_deadline)
                     std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 member->Unbind(callback);
-                const auto data=std::atomic_load(reply.get());
+                const auto data=reply->load();
                 if(!request->cancelled.load() && request->status==J::Status::Receiving) {
                     if(!data || data->bytes.empty())request->status=J::Status::HostUnavailable;
                     else if(!receive || !receive(request,data->bytes))request->status=J::Status::InvalidFile;

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include <algorithm>
 #include <atomic>
 #include <charconv>
@@ -23,12 +24,12 @@ struct Session {
     }
 };
 // Workers keep their own session. A cancelled worker cannot update a new run.
-inline std::shared_ptr<Session> current;
+inline Common::AtomicSharedPtr<Session> current;
 inline auto Begin() {
-    auto session=std::make_shared<Session>();std::atomic_store(&current,session);return session;
+    auto session=std::make_shared<Session>();current.store(session);return session;
 }
-inline void Reset() {std::atomic_store(&current,std::shared_ptr<Session>{});}
-inline unsigned Attempt() {const auto session=std::atomic_load(&current);return session?session->attempt.load():1;}
+inline void Reset() {current.store(std::shared_ptr<Session>{});}
+inline unsigned Attempt() {const auto session=current.load();return session?session->attempt.load():1;}
 // Presentation runs only on the emulation thread, independently of the worker.
 struct Presentation {
     static constexpr std::int64_t HoldUs=5000000,FadeUs=150000;
@@ -64,7 +65,7 @@ struct Presentation {
 inline Presentation presentation;
 inline std::shared_ptr<Session> presentation_session;
 inline void UpdatePresentation(std::int64_t now,bool active) {
-    const auto session=active?std::atomic_load(&current):std::shared_ptr<Session>{};
+    const auto session=active?current.load():std::shared_ptr<Session>{};
     if(session!=presentation_session) {presentation={};presentation_session=session;}
     if(session)presentation.Frame(now,session->attempt.load());
 }

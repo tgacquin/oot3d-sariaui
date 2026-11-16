@@ -540,7 +540,7 @@ int main(int argc,char** argv) {
     {
         // Shadow, dungeon corner, then icons/text. Allocation failure must still
         // continue with the original prompt sequence.
-        std::atomic_store(&assets,std::shared_ptr<const Assets>(std::make_shared<Assets>(*image)));
+        assets.store(std::shared_ptr<const Assets>(std::make_shared<Assets>(*image)));
         SetLayout(Layout{},false);
         m.words[0x5066f8+0x20]=source;m.words[0x5066f8+0x34]=0;m.words[0x506cb0+0x38]=2;
         Hook navigation_hook;regs=saved;

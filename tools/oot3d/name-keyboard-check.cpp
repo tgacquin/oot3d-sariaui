@@ -98,7 +98,7 @@ int main(int argc,char** argv) {
     std::ifstream ff(std::string(argv[2])+"/message/us/ltn16.qbf",std::ios::binary);assert(ff);
     const std::vector<std::uint8_t> font_bytes{std::istreambuf_iterator<char>(ff),{}};
     const auto font=OOT3D::FileStatusText::MakeAssets(font_bytes);assert(font);
-    std::atomic_store(&OOT3D::FileStatusText::assets,std::make_shared<const OOT3D::FileStatusText::Assets>(*font));
+    OOT3D::FileStatusText::assets.store(std::make_shared<const OOT3D::FileStatusText::Assets>(*font));
     m.Write(K::Owner+4,4);m.Write(K::Owner+0x40,1);
     F::Layout layout;layout.name_parts[F::Keyboard]={33,-12,.8f};
     layout.keyboard.spacing_x=8;layout.keyboard.spacing_y=6;

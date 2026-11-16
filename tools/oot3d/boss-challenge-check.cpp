@@ -142,8 +142,7 @@ int main(int argc,char** argv) {
     e.Write(0x870000,0x4ebd60);
     e.Write(0x870000+0x1dc,0x873000); // A ready donor owns a valid material.
     e.Write(background+0x6c,0x01010000); // Native background is hidden.
-    std::atomic_store(&OOT3D::FileBackground::pixels,
-        std::shared_ptr<const OOT3D::FileBackground::Pixels>(
+    OOT3D::FileBackground::pixels.store(std::shared_ptr<const OOT3D::FileBackground::Pixels>(
             std::make_shared<OOT3D::FileBackground::Pixels>()));
     // Full 320x240 artwork, not the challenge pane's 160x120 fragment.
     auto panel_layout=B::GetLayout();panel_layout[B::Background]={17,-9,.5f};

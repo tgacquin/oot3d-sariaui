@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/control_swap.h"
 #include "oot3d/message_patch.h"
 #include <array>
@@ -11,8 +12,8 @@ struct Variants {
     std::uint32_t signature=0;
     std::unordered_map<std::uint32_t,std::uint32_t> entries,shoulder_entries,both_entries;
 };
-inline std::shared_ptr<const Variants> variants;
-inline void ResetText() {std::atomic_store(&variants,std::shared_ptr<const Variants>{});}
+inline Common::AtomicSharedPtr<const Variants> variants;
+inline void ResetText() {variants.store(std::shared_ptr<const Variants>{});}
 // QM uses UTF-8 text interleaved with binary commands. Never search command
 // arguments, which can contain arbitrary bytes including apparent words.
 inline std::optional<std::vector<std::uint8_t>> SwapText(std::span<const std::uint8_t> text,
@@ -78,12 +79,12 @@ inline bool PrepareText(std::vector<std::uint8_t>& bytes) {
     }
     next->signature=result.size();
     for(auto word:{0x53574150u,0x53544152u})for(unsigned i=0;i<4;++i)result.push_back(word>>(8*i));
-    bytes.swap(result);std::atomic_store(&variants,std::shared_ptr<const Variants>(next));return true;
+    bytes.swap(result);variants.store(std::shared_ptr<const Variants>(next));return true;
 }
 template<class M,class R> bool SelectText(M& m,R& r) {
     const unsigned mode=(enabled.load()?1:0)|(shoulders.load()?2:0);
     if(!mode)return false;
-    const auto v=std::atomic_load(&variants);if(!v)return false;
+    const auto v=variants.load();if(!v)return false;
     const auto& entries=mode==1?v->entries:mode==2?v->shoulder_entries:v->both_entries;
     const auto it=entries.find(r[1]);if(it==entries.end())return false;
     const auto base=m.Read(r[0]+4).value_or(0);

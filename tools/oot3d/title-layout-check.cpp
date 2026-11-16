@@ -167,7 +167,7 @@ int main(int argc, char** argv) {
             shadow|=(pixel>>8)==0 && (pixel&255);
         }
         assert(white && shadow);
-        std::atomic_store(&T::assets,std::shared_ptr<const T::Assets>(std::make_shared<T::Assets>(*image)));
+        T::assets.store(std::shared_ptr<const T::Assets>(std::make_shared<T::Assets>(*image)));
         T::Hook hook;
         memory.words[actor]=0x00060171;
         memory.words[actor+0x140]=0x1da4f4;

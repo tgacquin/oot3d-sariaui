@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/map_frame_asset.h"
 #include <cmath>
 #include <mutex>
@@ -13,10 +14,10 @@ struct Cutout {
     std::vector<Point> hole;
 };
 struct CutImage { std::shared_ptr<const Pixels> pixels; int width=0,height=0,left=0,top=0; };
-inline std::shared_ptr<const SourcePixels> source_image;
-inline std::shared_ptr<const CutImage> cut_image;
-inline auto GetSource() { return std::atomic_load(&source_image); }
-inline auto GetCutImage() { return std::atomic_load(&cut_image); }
+inline Common::AtomicSharedPtr<const SourcePixels> source_image;
+inline Common::AtomicSharedPtr<const CutImage> cut_image;
+inline auto GetSource() { return source_image.load(); }
+inline auto GetCutImage() { return cut_image.load(); }
 inline std::mutex cutout_mutex;
 inline Cutout saved_cutout;
 inline bool has_saved_cutout=false;

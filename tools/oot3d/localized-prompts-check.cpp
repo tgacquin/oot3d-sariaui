@@ -32,7 +32,7 @@ int main(int argc,char** argv) {
     assert(argc==2);const std::string root=argv[1];
     const auto font=Read(root+"/message/us/ltn16.qbf"),icons=Read(root+"/message/parts.ctxb");
     const auto status=FileStatusText::MakeAssets(font);assert(status);
-    std::atomic_store(&FileStatusText::assets,std::make_shared<const FileStatusText::Assets>(*status));
+    FileStatusText::assets.store(std::make_shared<const FileStatusText::Assets>(*status));
     static_assert(P::TextWidth*P::TextHeight==128*1024); // No larger prompt texture allocation.
     std::array<std::shared_ptr<const P::Assets>,3> images;
     std::array<std::shared_ptr<DungeonLocation::Assets>,3> locations;

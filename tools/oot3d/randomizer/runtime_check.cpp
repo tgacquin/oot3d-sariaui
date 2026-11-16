@@ -238,7 +238,7 @@ int main(int argc,char** argv) {
     std::memcpy(env.bytes.data()+archive_at,archive.data(),archive.size());
     env.Write(owner+4,archive_at);env.Write(owner+8,archive_at+16);
     OOT3D::Difficulty::price_text_ready=true;
-    const auto variants=std::atomic_load(&OOT3D::Prices::text_variants);
+    const auto variants=OOT3D::Prices::text_variants.load();
     for(unsigned factor:{1u,2u,3u}) {
         OOT3D::Difficulty::file_rules=true;OOT3D::Difficulty::increase_prices=factor>1;
         OOT3D::Difficulty::price_multiplier=std::max(2u,factor);

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -11,7 +12,7 @@ namespace OOT3D::Randomizer {
 // Decoded from the player's ROM, never bundled with the executable.
 constexpr unsigned IconAtlasSize = 512, IconCellSize = 42, IconColumns = 12;
 using IconPixels = std::array<std::uint32_t, IconAtlasSize * IconAtlasSize>;
-inline std::shared_ptr<const IconPixels> icon_pixels;
+inline Common::AtomicSharedPtr<const IconPixels> icon_pixels;
 class IconAtlas {
 public:
     IconAtlas(const Vulkan::Instance&, std::mutex&);

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -79,7 +80,7 @@ struct Assets {
     std::array<unsigned,Text.size()> lengths{};
     unsigned native_spacing=2;
 };
-inline std::shared_ptr<const Assets> assets;
-inline auto GetAssets() {return std::atomic_load(&assets);}
+inline Common::AtomicSharedPtr<const Assets> assets;
+inline auto GetAssets() {return assets.load();}
 void Load(Core::System& system);
 }

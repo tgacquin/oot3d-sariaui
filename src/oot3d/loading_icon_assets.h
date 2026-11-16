@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/map_frame_asset.h"
 #include "oot3d/pause_prompts.h"
 #include "oot3d/hud_layout.h"
@@ -8,8 +9,8 @@
 namespace OOT3D::LoadingIcon {
 constexpr unsigned Width=64,Height=64;
 using Pixels=std::array<std::uint32_t,Width*Height/2>;
-inline std::shared_ptr<const Pixels> pixels;
-inline auto GetPixels() {return std::atomic_load(&pixels);}
+inline Common::AtomicSharedPtr<const Pixels> pixels;
+inline auto GetPixels() {return pixels.load();}
 inline std::optional<Pixels> MakePixels(std::span<const std::uint8_t> source) {
     using MapFrame::LE32;
     if(source.size()!=72+Width*Height*2 || LE32(source,0)!=0x62787463 ||

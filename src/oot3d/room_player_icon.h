@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/pause_prompts.h"
 #include "oot3d/map_frame_asset.h"
 
@@ -7,8 +8,8 @@ namespace OOT3D::RoomPlayerIcon {
 constexpr unsigned Width=32,Height=32;
 using Pixels=std::array<std::uint32_t,Width*Height>;
 using Geometry=PausePrompts::QuadGeometry<1>;
-inline std::shared_ptr<const Pixels> pixels;
-inline auto GetPixels() {return std::atomic_load(&pixels);}
+inline Common::AtomicSharedPtr<const Pixels> pixels;
+inline auto GetPixels() {return pixels.load();}
 constexpr unsigned Tiled(unsigned x,unsigned y) {
     unsigned m=0;for(unsigned b=0;b<3;++b)m|=((x>>b)&1)<<(2*b)|((y>>b)&1)<<(2*b+1);
     return ((y/8)*(Width/8)+x/8)*64+m;

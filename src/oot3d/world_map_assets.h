@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/map_cutout.h"
 
 namespace OOT3D::WorldMap {
 constexpr unsigned MapWidth=320,MapHeight=240,PaperWidth=208,PaperHeight=176;
 struct PaperImage { std::vector<std::array<float,4>> colors; };
-inline std::shared_ptr<const PaperImage> paper_image;
-inline std::shared_ptr<const MapFrame::SourcePixels> source_image;
-inline auto GetSource() {return std::atomic_load(&source_image);}
-inline auto GetPaper() {return std::atomic_load(&paper_image);}
+inline Common::AtomicSharedPtr<const PaperImage> paper_image;
+inline Common::AtomicSharedPtr<const MapFrame::SourcePixels> source_image;
+inline auto GetSource() {return source_image.load();}
+inline auto GetPaper() {return paper_image.load();}
 struct Outline {
     MapFrame::Cutout cut{0,0,320,240,{}};
     float feather=8,rounding=8;
 };
-inline std::shared_ptr<const Outline> outline;
-inline auto GetOutline() {return std::atomic_load(&outline);}
+inline Common::AtomicSharedPtr<const Outline> outline;
+inline auto GetOutline() {return outline.load();}
 inline bool Valid(const Outline& o) {
     return MapFrame::Valid(o.cut) && o.cut.right<=int(MapWidth) &&
         o.cut.bottom<=int(MapHeight) && std::isfinite(o.feather) && o.feather>=0 && o.feather<=64 &&

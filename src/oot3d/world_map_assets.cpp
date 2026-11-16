@@ -22,10 +22,10 @@ void Warmup() {
 void Load(Core::System& system) {
     {
         std::scoped_lock lock{warm_mutex};warm_source.reset();
-        std::atomic_store(&warm_artwork,std::shared_ptr<const WarmPair>{});
+        warm_artwork.store(std::shared_ptr<const WarmPair>{});
     }
-    std::atomic_store(&paper_image,std::shared_ptr<const PaperImage>{});
-    std::atomic_store(&source_image,std::shared_ptr<const MapFrame::SourcePixels>{});
+    paper_image.store(std::shared_ptr<const PaperImage>{});
+    source_image.store(std::shared_ptr<const MapFrame::SourcePixels>{});
     LoadOutline();
     auto& loader=system.GetAppLoader();u64 program=0;
     if(loader.ReadProgramId(program)!=Loader::ResultStatus::Success || program!=TitleScreen::ProgramId)return;
@@ -35,7 +35,7 @@ void Load(Core::System& system) {
     const auto paper=ExtractPaper(ReadRomFSFile(*romfs,path),[](std::uint64_t bits,unsigned x,unsigned y) {
         const auto c=Pica::Texture::SampleETC1Subtile(bits,x,y);return std::array{c.r(),c.g(),c.b()};
     });
-    std::atomic_store(&paper_image,std::shared_ptr<const PaperImage>(paper));
+    paper_image.store(std::shared_ptr<const PaperImage>(paper));
     if(!paper)LOG_WARNING(Frontend,"OoT3D overworld parchments: unsupported or missing dungeon atlas");
     constexpr std::array<std::u16string_view,3> map_path{u"menu",u"01_US_ENGLISH",u"menu_map_parts01.ctxb"};
     const auto atlas=ReadRomFSFile(*romfs,map_path);

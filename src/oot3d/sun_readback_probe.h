@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -44,12 +45,7 @@ struct Session {
     }
     bool Running(I64 now) const {return !cancelled.load() && now < begins + 3 * Duration;}
 };
-// Apple libc++ versions used by this project lack atomic<shared_ptr<T>>.
-struct SessionSlot {
-    std::shared_ptr<Session> value;
-    std::shared_ptr<Session> load() const {return std::atomic_load(&value);}
-    void store(std::shared_ptr<Session> session) {std::atomic_store(&value,std::move(session));}
-};
+using SessionSlot = Common::AtomicSharedPtr<Session>;
 inline SessionSlot current;
 inline std::atomic<unsigned> installed{}, rejected{};
 inline std::shared_ptr<Session> Start(I64 now = Now(), bool optimized = false) {

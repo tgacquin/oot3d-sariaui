@@ -93,10 +93,10 @@ inline void CheckRoomReturnText(const char* code_path) {
         e.Write(M::Owner+0x14,selected);e.Write(M::Owner+0x10,8);e.Write(J::NameOwner+4,0);
         e.Write(0x50af18,0);e.Write(0x50af14,0);
         M::Hook flow;flow.pending_profile=1;flow.profile_slot=selected;
-        std::atomic_store(&J::profiles[selected],std::make_shared<const J::Profile>(J::Profile{"fixture",false}));
+        J::profiles[selected].store(std::make_shared<const J::Profile>(J::Profile{"fixture",false}));
         assert(flow.Dispatch(e,cpu.Regs(),1000000));
         assert(J::phase==J::Phase::ProfileLeaving && J::name==saved_name && !flow.awaiting_name);
-        assert(!std::atomic_load(&J::request) && e.Read(J::NameOwner+4)==0);
+        assert(!J::request.load() && e.Read(J::NameOwner+4)==0);
         assert(flow.Dispatch(e,cpu.Regs(),1075000) && J::opacity==.5f);
         assert(flow.Dispatch(e,cpu.Regs(),1150000));
         const auto regs=cpu.Regs();assert(regs[15]==M::ProfileBack && J::HideFiles());
@@ -107,7 +107,7 @@ inline void CheckRoomReturnText(const char* code_path) {
         assert(e.Read(J::NameOwner+4)==0 && e.Read(M::Owner+0x10)==9);
         e.Write(M::Owner+0x10,3);
         assert(flow.Dispatch(e,cpu.Regs(),1500000));
-        const auto request=std::atomic_load(&J::request);
+        const auto request=J::request.load();
         assert(request && request->name==saved_name && request->slot==selected && request->game_id=="fixture");
         assert(request->intent==J::Intent::Resume && J::CurrentStatus()==J::Status::Matching);
         assert(R::ReadBytes(e,M::Saves,3*M::Stride)==native_saves);
@@ -118,7 +118,7 @@ inline void CheckRoomReturnText(const char* code_path) {
         e.Write(0x50af18,0);assert(flow.Dispatch(e,cpu.Regs(),1700000));
         assert(!J::Active() && M::returning && e.Read(J::NameOwner+4)==0);
         assert(R::ReadBytes(e,M::Saves,3*M::Stride)==native_saves);
-        std::atomic_store(&J::profiles[selected],std::shared_ptr<const J::Profile>{});
+        J::profiles[selected].store(std::shared_ptr<const J::Profile>{});
     }
     std::cout<<"Existing-file Join: saved UTF-16 name, native action cleanup, direct matching search, B cancellation and unchanged saves passed\n";
 
@@ -170,7 +170,7 @@ inline void CheckRoomImport(const char* code_path, R::Package package) {
     const auto id=package.json["shared_game_id"].toString().toStdString();assert(!id.empty());
     auto resumed=std::make_shared<const J::Request>(0,package.mq,u"Guest",J::Intent::Resume,id);
     assert(R::ReceiveRoomFile(resumed,*wire) && resumed->saved && resumed->status==J::Status::Connected);
-    assert(!std::atomic_load(&resumed->file)); // No native save import queued.
+    assert(!resumed->file.load()); // No native save import queued.
     auto wrong=std::make_shared<const J::Request>(0,package.mq,u"Guest",J::Intent::Resume,"wrong");
     assert(!R::ReceiveRoomFile(wrong,*wire));
     auto old_progress=package;old_progress.extended_save.fill(char(9));
@@ -202,8 +202,8 @@ inline void CheckRoomImport(const char* code_path, R::Package package) {
         e.Write(M::Owner+0x10,3);e.Write(0x50bb58,0);
         for(unsigned i=0;i<3;++i)e.Write(M::Exists+4*i,0);
         J::Reset();J::Begin(2,0);J::name=u"Guest";J::Wait(1,false);
-        auto request=std::atomic_load(&J::request);assert(R::ReceiveRoomFile(request,*wire));
-        const auto file=std::atomic_load(&request->file);
+        auto request=J::request.load();assert(R::ReceiveRoomFile(request,*wire));
+        const auto file=request->file.load();
         assert(file && file->native_save==raw && file->package.config==package.config &&
                file->package.extended_save==package.extended_save);
         cpu.Reset();cpu.SetCpsr(0x10);

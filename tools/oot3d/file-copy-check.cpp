@@ -145,8 +145,8 @@ int main() {
         }
         // An active hosting message still draws, including its native outline;
         // stopping immediately hides it even before the replacement is rebuilt.
-        const auto previous_entry=std::atomic_load(&L::entry);
-        std::atomic_store(&L::entry,std::make_shared<const L::Entry>());
+        const auto previous_entry=L::entry.load();
+        L::entry.store(std::make_shared<const L::Entry>());
         J::profile_visible=true;J::hosting=true;hook->prompt_slot=6;
         Q::prompt_message=L::RoomMessageId();m.words[F::Owner+0x10]=8;
         for(unsigned j=0;j<9;++j)assert(hook->ModelTransform(m,0x8650600+j*4).sx>0);
@@ -158,7 +158,7 @@ int main() {
         Q::start_error=Q::FileError::None;Q::prompt_message=0x950;
         m.words[F::Owner+0x10]=3;
         for(unsigned j=0;j<9;++j)assert(hook->ModelTransform(m,0x8650600+j*4).sx>0);
-        std::atomic_store(&L::entry,previous_entry);Q::prompt_controller=0;
+        L::entry.store(previous_entry);Q::prompt_controller=0;
         std::cout<<"Private prompt lifetime: host/unhost through Copy/Erase/Start, all nine text layers, active-message preservation and no guest writes passed\n";
     }
     {

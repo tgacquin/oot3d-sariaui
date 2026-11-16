@@ -62,8 +62,7 @@ int main(int argc, char** argv) {
     }
     Check(soft > 1000 && opaque > 1000 && transparent > 1000);
     auto pixels = std::make_shared<OOT3D::MapFrame::SourcePixels>(); pixels->fill(~0u);
-    std::atomic_store(&OOT3D::MapFrame::source_image,
-        std::shared_ptr<const OOT3D::MapFrame::SourcePixels>(pixels));
+    OOT3D::MapFrame::source_image.store(std::shared_ptr<const OOT3D::MapFrame::SourcePixels>(pixels));
     OOT3D::MapFrame::LoadCutout();
     Check(OOT3D::MapFrame::GetCutImage() && OOT3D::MapFrame::has_saved_cutout);
     Check(OOT3D::MapFrame::saved_cutout.hole.size() == 20);

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/hd_font.h"
 #include "oot3d/hd_system_font_data.h"
 
@@ -10,7 +11,7 @@ struct Glyph {
     std::array<std::uint8_t,HDW*HDH*4> rgba;
 };
 using Face=std::vector<Glyph>;
-std::shared_ptr<const Face> face;
+Common::AtomicSharedPtr<const Face> face;
 std::atomic<std::uint64_t> system_generation{0};
 std::uint64_t Hash(std::span<const std::uint8_t> bytes) {
     std::uint64_t hash=14695981039346656037ULL;
@@ -19,7 +20,7 @@ std::uint64_t Hash(std::span<const std::uint8_t> bytes) {
 }
 }
 std::uint64_t SystemArtworkGeneration() {return system_generation.load();}
-void ClearSystemArtwork() {std::atomic_store(&face,std::shared_ptr<const Face>{});++system_generation;}
+void ClearSystemArtwork() {face.store(std::shared_ptr<const Face>{});++system_generation;}
 bool LoadSystemArtwork(std::span<const std::uint8_t> qbf) {
     ClearSystemArtwork();
     if(qbf.size()<16 || qbf[0]!='Q' || qbf[1]!='B' || qbf[2]!='F' || qbf[3]!='1' ||
@@ -49,13 +50,13 @@ bool LoadSystemArtwork(std::span<const std::uint8_t> qbf) {
         }
     }
     if(result->empty())return false;
-    std::atomic_store(&face,std::shared_ptr<const Face>(std::move(result)));
+    face.store(std::shared_ptr<const Face>(std::move(result)));
     ++system_generation;
     return true;
 }
 
 std::vector<std::uint8_t> RedrawSystem(std::span<const std::uint8_t> ia4,unsigned width,unsigned height) {
-    const auto current=std::atomic_load(&face);
+    const auto current=face.load();
     if(!current || width<W || height<H || width>512 || height>512 ||
        width%8 || height%8 || ia4.size()!=width*height)return {};
     struct Match {unsigned x,y,index;};

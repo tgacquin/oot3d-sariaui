@@ -115,7 +115,7 @@ int main(int argc,char** argv) {
     // Saved concave/rounded outline and inward feather clip cloud alpha too.
     W::Outline outline;outline.cut.hole={{30,20},{290,20},{290,100},{180,100},{180,220},{30,220}};
     outline.feather=12;outline.rounding=8;
-    std::atomic_store(&W::outline,std::shared_ptr<const W::Outline>(std::make_shared<W::Outline>(outline)));
+    W::outline.store(std::shared_ptr<const W::Outline>(std::make_shared<W::Outline>(outline)));
     assert(clouds.Prepare(m,model,decode));
     const auto ordinary_mask=clouds.composed;
     m.Floats(map_live+120*12,std::array<float,8>{320.f/512,1,0,1,320.f/512,16.f/256,0,16.f/256});

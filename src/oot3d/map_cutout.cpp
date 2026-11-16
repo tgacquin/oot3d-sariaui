@@ -28,11 +28,11 @@ bool ApplyCutout(const Cutout& c) {
     {
         std::scoped_lock lock{cutout_mutex};saved_cutout=c;has_saved_cutout=true;
     }
-    std::atomic_store(&cut_image,std::shared_ptr<const CutImage>(result));
+    cut_image.store(std::shared_ptr<const CutImage>(result));
     return true;
 }
 void LoadCutout() {
-    std::atomic_store(&cut_image,std::shared_ptr<const CutImage>{});
+    cut_image.store(std::shared_ptr<const CutImage>{});
     {std::scoped_lock lock{cutout_mutex};saved_cutout={};has_saved_cutout=false;}
     const auto source=GetSource();if(!source)return;
     QFile file(ReleaseDefaults::PresentationAsset(Path()));if(!file.open(QIODevice::ReadOnly) || file.size()>32768)return;
@@ -48,6 +48,6 @@ void LoadCutout() {
     }
     const auto result=Cut(*source,c);if(!result)return;
     {std::scoped_lock lock{cutout_mutex};saved_cutout=c;has_saved_cutout=true;}
-    std::atomic_store(&cut_image,std::shared_ptr<const CutImage>(result));
+    cut_image.store(std::shared_ptr<const CutImage>(result));
 }
 }

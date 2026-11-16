@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/world_map_assets.h"
 #include "oot3d/dungeon_sides.h"
 #include "oot3d/map_extension.h"
@@ -259,11 +260,11 @@ struct WarmArtwork {
     LightingCache lighting;
 };
 using WarmPair=std::array<WarmArtwork,2>;
-inline std::shared_ptr<const WarmPair> warm_artwork;
+inline Common::AtomicSharedPtr<const WarmPair> warm_artwork;
 inline std::shared_ptr<const WarmPair> FindWarm(const std::vector<float>& key,
         const std::vector<U32>& source,const std::shared_ptr<const PaperImage>& paper,
         const std::shared_ptr<const Outline>& outline,unsigned& index) {
-    auto ready=std::atomic_load(&warm_artwork);
+    auto ready=warm_artwork.load();
     if(ready)for(unsigned i=0;i<ready->size();++i) {
         const auto& candidate=(*ready)[i];
         if(candidate.key==key && candidate.paper==paper && candidate.outline==outline &&
@@ -306,9 +307,9 @@ public:
         if(job.valid()) {
             if(job.wait_for(std::chrono::seconds(0))!=std::future_status::ready)return;
             auto completed=job.get();
-            if(matches(completed))std::atomic_store(&warm_artwork,std::move(completed));
+            if(matches(completed))warm_artwork.store(std::move(completed));
         }
-        if(matches(std::atomic_load(&warm_artwork)))return;
+        if(matches(warm_artwork.load()))return;
         job=std::async(std::launch::async,[source,outline,normal,mirror] {
             auto result=std::make_shared<WarmPair>();
             for(unsigned i=0;i<2;++i) {
@@ -406,7 +407,7 @@ struct Hook {
                 map_pixels[y*MapWidth+x]={float(c[0]),float(c[1]),float(c[2]),float(alpha)};
                 (*source)[y*MapFrame::SourceWidth+x]=(U32(c[0])<<24)|(U32(c[1])<<16)|(U32(c[2])<<8)|alpha;
             }
-            std::atomic_store(&source_image,std::shared_ptr<const MapFrame::SourcePixels>(source));
+            source_image.store(std::shared_ptr<const MapFrame::SourcePixels>(source));
             compressed=std::move(bytes);
         }
         const bool paper_changed=new_paper!=paper_source;

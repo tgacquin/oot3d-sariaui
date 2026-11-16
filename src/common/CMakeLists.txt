@@ -11,6 +11,7 @@ add_library(citra_common STATIC EXCLUDE_FROM_ALL
     archives.h
     assert.h
     atomic_ops.h
+    atomic_shared_ptr.h
     detached_tasks.cpp
     detached_tasks.h
     bit_field.h

@@ -1,6 +1,12 @@
 add_library(oot3d_hd_font STATIC hd_font_artwork.cpp hd_system_font.cpp hd_rupee_font.cpp hd_boss_timer_font.cpp)
 target_include_directories(oot3d_hd_font PUBLIC "${PROJECT_SOURCE_DIR}/src")
 
+add_executable(oot3d_atomic_shared_ptr_check EXCLUDE_FROM_ALL
+    ../../tools/oot3d/atomic-shared-ptr-check.cpp)
+target_include_directories(oot3d_atomic_shared_ptr_check PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(oot3d_atomic_shared_ptr_check PRIVATE Threads::Threads)
+target_compile_options(oot3d_atomic_shared_ptr_check PRIVATE -UNDEBUG)
+
 add_executable(oot3d_release_defaults_check EXCLUDE_FROM_ALL
     ../../tools/oot3d/release-defaults-check.cpp release_defaults.qrc
     world_map_outline.cpp map_cutout.cpp)

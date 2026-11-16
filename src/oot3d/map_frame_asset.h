@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -15,9 +16,9 @@ using Bytes = std::vector<std::uint8_t>;
 constexpr unsigned Width = 512, Height = 256, FrameWidth = 400, FrameHeight = 216;
 constexpr unsigned MaskVersion = 2;
 using Pixels = std::array<std::uint32_t, Width * Height>;
-inline std::shared_ptr<const Pixels> texture;
-inline auto GetTexture() { return std::atomic_load(&texture); }
-inline void SetTexture(std::shared_ptr<const Pixels> value) { std::atomic_store(&texture,std::move(value)); }
+inline Common::AtomicSharedPtr<const Pixels> texture;
+inline auto GetTexture() { return texture.load(); }
+inline void SetTexture(std::shared_ptr<const Pixels> value) { texture.store(std::move(value)); }
 enum class Status { Unavailable, Extracted, Cached };
 inline std::atomic<Status> status{Status::Unavailable};
 void Load(Core::System& system);

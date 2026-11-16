@@ -11,8 +11,8 @@
 
 namespace OOT3D::DPad {
 void Load(Core::System& system) {
-    std::atomic_store(&Randomizer::icon_pixels, std::shared_ptr<const Randomizer::IconPixels>{});
-    for(auto& image:textures)std::atomic_store(&image,std::shared_ptr<const Pixels>{});
+    Randomizer::icon_pixels.store(std::shared_ptr<const Randomizer::IconPixels>{});
+    for(auto& image:textures)image.store(std::shared_ptr<const Pixels>{});
     auto& loader=system.GetAppLoader();u64 program=0;
     if(loader.ReadProgramId(program)!=Loader::ResultStatus::Success ||
        program!=TitleScreen::ProgramId)return;
@@ -68,9 +68,9 @@ void Load(Core::System& system) {
             (*icons)[(top+8+y)*512+left+x]=pixel;
         }
     }
-    std::atomic_store(&Randomizer::icon_pixels, std::shared_ptr<const Randomizer::IconPixels>(icons));
+    Randomizer::icon_pixels.store(std::shared_ptr<const Randomizer::IconPixels>(icons));
     for(unsigned i=0;i<TextureCount;++i)
-        std::atomic_store(&textures[i],std::shared_ptr<const Pixels>(
+        textures[i].store(std::shared_ptr<const Pixels>(
             std::make_shared<Pixels>(MakeTexture(i==1,sample))));
 }
 }

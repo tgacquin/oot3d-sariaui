@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/user_hud.h"
 #include <array>
 #include <atomic>
@@ -46,7 +47,7 @@ constexpr unsigned TextureWidth=256,TextureHeight=128;
 using Pixels=std::array<std::uint32_t,TextureWidth*TextureHeight>;
 // Both ocarinas come from the player's cartridge. Never bundle the game atlas.
 constexpr unsigned TextureCount=2;
-inline std::array<std::shared_ptr<const Pixels>,TextureCount> textures{};
-inline auto GetTexture(unsigned variant) {return std::atomic_load(&textures[variant]);}
+inline std::array<Common::AtomicSharedPtr<const Pixels>,TextureCount> textures{};
+inline auto GetTexture(unsigned variant) {return textures[variant].load();}
 void Load(Core::System& system);
 }

@@ -22,7 +22,7 @@ int main(int argc,char** argv) {
     assert(argc==4);
     auto decode=[](std::uint64_t bits,unsigned x,unsigned y) {const auto c=Pica::Texture::SampleETC1Subtile(bits,x,y);return std::array{c.r(),c.g(),c.b()};};
     auto paper=W::ExtractPaper(Read(argv[1]),decode);assert(paper && paper->colors.size()==208*176);
-    std::atomic_store(&W::paper_image,std::shared_ptr<const W::PaperImage>(paper));
+    W::paper_image.store(std::shared_ptr<const W::PaperImage>(paper));
     // Preserve fractional overlap/feather sampling while preparing coordinates
     // once per axis. Bounds intentionally differ from every paper rectangle.
     P::Paper reference;reference.Set(paper->colors,W::PaperWidth,W::PaperHeight);
@@ -107,10 +107,10 @@ int main(int argc,char** argv) {
         <<std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count()<<" ms\n";
     m.Floats(live+120*12,std::array<float,8>{320.f/512,1,0,1,320.f/512,16.f/256,0,16.f/256});
     assert(warm.Prepare(m,model,decode) && warm.warm_hits==2);
-    auto ready=std::atomic_exchange(&W::warm_artwork,std::shared_ptr<const W::WarmPair>{});
+    auto ready=W::warm_artwork.exchange(std::shared_ptr<const W::WarmPair>{});
     W::Hook cold_mirror;assert(cold_mirror.Prepare(m,model,decode) && cold_mirror.warm_hits==0);
     assert(*warm.composed==*cold_mirror.composed);
-    std::atomic_store(&W::warm_artwork,ready);
+    W::warm_artwork.store(ready);
     m.Floats(live+120*12,std::array<float,8>{0,1,320.f/512,1,0,16.f/256,320.f/512,16.f/256});
     // Full source validation rejects edits, including outside the visible crop.
     const auto last=texture+131072-4;m.words[last]^=1;
@@ -124,7 +124,7 @@ int main(int argc,char** argv) {
     PauseMenu::SetLayout(changed_layout,false);W::Hook changed_settings;
     assert(changed_settings.Prepare(m,model,decode) && !changed_settings.warm_hits);
     // Change settings while a job is in flight; only the new recipe publishes.
-    std::atomic_store(&W::warm_artwork,std::shared_ptr<const W::WarmPair>{});
+    W::warm_artwork.store(std::shared_ptr<const W::WarmPair>{});
     warmer.Poll(source,layout,{});wait_warm(changed_layout);
     unsigned warm_index=0;
     assert(!W::FindWarm(W::WarmRecipe(layout,false).key,*source->compressed,paper,{},warm_index));
@@ -151,7 +151,7 @@ int main(int argc,char** argv) {
     }
     m.Floats(live+120*20,posed_color);W::Hook posed_hook;
     assert(posed_hook.Prepare(m,model,decode) && posed_hook.warm_hits==1);
-    std::atomic_store(&W::warm_artwork,std::shared_ptr<const W::WarmPair>{});
+    W::warm_artwork.store(std::shared_ptr<const W::WarmPair>{});
     W::Hook posed_cold;assert(posed_cold.Prepare(m,model,decode) && *posed_cold.composed==*posed_hook.composed);
     m.Floats(live,positions);for(unsigned i=0;i<4;++i)for(unsigned c=0;c<3;++c)posed_color[4*i+c]=1;
     m.Floats(live+120*20,posed_color);
@@ -273,7 +273,7 @@ int main(int argc,char** argv) {
     outline.cut.hole={{8,20},{84,28},{155,14},{235,8},{310,42},{305,85},{265,104},
         {245,149},{211,175},{141,192},{91,189},{84,158},{111,139},{94,103},{51,82},{13,76}};
     outline.feather=10;assert(W::Valid(outline));
-    std::atomic_store(&W::outline,std::shared_ptr<const W::Outline>(std::make_shared<W::Outline>(outline)));
+    W::outline.store(std::shared_ptr<const W::Outline>(std::make_shared<W::Outline>(outline)));
     assert(hook.Prepare(m,model,decode) && hook.composed!=first);const auto masked=hook.composed;
     layout.world_map_shadow_opacity=0;PauseMenu::SetLayout(layout,false);
     assert(hook.Prepare(m,model,decode));const auto no_shadow=hook.composed;

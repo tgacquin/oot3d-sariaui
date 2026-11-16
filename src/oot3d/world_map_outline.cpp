@@ -19,11 +19,11 @@ bool ApplyOutline(const Outline& value) {
     const QJsonObject object{{"version",1},{"feather",value.feather},{"rounding",value.rounding},{"points",points}};
     const auto bytes=QJsonDocument(object).toJson();QSaveFile file(Path());
     if(!file.open(QIODevice::WriteOnly) || file.write(bytes)!=bytes.size() || !file.commit())return false;
-    std::atomic_store(&outline,std::shared_ptr<const Outline>(std::make_shared<Outline>(value)));
+    outline.store(std::shared_ptr<const Outline>(std::make_shared<Outline>(value)));
     return true;
 }
 void LoadOutline() {
-    std::atomic_store(&outline,std::shared_ptr<const Outline>{});
+    outline.store(std::shared_ptr<const Outline>{});
     QFile file(ReleaseDefaults::PresentationAsset(Path()));if(!file.open(QIODevice::ReadOnly) || file.size()>32768)return;
     const auto o=QJsonDocument::fromJson(file.readAll()).object();
     if(o.value("version").toInt()!=1 || !o.value("feather").isDouble())return;
@@ -37,6 +37,6 @@ void LoadOutline() {
         if(p.size()!=2 || !p[0].isDouble() || !p[1].isDouble())return;
         value.cut.hole.push_back({float(p[0].toDouble()),float(p[1].toDouble())});
     }
-    if(Valid(value))std::atomic_store(&outline,std::shared_ptr<const Outline>(std::make_shared<Outline>(value)));
+    if(Valid(value))outline.store(std::shared_ptr<const Outline>(std::make_shared<Outline>(value)));
 }
 }

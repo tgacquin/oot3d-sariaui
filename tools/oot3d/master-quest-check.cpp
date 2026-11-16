@@ -455,7 +455,7 @@ int main(int argc,char** argv) {
     for(unsigned i=3;i<48;i+=4)assert(invisible.colors[i]==0);
     assert(icon.colors!=OOT3D::LoadingIcon::Draw(8333,1,{12,-9,2},anchor).colors);
     // The file-menu caller caps this instance, leaving the title icon alone.
-    std::atomic_store(&OOT3D::LoadingIcon::pixels,std::make_shared<const OOT3D::LoadingIcon::Pixels>(*throbber));
+    OOT3D::LoadingIcon::pixels.store(std::make_shared<const OOT3D::LoadingIcon::Pixels>(*throbber));
     OOT3D::FileSelect::Hook loading_draw;
     loading_draw.source=0x8000000;m.words[loading_draw.source]=0x4ebd60;
     m.words[loading_draw.source+4]=0x8010000;m.words[0x8010000]=0x8020000;
@@ -487,7 +487,7 @@ int main(int argc,char** argv) {
     now=90000000;rejection.started_us=now-Q::SlideUs-Q::StaggerUs;
     const auto archive_before=Read(std::string(argv[2])+"/message/us/us.qm");
     auto archive=archive_before;assert(OOT3D::LoadingPrompt::Prepare(archive));
-    const auto messages=std::atomic_load(&OOT3D::LoadingPrompt::entry);
+    const auto messages=OOT3D::LoadingPrompt::entry.load();
     assert(std::equal(archive_before.begin(),archive_before.end(),archive.begin()));
     namespace GP=OOT3D::Randomizer::GenerationProgress;
     {
@@ -648,7 +648,7 @@ int main(int argc,char** argv) {
         // language and a one-shot loading-icon shake, rather than an F1 overlay.
         const auto previous_font=Status::GetAssets();
         const auto previous_source=m.words[OOT3D::HUD::Action+0x20];
-        std::atomic_store(&Status::assets,std::make_shared<const Status::Assets>(*font));
+        Status::assets.store(std::make_shared<const Status::Assets>(*font));
         for(unsigned language:{1u,2u,5u}) {
             OOT3D::UILanguage::active=language;
             OOT3D::MultiplayerStartup::phase=OOT3D::MultiplayerStartup::Phase::Failed;
@@ -672,7 +672,7 @@ int main(int argc,char** argv) {
             startup.Begin(m,r,0x123400,now+266667);assert(!startup.error_geometry.count);
         }
         OOT3D::UILanguage::active=1;OOT3D::MultiplayerStartup::phase=OOT3D::MultiplayerStartup::Phase::Idle;
-        std::atomic_store(&Status::assets,previous_font);
+        Status::assets.store(previous_font);
         m.words[OOT3D::HUD::Action+0x20]=previous_source;
         // Failure after background work: restore visible choices and start one
         // shake immediately; a held A must neither retry nor restart the shake.
@@ -869,13 +869,13 @@ int main(int argc,char** argv) {
         join.Dispatch(m,r,now,file);
         assert(J::phase==J::Phase::Waiting && J::opacity==0);
         assert(Q::PromptMessage()==OOT3D::LoadingPrompt::WaitingMessageId);
-        const auto request=std::atomic_load(&J::request);
+        const auto request=J::request.load();
         assert(request && request->slot==1 && request->name==u"Player");
         join.Dispatch(m,r,now+75000,file);assert(J::opacity==.5f); // Held B cannot cancel.
         m.words[0x50af18]=0;join.Dispatch(m,r,now+80000,file);
         m.words[0x50af18]=2;join.Dispatch(m,r,now+90000,file);
         const float leaving_from=J::opacity.load();assert(J::phase==J::Phase::Leaving);
-        assert(!std::atomic_load(&J::request));join.Handle(m,r,6,now+90000,file);
+        assert(!J::request.load());join.Handle(m,r,6,now+90000,file);
         join.Dispatch(m,r,now+100000,file);assert(J::opacity<leaving_from);
         join.Dispatch(m,r,now+240000,file);
         assert(!J::Active() && !join.modal && !Q::choosing && Q::returning && join.slot==3);
@@ -895,7 +895,7 @@ int main(int argc,char** argv) {
         // A saved host file reloads its native card and selects Start/Copy/Erase.
         // Connection ownership transfers only after that file can be opened.
         J::Begin(1,0);J::name=u"Link";J::Wait(now+830000,false);
-        const auto connected=std::atomic_load(&J::request);
+        const auto connected=J::request.load();
         connected->saved=true;
         connected->status=J::Status::Connected;
         join.Dispatch(m,r,now+840000,file);
@@ -954,14 +954,14 @@ int main(int argc,char** argv) {
         assert(!join.Dispatch(m,r,now+1500000,file));
         for(unsigned i=0;i<3;++i)assert(crcs[i]==CRC(m,Q::Saves+i*Q::Stride));
         // Existing occupied files enter nickname entry without changing save data.
-        std::atomic_store(&J::profiles[1],std::make_shared<const J::Profile>(J::Profile{"test-game",false}));
+        J::profiles[1].store(std::make_shared<const J::Profile>(J::Profile{"test-game",false}));
         m.words[Q::Exists+4]=1;m.words[Q::Owner+0x10]=8;m.words[Q::Owner+0x14]=1;
         m.words[0x50af18]=0;join.Dispatch(m,r,now+2000000,file);
         m.words[Q::Owner+0x18]=2;
         m.words[0x50af18]=0x800;join.Dispatch(m,r,now+2000001,file);
         assert(m.Read(Q::Owner+0x18)==0);
         assert(!join.pending_profile && r[15]==0x4301c4 && r[0]==Q::RandomizerToggleSound);
-        const auto hosting_request=std::atomic_load(&J::request);
+        const auto hosting_request=J::request.load();
         assert(hosting_request && hosting_request->inline_host && hosting_request->game_id=="test-game");
         join.Handle(m,r,5,now+2000001,file);
         join.Dispatch(m,r,now+2100000,file);assert(!J::Active());
@@ -997,7 +997,7 @@ int main(int argc,char** argv) {
         assert(join.sound_only==Q::Hook::Sound::Select && r[15]==Q::Sites[2].pc+4);
         join.Handle(m,r,4,now+2700000,file);join.Dispatch(m,r,now+2900000,file);
         assert(J::intent==J::Intent::Resume && J::game_id=="test-game");
-        assert(J::phase==J::Phase::ProfileLeaving && !join.awaiting_name && !std::atomic_load(&J::request));
+        assert(J::phase==J::Phase::ProfileLeaving && !join.awaiting_name && !J::request.load());
         assert(J::name==Q::SavedFileName(m,1));
         assert(join.Dispatch(m,r,now+2975000,file) && r[15]==Q::FilePresentation && J::opacity==.5f);
         assert(join.Dispatch(m,r,now+3050000,file) && r[15]==Q::ProfileBack && r[7]==1);
@@ -1006,12 +1006,12 @@ int main(int argc,char** argv) {
         m.words[Q::Owner+0x10]=3;m.words[J::NameOwner+4]=0;
         assert(join.Dispatch(m,r,now+3200000,file) && J::phase==J::Phase::Waiting);
         assert(Q::Occupied(m,1));
-        const auto resume_request=std::atomic_load(&J::request);
+        const auto resume_request=J::request.load();
         assert(resume_request && resume_request->name==Q::SavedFileName(m,1) && resume_request->game_id=="test-game");
         assert(J::CurrentStatus()==J::Status::Matching && J::Label(J::CurrentStatus())=="Looking for matching room ID...");
         for(unsigned i=0;i<3;++i)assert(crcs[i]==CRC(m,Q::Saves+i*Q::Stride));
         J::Reset();J::profile_visible=false;
-        std::atomic_store(&J::profiles[1],std::shared_ptr<const J::Profile>{});
+        J::profiles[1].store(std::shared_ptr<const J::Profile>{});
         m.words[Q::Owner+0x10]=3;m.words[Q::Exists+4]=0;m.words[0x50af18]=0;
         OOT3D::Randomizer::FileStatus::Publish(1,"seed","ba7ab566-c1e4-4933-9e6d-efdc6251a7bb");
         assert(OOT3D::Randomizer::FileStatus::ShortRoomId(1)=="BA7AB566");

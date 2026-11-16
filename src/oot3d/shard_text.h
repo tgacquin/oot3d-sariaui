@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/message_patch.h"
 #include "oot3d/rumble.h"
 #include <memory>
@@ -9,8 +10,8 @@ struct Patch {std::uint32_t id,slot;std::uint64_t fingerprint;unsigned size;std:
 #include "oot3d/messages/rumble_patches.h"
 namespace OOT3D::ShardText {
 struct Variants {std::array<std::uint32_t,2> entries{};std::uint32_t signature=0;};
-inline std::shared_ptr<const Variants> variants;
-inline void Reset() {std::atomic_store(&variants,std::shared_ptr<const Variants>{});}
+inline Common::AtomicSharedPtr<const Variants> variants;
+inline void Reset() {variants.store(std::shared_ptr<const Variants>{});}
 inline bool Prepare(std::vector<std::uint8_t>& bytes) {
     Reset();using Messages::Read32;using Messages::Write32;
     if(bytes.size()<16 || bytes.size()>8*1024*1024 || Read32(bytes,0)!=0x4d51 || Read32(bytes,4)!=4)return false;
@@ -43,11 +44,11 @@ inline bool Prepare(std::vector<std::uint8_t>& bytes) {
     if(found!=6)return false;
     next->signature=result.size();for(auto word:{0x53484152u,0x4452554du})
         for(unsigned i=0;i<4;++i)result.push_back(word>>(i*8));
-    bytes.swap(result);std::atomic_store(&variants,std::shared_ptr<const Variants>(next));return true;
+    bytes.swap(result);variants.store(std::shared_ptr<const Variants>(next));return true;
 }
 template<class M,class R> bool Select(M& m,R& r) {
     if(!Rumble::enabled.load() || (r[1]!=0x68 && r[1]!=0x76f))return false;
-    const auto v=std::atomic_load(&variants);const auto base=m.Read(r[0]+4).value_or(0);
+    const auto v=variants.load();const auto base=m.Read(r[0]+4).value_or(0);
     if(!v || !base || m.Read(base)!=0x4d51 || m.Read(base+v->signature)!=0x53484152 ||
        m.Read(base+v->signature+4)!=0x4452554d)return false;
     r[0]=base+v->entries[r[1]==0x68?0:1];r[15]=r[14];return true;

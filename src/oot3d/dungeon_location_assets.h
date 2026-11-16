@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/map_frame_asset.h"
 #include <optional>
 #include "oot3d/ui_language.h"
@@ -9,8 +10,8 @@ constexpr unsigned Width=256,Height=512;
 using PaperPixels=std::array<std::uint32_t,256*256/4>; // Native ETC1A4.
 using TitlePixels=std::array<std::uint32_t,Width*Height>;
 struct Assets {PaperPixels paper{};TitlePixels titles{};unsigned available=0;};
-inline std::shared_ptr<const Assets> assets;
-inline auto GetAssets() {return std::atomic_load(&assets);}
+inline Common::AtomicSharedPtr<const Assets> assets;
+inline auto GetAssets() {return assets.load();}
 constexpr std::array<std::u16string_view,12> Archives{u"ydan.zar",u"ddan.zar",u"bdan.zar",u"bmori1.zar",
     u"hidan.zar",u"mizusin.zar",u"jyasinzou.zar",u"hakadan.zar",u"hakadan_ch.zar",
     u"ice_doukutu.zar",u"men.zar",u"ganontika.zar"};

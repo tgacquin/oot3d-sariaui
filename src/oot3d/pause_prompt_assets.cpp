@@ -29,21 +29,21 @@ void Load(Core::System& system) {
     UILanguage::active=static_cast<unsigned>(Service::CFG::GetModule(system)->GetSystemLanguage());
     GraphicsMemory::live_diagnostics.Reset();
     HDFont::Reset();
-    std::atomic_store(&HDFont::rupee_atlas,std::shared_ptr<const HDFont::RupeeAtlas>{});
+    HDFont::rupee_atlas.store(std::shared_ptr<const HDFont::RupeeAtlas>{});
     for(auto& atlas:HDFont::boss_timer_atlases)
-        std::atomic_store(&atlas,std::shared_ptr<const HDFont::RupeeAtlas>{});
-    std::atomic_store(&DungeonLocation::assets,std::shared_ptr<const DungeonLocation::Assets>{});
-    std::atomic_store(&RoomPlayerIcon::pixels,std::shared_ptr<const RoomPlayerIcon::Pixels>{});
-    std::atomic_store(&BossTitle::pixels,std::shared_ptr<const BossTitle::Pixels>{});
-    std::atomic_store(&ShopHint::pixels,std::shared_ptr<const ShopHint::Pixels>{});
-    std::atomic_store(&FileParticles::pixels,std::shared_ptr<const FileParticles::Pixels>{});
-    std::atomic_store(&LoadingIcon::pixels,std::shared_ptr<const LoadingIcon::Pixels>{});
+        atlas.store(std::shared_ptr<const HDFont::RupeeAtlas>{});
+    DungeonLocation::assets.store(std::shared_ptr<const DungeonLocation::Assets>{});
+    RoomPlayerIcon::pixels.store(std::shared_ptr<const RoomPlayerIcon::Pixels>{});
+    BossTitle::pixels.store(std::shared_ptr<const BossTitle::Pixels>{});
+    ShopHint::pixels.store(std::shared_ptr<const ShopHint::Pixels>{});
+    FileParticles::pixels.store(std::shared_ptr<const FileParticles::Pixels>{});
+    LoadingIcon::pixels.store(std::shared_ptr<const LoadingIcon::Pixels>{});
     LoadingIcon::ObserveTop({});
-    std::atomic_store(&assets,std::shared_ptr<const Assets>{});
-    std::atomic_store(&TitlePrompt::assets,std::shared_ptr<const TitlePrompt::Assets>{});
-    std::atomic_store(&FileStatusText::assets,std::shared_ptr<const FileStatusText::Assets>{});
-    std::atomic_store(&FileBackground::pixels,std::shared_ptr<const FileBackground::Pixels>{});
-    std::atomic_store(&QuestChoice::pixels,std::shared_ptr<const QuestChoice::Pixels>{});
+    assets.store(std::shared_ptr<const Assets>{});
+    TitlePrompt::assets.store(std::shared_ptr<const TitlePrompt::Assets>{});
+    FileStatusText::assets.store(std::shared_ptr<const FileStatusText::Assets>{});
+    FileBackground::pixels.store(std::shared_ptr<const FileBackground::Pixels>{});
+    QuestChoice::pixels.store(std::shared_ptr<const QuestChoice::Pixels>{});
     auto& loader=system.GetAppLoader();u64 program=0;
     if(loader.ReadProgramId(program)!=Loader::ResultStatus::Success ||
        program!=TitleScreen::ProgramId)return;
@@ -51,7 +51,7 @@ void Load(Core::System& system) {
     if(loader.ReadRomFS(romfs)!=Loader::ResultStatus::Success || !romfs)return;
     constexpr std::array<std::u16string_view,2> icon_path{u"message",u"parts.ctxb"};
     constexpr std::array<std::u16string_view,3> map_icon_path{u"menu",u"01_US_ENGLISH",u"menu_map_parts00.ctxb"};
-    std::atomic_store(&RoomPlayerIcon::pixels,RoomPlayerIcon::Extract(ReadRomFSFile(*romfs,map_icon_path),
+    RoomPlayerIcon::pixels.store(RoomPlayerIcon::Extract(ReadRomFSFile(*romfs,map_icon_path),
         [](u64 value,unsigned x,unsigned y){return Pica::Texture::SampleETC1Subtile(value,x,y);}));
     constexpr std::array<std::u16string_view,2> loading_path{u"misc",u"throbber.ctxb"};
     constexpr std::array<std::u16string_view,2> particle_path{u"actor",u"zelda_keep.zar"};
@@ -61,7 +61,7 @@ void Load(Core::System& system) {
         const std::array<std::u16string_view,2> path{u"actor",BossTitle::Archives[i]};
         if(!BossTitle::LoadTitle(*titles,i,ReadRomFSFile(*romfs,path),UILanguage::active.load()))titles_loaded=false;
     }
-    if(titles_loaded)std::atomic_store(&BossTitle::pixels,std::shared_ptr<const BossTitle::Pixels>(titles));
+    if(titles_loaded)BossTitle::pixels.store(std::shared_ptr<const BossTitle::Pixels>(titles));
     else LOG_WARNING(Frontend,"OoT3D boss intro titles unavailable");
     auto locations=std::make_shared<DungeonLocation::Assets>();
     const std::array<std::u16string_view,3> paper_path{u"menu",UILanguage::Menu(UILanguage::active.load()),u"hud_menu_title00.ctxb"};
@@ -71,26 +71,26 @@ void Load(Core::System& system) {
             if(!DungeonLocation::LoadTitle(*locations,i,ReadRomFSFile(*romfs,path),UILanguage::active.load()))
                 LOG_WARNING(Frontend,"OoT3D dungeon-entry title unavailable: {}",i);
         }
-        std::atomic_store(&DungeonLocation::assets,std::shared_ptr<const DungeonLocation::Assets>(locations));
+        DungeonLocation::assets.store(std::shared_ptr<const DungeonLocation::Assets>(locations));
     }
     const auto keep=ReadRomFSFile(*romfs,particle_path);
     if(const auto hint=ShopHint::MakePixels(keep))
-        std::atomic_store(&ShopHint::pixels,std::make_shared<const ShopHint::Pixels>(*hint));
+        ShopHint::pixels.store(std::make_shared<const ShopHint::Pixels>(*hint));
     if(const auto particle=FileParticles::MakePixels(keep))
-        std::atomic_store(&FileParticles::pixels,std::make_shared<const FileParticles::Pixels>(*particle));
+        FileParticles::pixels.store(std::make_shared<const FileParticles::Pixels>(*particle));
     else
         LOG_WARNING(Frontend,"OoT3D file particles: native floating-particle texture unavailable");
     if(const auto icon=LoadingIcon::MakePixels(ReadRomFSFile(*romfs,loading_path)))
-        std::atomic_store(&LoadingIcon::pixels,std::make_shared<const LoadingIcon::Pixels>(*icon));
+        LoadingIcon::pixels.store(std::make_shared<const LoadingIcon::Pixels>(*icon));
     constexpr std::array<std::u16string_view,3> font_path{u"message",u"us",u"ltn16.qbf"};
     constexpr std::array<std::u16string_view,3> cursor_path{u"menu",u"01_US_ENGLISH",u"menu_cursor00.ctxb"};
     constexpr std::array<std::u16string_view,3> background_path{u"menu",u"01_US_ENGLISH",u"common_bg01.ctxb"};
     const std::array<std::u16string_view,4> quest_path{u"misc",u"us",UILanguage::active==2?u"french":UILanguage::active==5?u"spanish":u"english",u"ura.ctxb"};
     if(const auto quest=QuestChoice::MakePixels(ReadRomFSFile(*romfs,quest_path)))
-        std::atomic_store(&QuestChoice::pixels,std::shared_ptr<const QuestChoice::Pixels>(
+        QuestChoice::pixels.store(std::shared_ptr<const QuestChoice::Pixels>(
             std::make_shared<QuestChoice::Pixels>(*quest)));
     if(const auto background=FileBackground::MakePixels(ReadRomFSFile(*romfs,background_path)))
-        std::atomic_store(&FileBackground::pixels,std::shared_ptr<const FileBackground::Pixels>(
+        FileBackground::pixels.store(std::shared_ptr<const FileBackground::Pixels>(
             std::make_shared<FileBackground::Pixels>(*background)));
     const auto font=ReadRomFSFile(*romfs,font_path);
     if (HDFont::LoadArtwork(font))
@@ -109,8 +109,7 @@ void Load(Core::System& system) {
         if(auto atlas=HDFont::DecodeBossTimerAtlas(bytes,
             [](u64 value,unsigned x,unsigned y){return Pica::Texture::SampleETC1Subtile(value,x,y);})) {
             atlas->hash=Common::CityHash64(reinterpret_cast<const char*>(bytes.data()+72),bytes.size()-72);
-            std::atomic_store(&HDFont::boss_timer_atlases[language],
-                std::shared_ptr<const HDFont::RupeeAtlas>(std::move(atlas)));
+            HDFont::boss_timer_atlases[language].store(std::shared_ptr<const HDFont::RupeeAtlas>(std::move(atlas)));
         }
     }
     auto rupees=std::make_shared<HDFont::RupeeAtlas>();
@@ -118,7 +117,7 @@ void Load(Core::System& system) {
     rupees->rgba=HDFont::MakeRupeeAtlas(numbers);
     if(!rupees->rgba.empty()) {
         rupees->hash=Common::CityHash64(reinterpret_cast<const char*>(numbers.data()+72),numbers.size()-72);
-        std::atomic_store(&HDFont::rupee_atlas,std::shared_ptr<const HDFont::RupeeAtlas>(std::move(rupees)));
+        HDFont::rupee_atlas.store(std::shared_ptr<const HDFont::RupeeAtlas>(std::move(rupees)));
     }
     const auto register_text = [&](unsigned width, unsigned height,
                                    std::span<const std::uint32_t> native,
@@ -139,14 +138,14 @@ void Load(Core::System& system) {
         for (const auto& glyph : status->glyphs)
             glyphs.push_back({glyph.code, glyph.x + 1, glyph.y + 2});
         register_text(FileStatusText::Width, FileStatusText::Height, status->pixels, glyphs);
-        std::atomic_store(&FileStatusText::assets,std::make_shared<const FileStatusText::Assets>(*status));
+        FileStatusText::assets.store(std::make_shared<const FileStatusText::Assets>(*status));
     }
     if(const auto title=TitlePrompt::MakeAssets(font,UILanguage::active.load())) {
         std::vector<HDFont::TextGlyph> glyphs;
         for (unsigned i = 0; i < title->length; ++i)
             glyphs.push_back({unsigned(TitlePrompt::Labels[UILanguage::Index(UILanguage::active.load())][i]), title->glyphs[i].x, 2});
         register_text(TitlePrompt::Width, TitlePrompt::Height, title->pixels, glyphs);
-        std::atomic_store(&TitlePrompt::assets,std::shared_ptr<const TitlePrompt::Assets>(
+        TitlePrompt::assets.store(std::shared_ptr<const TitlePrompt::Assets>(
             std::make_shared<TitlePrompt::Assets>(*title)));
     }
     const auto image=MakeAssets(ReadRomFSFile(*romfs,icon_path),font,
@@ -160,6 +159,6 @@ void Load(Core::System& system) {
         for (unsigned i = 0; i < image->lengths[row]; ++i)
             glyphs.push_back({image->glyphs[row][i].code, image->glyphs[row][i].x, row * TextRowHeight + 2});
     register_text(TextWidth, TextHeight, image->text, glyphs);
-    std::atomic_store(&assets,std::shared_ptr<const Assets>(std::make_shared<Assets>(*image)));
+    assets.store(std::shared_ptr<const Assets>(std::make_shared<Assets>(*image)));
 }
 }

@@ -18,7 +18,7 @@ namespace OOT3D::MapFrame {
 void Load(Core::System& system) {
     WorldMap::Load(system);
     SetTexture({});status.store(Status::Unavailable);
-    std::atomic_store(&source_image,std::shared_ptr<const SourcePixels>{});
+    source_image.store(std::shared_ptr<const SourcePixels>{});
     LoadCutout();
     auto& loader=system.GetAppLoader();
     u64 program=0;
@@ -37,7 +37,7 @@ void Load(Core::System& system) {
         (*decoded)[y*SourceWidth+x]=255u | (unsigned(rgb.b())<<8) |
             (unsigned(rgb.g())<<16) | (unsigned(rgb.r())<<24);
     }
-    std::atomic_store(&source_image,std::shared_ptr<const SourcePixels>(decoded));
+    source_image.store(std::shared_ptr<const SourcePixels>(decoded));
     LoadCutout();
     status.store(Status::Extracted);
     LOG_INFO(Frontend,"OoT3D map border: source ready for coordinate selection");

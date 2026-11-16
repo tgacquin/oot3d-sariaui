@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "common/atomic_shared_ptr.h"
 #include "oot3d/randomizer/service.h"
 #include "oot3d/randomizer/presets.h"
 #include "common/logging/log.h"
@@ -44,7 +45,7 @@ std::shared_ptr<std::atomic<bool>> cancel_generation;
 thread_local std::shared_ptr<const std::atomic<bool>> reporting_cancellation;
 std::optional<Package> prepared;
 unsigned preparing_slot = 3;
-std::array<std::shared_ptr<const RoomFile>,3> room_files;
+std::array<Common::AtomicSharedPtr<const RoomFile>,3> room_files;
 std::atomic<unsigned> room_selected{3};
 bool preparing_mq = false, generation_failed = false;
 QString SlotDirectory(unsigned slot) { return directory + QStringLiteral("/slot%1").arg(slot); }
@@ -482,8 +483,8 @@ bool RecordSave(unsigned slot, const QByteArray& bytes, const Package* package, 
 void BeginOrdinaryFile(unsigned slot) {
     if (slot < 3) {
         QFile::remove(SlotDirectory(slot) + "/randomized");
-        std::atomic_store(&RoomJoin::profiles[slot],std::shared_ptr<const RoomJoin::Profile>{});
-        std::atomic_store(&room_files[slot],std::shared_ptr<const RoomFile>{});
+        RoomJoin::profiles[slot].store(std::shared_ptr<const RoomJoin::Profile>{});
+        room_files[slot].store(std::shared_ptr<const RoomFile>{});
     }
 }
 void CopySlot(unsigned source, unsigned destination, const QByteArray& bytes) {
@@ -507,27 +508,27 @@ bool ValidRoomSave(const QByteArray& bytes) {
 }
 void ClearRoomFiles() {
     room_selected=3;
-    for(auto& file:room_files)std::atomic_store(&file,std::shared_ptr<const RoomFile>{});
-    for(auto& profile:RoomJoin::profiles)std::atomic_store(&profile,std::shared_ptr<const RoomJoin::Profile>{});
+    for(auto& file:room_files)file.store(std::shared_ptr<const RoomFile>{});
+    for(auto& profile:RoomJoin::profiles)profile.store(std::shared_ptr<const RoomJoin::Profile>{});
 }
 void SelectRoomFile(unsigned slot) {room_selected=slot;}
 void PublishRoomFile(unsigned slot,const QByteArray& bytes,const Package* package) {
     if(slot>=3)return;
-    std::atomic_store(&RoomJoin::profiles[slot],std::shared_ptr<const RoomJoin::Profile>{});
+    RoomJoin::profiles[slot].store(std::shared_ptr<const RoomJoin::Profile>{});
     if(!package || !ValidRoomSave(bytes) || (bytes[0xe]!=0)!=package->mq) {
-        std::atomic_store(&room_files[slot],std::shared_ptr<const RoomFile>{});return;
+        room_files[slot].store(std::shared_ptr<const RoomFile>{});return;
     }
     auto file=std::make_shared<RoomFile>();file->native_save=bytes;file->package=*package;
     file->package.json["extended_save"]=QString::fromLatin1(package->extended_save.toBase64());
     file->identity=RoomIdentity(file->package.json);
     const auto id=file->package.json.value("shared_game_id").toString().toStdString();
     if(!id.empty() && package->config.advanced.contains("MP_Enabled") && package->config.advanced.at("MP_Enabled"))
-        std::atomic_store(&RoomJoin::profiles[slot],std::make_shared<const RoomJoin::Profile>(RoomJoin::Profile{id,package->mq}));
+        RoomJoin::profiles[slot].store(std::make_shared<const RoomJoin::Profile>(RoomJoin::Profile{id,package->mq}));
     const auto wire=QJsonDocument(QJsonObject{{"format","oot3d-room-file-1"},
         {"save",QString::fromLatin1(bytes.toBase64())},{"package",file->package.json}}).toJson(QJsonDocument::Compact);
     if(wire.size()>8*1024*1024)return;
     file->wire=std::make_shared<const std::vector<std::uint8_t>>(wire.begin(),wire.end());
-    std::atomic_store(&room_files[slot],std::shared_ptr<const RoomFile>(std::move(file)));
+    room_files[slot].store(std::shared_ptr<const RoomFile>(std::move(file)));
 }
 std::shared_ptr<const std::vector<std::uint8_t>> HostedRoomFile(bool new_room) {
     // Called only by the frontend. A room stays tied to the file/seed selected
@@ -536,10 +537,10 @@ std::shared_ptr<const std::vector<std::uint8_t>> HostedRoomFile(bool new_room) {
     if(new_room){slot=3;identity.clear();}
     if(slot>=3) {
         const auto selected=room_selected.load();if(selected>=3)return {};
-        const auto file=std::atomic_load(&room_files[selected]);if(!file)return {};
+        const auto file=room_files[selected].load();if(!file)return {};
         slot=selected;identity=file->identity;
     }
-    const auto file=std::atomic_load(&room_files[slot]);
+    const auto file=room_files[slot].load();
     return file && file->identity==identity?file->wire:nullptr;
 }
 bool ReceiveRoomFile(const std::shared_ptr<const RoomJoin::Request>& request,
@@ -559,14 +560,14 @@ bool ReceiveRoomFile(const std::shared_ptr<const RoomJoin::Request>& request,
     file->identity=RoomIdentity(file->package.json);
     if(request->cancelled.load())return false;
     if(request->intent==RoomJoin::Intent::Resume) {
-        const auto local=request->slot<3?std::atomic_load(&room_files[request->slot]):nullptr;
+        const auto local=request->slot<3?room_files[request->slot].load():nullptr;
         if(!local || request->game_id!=file->package.json.value("shared_game_id").toString().toStdString() ||
            local->identity!=file->identity)return false;
         // Existing progress is reconciled by ordinary multiplayer at game start.
         // Do not run the import writer on an occupied slot.
         request->saved=true;request->status=RoomJoin::Status::Connected;return true;
     }
-    std::atomic_store(&request->file,std::shared_ptr<const RoomFile>(std::move(file)));
+    request->file.store(std::shared_ptr<const RoomFile>(std::move(file)));
     request->status=RoomJoin::Status::ReadyToSave;
     return true;
 }
