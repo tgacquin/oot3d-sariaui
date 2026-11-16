@@ -52,13 +52,10 @@ jobs:
         include:
           - platform: windows-x64
             runner: windows-2022
-            shell: 'msys2 {0}'
           - platform: macos-arm64
             runner: macos-15
-            shell: bash
           - platform: linux-x86_64
             runner: ubuntu-24.04
-            shell: bash
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 150
     env:
@@ -93,9 +90,15 @@ jobs:
             mingw-w64-ucrt-x86_64-qt6-multimedia
             mingw-w64-ucrt-x86_64-qt6-tools
             mingw-w64-ucrt-x86_64-SDL2
-      - name: Build, check and package macOS or Windows
-        if: matrix.platform != 'linux-x86_64'
-        shell: ${{ matrix.shell }}
+      - name: Build, check and package Windows
+        if: matrix.platform == 'windows-x64'
+        shell: 'msys2 {0}'
+        run: |
+          set -euo pipefail
+          bash tools/oot3d/release/build.sh "$RELEASE_PLATFORM" "$RELEASE_VERSION" 2>&1 | tee release-build.log
+      - name: Build, check and package macOS
+        if: matrix.platform == 'macos-arm64'
+        shell: bash
         run: |
           set -euo pipefail
           bash tools/oot3d/release/build.sh "$RELEASE_PLATFORM" "$RELEASE_VERSION" 2>&1 | tee release-build.log
