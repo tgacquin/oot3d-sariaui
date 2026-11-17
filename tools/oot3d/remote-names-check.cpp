@@ -31,6 +31,22 @@ int main() {
     const auto screen_x=[](const auto& v){return v.position[1]/v.position[3];};
     assert(screen_x(close[2])>screen_x(close[0]) && close[2].uv[0]>close[0].uv[0]);
     assert(screen_x(close[6])>screen_x(close[0]));
+    // Regular and mirrored projections must both keep glyphs and letter order
+    // readable, including a clip-axis flip. The anchor still follows the world.
+    for(double projection_sign:{-1.,1.})for(float clip_sign:{-1.f,1.f}) {
+        auto mirrored=scene;mirrored.projection[1][0]=projection_sign;mirrored.clip_y=clip_sign;
+        auto offset_labels=labels;offset_labels.anchors[0].position[0]=12;
+        const auto text=N::Geometry(font,offset_labels,mirrored,layout);
+        assert(text.size()==close.size());
+        for(unsigned glyph=0;glyph<text.size();glyph+=6) {
+            assert(screen_x(text[glyph+2])>screen_x(text[glyph]));
+            assert(text[glyph+2].uv[0]>text[glyph].uv[0]);
+            if(glyph)assert(screen_x(text[glyph])>screen_x(text[glyph-6]));
+        }
+        const auto centered=N::Geometry(font,labels,mirrored,layout);
+        for(unsigned i=0;i<text.size();++i)
+            assert(near(screen_x(text[i])-screen_x(centered[i]),projection_sign*clip_sign*12/100));
+    }
     const auto height=[](const auto& g){return std::abs(g[0].position[0]/g[0].position[3]-g[1].position[0]/g[1].position[3]);};
     labels.anchors[0].position[2]=-200;
     const auto far=N::Geometry(font,labels,scene,layout);assert(near(height(close),2*height(far)));
