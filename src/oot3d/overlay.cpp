@@ -623,6 +623,12 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                         UserHUD::hd_numbers_override=hd_numbers?1:0;UserHUD::dirty=true;
                     }
                     if(ImGui::IsItemHovered())ImGui::SetTooltip("Changes your HUD only. Reset all HUD elements restores the default.");
+                    float overall_percent=layout.overall_scale*100.f;
+                    if(ImGui::SliderFloat("Overall HUD scale",&overall_percent,50,200,"%.1f%%",
+                        ImGuiSliderFlags_AlwaysClamp|ImGuiSliderFlags_NoRoundToFormat)) {
+                        layout.overall_scale=overall_percent/100.f;changed=true;
+                    }
+                    if(ImGui::IsItemHovered())ImGui::SetTooltip("100% uses the default HUD size. Combines with your individual element and button scales.");
                     ImGui::Separator();
                     if(ImGui::BeginTabBar("User HUD options")) {
                         if(ImGui::BeginTabItem("Elements")) {

@@ -27,6 +27,7 @@ struct Adjustment { float x=0, y=0, scale=0; }; // Scale is a percentage change.
 inline constexpr int SidePaddingLimit=100,VerticalPaddingLimit=40;
 struct Layout : std::array<Adjustment, Count> {
     int top=0,bottom=0,left=0,right=0;
+    float overall_scale=1;
     float button_scale=0;
     float heart_spacing=0; // Extra spacing relative to the authored heart row.
     // Zero inherits the authored magic dimensions; width is a relative factor.
@@ -62,12 +63,22 @@ inline Layout GetEffectiveOffsets() {
     for(auto e:{Hearts,Magic,DPad,ShardAgony,AButton,BButton,ItemButtons,TargetIndicator,Carrots})result[e].y+=result.top;
     for(auto e:{Rupees,Keys,Minimap,OutsideMinimap,LoadingIcon,Timer,Minigame})result[e].y-=result.bottom;
     result[OutsideMinimap]=result[Minimap];
+    if(result.overall_scale!=1) {
+        // Scale each HUD group once. Item-button children inherit their group;
+        // A/B spacing uses the same combined factor as their sizes.
+        result.button_scale=100.f*((1.f+result.button_scale/100.f)*result.overall_scale-1.f);
+        for(unsigned i=0;i<XButton;++i) {
+            if(i==AButton || i==BButton || i==ItemButtons || i==DPad)continue;
+            result[i].scale=100.f*((1.f+result[i].scale/100.f)*result.overall_scale-1.f);
+        }
+    }
     for(auto e:{AButton,BButton,ItemButtons,DPad})
         result[e].scale=100.f*((1.f+result[e].scale/100.f)*(1.f+result.button_scale/100.f)-1.f);
     return result;
 }
 inline void SetLayout(Layout value,bool save=true) {
     for(auto& a:value)a=Sanitize(a);
+    value.overall_scale=std::isfinite(value.overall_scale)?std::clamp(value.overall_scale,.5f,2.f):1.f;
     value.button_scale=Clean(value.button_scale,-90,200);
     value.heart_spacing=Clean(value.heart_spacing,-28,28);
     value.magic_height=value.magic_height==0?0:Clean(value.magic_height,1,8);

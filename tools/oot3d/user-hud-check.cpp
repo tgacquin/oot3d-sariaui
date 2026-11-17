@@ -32,6 +32,41 @@ int main() {
                d.scale_x==dpad.group.scale_x && d.scale_y==dpad.group.scale_y);
     };
     unchanged();
+    // Overall scale reaches every HUD group once, composes with local scales,
+    // and preserves padding and the authored layout across repeated frames.
+    for(float factor:{.5f,1.f,1.375f,2.f}) {
+        UserHUD::Layout all;all.overall_scale=factor;all.left=7;all.top=4;
+        all.button_scale=10;all[UserHUD::XButton].scale=20;
+        UserHUD::SetLayout(all,false);
+        for(unsigned frame=0;frame<3;++frame) {
+            const auto hud=HUD::GetEffectiveLayout();
+            for(unsigned i=0;i<hud.size();++i) {
+                const float expected=baseline[i].scale*factor*(i==HUD::AButton?1.1f:1.f);
+                assert(Near(hud[i].scale,std::clamp(expected,.1f,3.f)));
+                assert(Same(HUD::GetLayout()[i],baseline[i]));
+            }
+            assert(Near(hud[HUD::Hearts].x,baseline[HUD::Hearts].x+7));
+            assert(Near(hud[HUD::Hearts].y,baseline[HUD::Hearts].y+4));
+            assert(Near(hud.outside_minimap.scale,std::clamp(baseline.outside_minimap.scale*factor,.1f,3.f)));
+            const auto b=HUDButtons::GetEffectiveLayout();
+            const auto old_x=*HUDButtons::ButtonPose(buttons,HUDButtons::X);
+            const auto old_i=*HUDButtons::ButtonPose(buttons,HUDButtons::I);
+            const auto x=*HUDButtons::ButtonPose(b,HUDButtons::X);
+            const auto i=*HUDButtons::ButtonPose(b,HUDButtons::I);
+            assert(Near(x.scale,old_x.scale*factor*1.1f*1.2f));
+            assert(Near(i.scale,old_i.scale*factor*1.1f));
+            assert(Near(i.y-x.y,(old_i.y-old_x.y)*factor*1.1f));
+            assert(Near(HUD::ActionAnchorX+hud[HUD::AButton].x-b.buttons[HUDButtons::B].pose.x,
+                (HUD::ActionAnchorX+baseline[HUD::AButton].x-buttons.buttons[HUDButtons::B].pose.x)*factor*1.1f));
+            assert(Near(DPad::GetEffectiveLayout().group.scale_x,std::clamp(dpad.group.scale_x*factor*1.1f,.1f,4.f)));
+            assert(UserHUD::GetLayout().button_scale==10);
+        }
+    }
+    UserHUD::Layout invalid;invalid.overall_scale=std::numeric_limits<float>::quiet_NaN();
+    UserHUD::SetLayout(invalid,false);assert(UserHUD::GetLayout().overall_scale==1);
+    invalid.overall_scale=100;UserHUD::SetLayout(invalid,false);assert(UserHUD::GetLayout().overall_scale==2);
+    invalid.overall_scale=-1;UserHUD::SetLayout(invalid,false);assert(UserHUD::GetLayout().overall_scale==.5f);
+    UserHUD::SetLayout({},false);unchanged();
     UserHUD::Layout offsets{};
     offsets[UserHUD::Rupees]={12,-7,50};
     offsets[UserHUD::ItemButtons]={20,10,-50};
@@ -184,6 +219,7 @@ int main() {
     config.setValue("HUD/hd_numbers",true);
     auto authored=baseline;UserHUD::LoadAuthoredTitles(config,authored);
     assert(authored.reposition_area_titles && authored.area_title_y==-48);
+    auto scaled=UserHUD::GetLayout();scaled.overall_scale=1.375f;UserHUD::SetLayout(scaled,false);
     UserHUD::SaveConfig(config);config.sync();
     assert(!config.value("Restorations/area_titles").toBool());
     assert(config.value("UserHUD/area_title_y").toFloat()==-48);
@@ -193,6 +229,7 @@ int main() {
     UserHUD::SetLayout({},false);UserHUD::hd_numbers_override=-1;
     UserHUD::LoadConfig(config);
     const auto restored=UserHUD::GetLayout();
+    assert(restored.overall_scale==1.375f && !config.contains("HUD/overall_scale"));
     assert(restored.heart_spacing==3);
     assert(!config.contains("HUD/hearts/spacing"));
     assert(restored.button_scale==50 && restored[UserHUD::XButton].x==7);

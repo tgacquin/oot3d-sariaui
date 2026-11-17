@@ -38,6 +38,7 @@ inline void LoadConfig(QSettings& config) {
     value.left=config.value(QStringLiteral("UserHUD/padding/left"),0).toInt();
     value.right=config.value(QStringLiteral("UserHUD/padding/right"),0).toInt();
     value.heart_spacing=ReadFloat(config,QStringLiteral("UserHUD/hearts/spacing"),0,-28,28);
+    value.overall_scale=ReadFloat(config,QStringLiteral("UserHUD/overall_scale"),1,.5f,2);
     value.button_scale=ReadFloat(config,QStringLiteral("UserHUD/buttons/group_scale"),0,-90,200);
     value.magic_height=ReadFloat(config,QStringLiteral("UserHUD/magic/height"),0,0,8);
     value.magic_border=ReadFloat(config,QStringLiteral("UserHUD/magic/border"),0,0,4);
@@ -55,6 +56,7 @@ inline void SaveConfig(QSettings& config) {
         config.setValue(prefix+QStringLiteral("scale"),value[i].scale);
     }
     config.setValue(QStringLiteral("UserHUD/minimap_unified"),true);
+    config.setValue(QStringLiteral("UserHUD/overall_scale"),value.overall_scale);
     config.setValue(QStringLiteral("UserHUD/padding/top"),value.top);
     config.setValue(QStringLiteral("UserHUD/padding/bottom"),value.bottom);
     config.setValue(QStringLiteral("UserHUD/padding/left"),value.left);
