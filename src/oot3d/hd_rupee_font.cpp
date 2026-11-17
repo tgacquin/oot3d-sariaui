@@ -11,18 +11,19 @@ std::shared_ptr<const RupeeAtlas> StyledRupeeAtlas(RupeeShadow shadow,bool timer
     const auto source=rupee_atlas.load();
     if(!source || (!bold && !timer && !backdrop && shadow==RupeeShadow{}))return source;
     static std::mutex mutex;
-    static std::array<std::shared_ptr<const RupeeAtlas>,4> previous,result;
-    static std::array<RupeeShadow,4> style;
-    static std::array<bool,4> weight{};
+    // Thin counters and bold ammo can share a frame. Retain both weights so
+    // alternating draws reuse the same generated pixels and GPU variants.
+    static std::array<std::shared_ptr<const RupeeAtlas>,8> previous,result;
+    static std::array<RupeeShadow,8> style;
     static std::uint64_t variant=0;
-    const unsigned slot=unsigned(timer)+2*unsigned(backdrop);
+    const unsigned slot=unsigned(timer)+2*unsigned(backdrop)+4*unsigned(bold);
     std::scoped_lock lock{mutex};
-    if(previous[slot]==source && style[slot]==shadow && weight[slot]==bold)return result[slot];
+    if(previous[slot]==source && style[slot]==shadow)return result[slot];
     auto next=std::make_shared<RupeeAtlas>();
     next->rgba=MakeRupeeAtlas(source->native,shadow,timer,backdrop,bold);
     if(next->rgba.empty())return source;
     next->hash=source->hash;next->variant=++variant;
-    previous[slot]=source;style[slot]=shadow;weight[slot]=bold;result[slot]=std::move(next);
+    previous[slot]=source;style[slot]=shadow;result[slot]=std::move(next);
     return result[slot];
 }
 std::vector<std::uint8_t> MakeRupeeAtlas(std::span<const std::uint8_t> bytes,RupeeShadow style,bool timer,bool backdrop,bool bold) {

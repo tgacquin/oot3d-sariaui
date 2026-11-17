@@ -4092,7 +4092,9 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
                             {
                                 ammo_backdrop=texture_index==0 && *kind==OOT3D::HUD::NumberKind::Ammo &&
                                     OOT3D::AmmoBackdrop::Enabled(layout);
-                                rupees=OOT3D::HDFont::StyledRupeeAtlas(layout.hd_rupee_shadow,false,ammo_backdrop,layout.hd_numbers_bold);
+                                const bool bold=layout.hd_numbers_bold || *kind==OOT3D::HUD::NumberKind::Ammo ||
+                                    *kind==OOT3D::HUD::NumberKind::Skulltula;
+                                rupees=OOT3D::HDFont::StyledRupeeAtlas(layout.hd_rupee_shadow,false,ammo_backdrop,bold);
                             }
                     }
                 }

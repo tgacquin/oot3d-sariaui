@@ -75,6 +75,16 @@ int main(int argc,char** argv) {
         assert(bold->variant!=thin->variant && bold==StyledRupeeAtlas({},timer_font,backdrop,true));
         assert(StyledRupeeAtlas({},timer_font,backdrop,false)->rgba==thin->rgba);
     }
+    // Mixed-weight draws must retain their atlas identity: generating a fresh
+    // variant each time would continually upload textures on the HUD.
+    for(bool timer_font:{false,true})for(bool backdrop:{false,true}) {
+        const auto thin=StyledRupeeAtlas(shadow,timer_font,backdrop,false);
+        const auto bold=StyledRupeeAtlas(shadow,timer_font,backdrop,true);
+        for(unsigned frame=0;frame<60;++frame) {
+            assert(StyledRupeeAtlas(shadow,timer_font,backdrop,false)==thin);
+            assert(StyledRupeeAtlas(shadow,timer_font,backdrop,true)==bold);
+        }
+    }
     shadow.blur=3;assert(MakeRupeeAtlas(native,shadow).empty());
     assert(OOT3D::HDFont::MakeRupeeAtlas({}).empty());
     native[48]^=1;assert(OOT3D::HDFont::MakeRupeeAtlas(native).empty());
