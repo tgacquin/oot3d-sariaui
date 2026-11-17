@@ -78,6 +78,14 @@ jobs:
       CCACHE_COMPILERCHECK: content
       LINUX_BUILD_IMAGE: ${{ vars.OOT3D_LINUX_BUILD_IMAGE || 'opensauce04/azahar-build-environment:latest' }}
     steps:
+      - name: Free unused Linux runner SDKs before checkout and image pull
+        if: matrix.platform == 'linux-x86_64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
@@ -131,10 +139,12 @@ jobs:
           set -euo pipefail
           docker pull "$LINUX_BUILD_IMAGE"
           docker image inspect "$LINUX_BUILD_IMAGE" --format '{{json .RepoDigests}}' > linux-toolchain.log
+          df -h / "$GITHUB_WORKSPACE"
           docker run --rm --user "$(id -u):$(id -g)" \
             -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
             -e RELEASE_VERSION -e RELEASE_PLATFORM \
             -e CCACHE_MAXSIZE -e CCACHE_COMPILERCHECK \
+            -e LANG=C.UTF-8 -e LC_ALL=C.UTF-8 \
             "$LINUX_BUILD_IMAGE" \
             bash -c 'bash tools/oot3d/release/build.sh "$RELEASE_PLATFORM" "$RELEASE_VERSION"' \
             2>&1 | tee release-build.log

@@ -59,6 +59,11 @@ for check in "${checks[@]}"; do
   suffix=''; if [[ "$platform" == windows-x64 ]]; then suffix=.exe; fi
   "$build_dir/bin/Release/$check$suffix"
 done
+if [[ "$platform" == linux-x86_64 ]]; then
+  echo 'Disk usage before AppImage bundling:'
+  df -h . /tmp
+  du -sh "$build_dir" .ccache 2>/dev/null || true
+fi
 cmake --build "$build_dir" --target bundle --parallel 3
 if [[ "$platform" == windows-x64 ]]; then
   mkdir -p "$build_dir/bundle/licenses"
