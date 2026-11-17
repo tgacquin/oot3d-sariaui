@@ -235,7 +235,7 @@ struct Hook : GuestUI::Hook<Geometry,Width,Height> {
         key[16]=std::isfinite(layout.parchment_blend)?std::clamp(layout.parchment_blend,0.f,80.f):18;
         const auto read_start=Clock::now();
         std::vector<U32> readback(131072/4);
-        for(unsigned i=0;i<readback.size();++i){const auto word=m.Read(address+4*i);if(!word)return;readback[i]=*word;}
+        if(!GuestUI::ReadTextureWords(m,address,readback))return;
         timings.read_ms+=Milliseconds(read_start);
         const bool texture_changed=compressed!=readback || cached_uv!=uv;
         if(texture_changed) {
@@ -281,8 +281,7 @@ struct Hook : GuestUI::Hook<Geometry,Width,Height> {
         if(!ready || !composed)return;
         if(dirty && Owned(m)) {
             ++timings.uploads;Measure upload_time{timings.upload_ms};
-            for(unsigned i=0;i<composed->size();++i)if(!m.Read(texture+4*i))return;
-            for(unsigned i=0;i<composed->size();++i)m.Write(texture+4*i,(*composed)[i]);
+            if(!GuestUI::WriteTextureWords(m,texture,*composed))return;
         }
         dirty=false;GuestUI::Hook<Geometry,Width,Height>::Begin(m,r,return_pc,prepared,*composed,native_model);
     }

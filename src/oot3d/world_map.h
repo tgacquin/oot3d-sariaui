@@ -395,7 +395,7 @@ struct Hook {
         }
         if(found!=1)return fail("map quad not found");
         std::vector<U32> bytes(131072/4);
-        for(unsigned i=0;i<bytes.size();++i) {const auto v=m.Read(address+4*i);if(!v)return false;bytes[i]=*v;}
+        if(!GuestUI::ReadTextureWords(m,address,bytes))return false;
         const bool changed=compressed!=bytes;
         if(changed || map_pixels.empty()) {
             auto source=std::make_shared<MapFrame::SourcePixels>();map_pixels.resize(MapWidth*MapHeight);
@@ -439,8 +439,7 @@ struct Hook {
     template<class M,class R,class Decode> bool NativeDraw(M& m,R& r,bool enabled,Decode decode) {
         if(!enabled || Drawing() || immediate || !Prepare(m,r[0],decode))return false;
         if(dirty && image.Owned(m)) {
-            for(unsigned i=0;i<composed->size();++i)if(!m.Read(image.texture+4*i))return false;
-            for(unsigned i=0;i<composed->size();++i)m.Write(image.texture+4*i,(*composed)[i]);
+            if(!GuestUI::WriteTextureWords(m,image.texture,*composed))return false;
         }
         image.Begin(m,r,PauseMenu::Sites[19].pc,prepared,*composed,native_model);
         immediate=image.Pending();

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "oot3d/title_hooks.h"
+#include "oot3d/guest_texture_transfer.h"
 #include <span>
 #include <tuple>
 #include <vector>
@@ -118,8 +119,7 @@ template<class Geometry,unsigned TextureWidth,unsigned TextureHeight,unsigned Te
         if(stage==Stage::TextureAllocate) {
             texture=r[0];
             if(texture<0x14000000 || texture>0x1c000000-TextureBytes || (texture&127)) {finish();return;}
-            for(unsigned i=0;i<pixels.size();++i)if(!m.Read(texture+4*i)){finish();return;}
-            for(unsigned i=0;i<pixels.size();++i)m.Write(texture+4*i,pixels[i]);
+            if(!WriteTextureWords(m,texture,pixels)){finish();return;}
             call(Stage::Mesh,0x348f34,block,block+Descriptor);return;
         }
         if(stage==Stage::Mesh) {

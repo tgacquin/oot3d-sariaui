@@ -29,7 +29,7 @@ struct Env : Dynarmic::A32::UserCallbacks {
     std::map<U32,U32> buffers, bindings;
     std::set<U32> freed;
     U32 next=0x800000,next_id=1,expected_material=Material;
-    unsigned allocations=0,draws=0;
+    unsigned allocations=0,draws=0,texture_uploads=0;
     U32 linear_next=Texture+256,general_bytes=0,linear_bytes=0;
     bool fail_linear=false,fail_texture=false;
     std::uint64_t ticks=0;
@@ -42,6 +42,11 @@ struct Env : Dynarmic::A32::UserCallbacks {
     template<class T> void Put(U32 at,T v) {std::memcpy(Ptr(at,sizeof v),&v,sizeof v);}
     std::optional<U32> Read(U32 at) {return Get<U32>(at);}
     void Write(U32 at,U32 v) {Put(at,v);}
+    bool WriteWords(U32 at,std::span<const U32> words) {
+        if(at<Texture || std::uint64_t(at)+words.size_bytes()>Texture+texture.size())return false;
+        std::memcpy(Ptr(at,words.size_bytes()),words.data(),words.size_bytes());
+        ++texture_uploads;return true;
+    }
     U32 Allocate(unsigned size) {U32 p=next;next+=(size+127)&~127u;++allocations;assert(next<0xd00000);return p;}
     std::optional<U32> MemoryReadCode(U32 at) override {
         if(at==Stop)return 0xef000000;
@@ -199,9 +204,12 @@ int main(int argc,char** argv) {
     // The generated map uses a much larger texture than the small UI gradients.
     // Exercise that size with the same native constructors, sampler and uploads.
     OOT3D::GuestUI::Hook<Geometry,1024,512> map;
+    const unsigned before_map_uploads=e.texture_uploads;
     e.Draw(map,Env::Source,2);
+    assert(e.texture_uploads==before_map_uploads+1);
     const unsigned map_allocations=e.allocations;
     e.Draw(map,Env::Source,3);assert(e.allocations==map_allocations);
+    assert(e.texture_uploads==before_map_uploads+1);
     assert(e.Get<U32>(map.block+0x15c)==(1024|(512u<<16)));
     // Generated models borrow their donor's material; their native destructor
     // must never free it a second time.

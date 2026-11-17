@@ -1,4 +1,6 @@
 #ifdef ENABLE_OOT3D_PRESENTATION
+#include <bit>
+#include <span>
 #include "oot3d/hd_font.h"
 #include "core/hle/service/nwm/nwm_uds.h"
 #include "core/hle/service/service.h"
@@ -236,6 +238,22 @@ class DynarmicUserCallbacks final : public Dynarmic::A32::UserCallbacks {
         const Kernel::Process* process;
         std::optional<u32> Read(u32 at) {return memory.Read32OrNullopt(at);}
         void Write(u32 at,u32 value) {memory.Write32(at,value);}
+        bool ReadWords(u32 at,std::span<u32> words) {
+            if(words.empty())return true;
+            if(words.size_bytes()>0x3fffffff || !Mapped(at,unsigned(words.size_bytes())))return false;
+            if constexpr(std::endian::native==std::endian::little)
+                memory.ReadBlock(*process,at,words.data(),words.size_bytes());
+            else for(unsigned i=0;i<words.size();++i)words[i]=memory.Read32(at+4*i);
+            return true;
+        }
+        bool WriteWords(u32 at,std::span<const u32> words) {
+            if(words.empty())return true;
+            if(words.size_bytes()>0x3fffffff || !Mapped(at,unsigned(words.size_bytes())))return false;
+            if constexpr(std::endian::native==std::endian::little)
+                memory.WriteBlock(*process,at,words.data(),words.size_bytes());
+            else for(unsigned i=0;i<words.size();++i)memory.Write32(at+4*i,words[i]);
+            return true;
+        }
         bool Mapped(u32 at,unsigned bytes) {
             if(!process || !OOT3D::TitleScreen::Pointer(at,bytes) || !bytes)return false;
             for(u32 page=at&~0xfffu;page<=((at+bytes-1)&~0xfffu);page+=0x1000)
