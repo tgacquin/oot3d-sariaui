@@ -81,15 +81,16 @@ inline std::vector<Vertex> Geometry(const Font& font,const WorldLabels& labels,c
         std::array<double,4> center{};
         for(unsigned r=0;r<4;++r){center[r]=clip[r][3];for(unsigned c=0;c<3;++c)center[r]+=clip[r][c]*label.position[c];}
         if(!std::isfinite(center[3]) || center[3]<=1 || center[2]>0 || center[2]<-center[3])continue;
-        // Landscape screen X follows clip Y. The native projection may mirror
-        // that axis (regular/MQ); choose the billboard direction after projection
-        // and clip scaling, including the interpolated camera and perspective.
+        // Landscape screen X runs OPPOSITE clip Y: native display transfer
+        // reverses tiled Y, and DrawOotMidpoint samples Y from high to low.
+        // Include that final presentation direction as well as regular/MQ
+        // projection mirroring, clip scaling and interpolated perspective.
         double horizontal_y=0,horizontal_w=0;
         for(unsigned c=0;c<3;++c) {
             horizontal_y+=clip[1][c]*labels.billboard[c][0];
             horizontal_w+=clip[3][c]*labels.billboard[c][0];
         }
-        const double horizontal=(horizontal_y*center[3]-center[1]*horizontal_w)*scene.clip_y;
+        const double horizontal=-(horizontal_y*center[3]-center[1]*horizontal_w)*scene.clip_y;
         const double right=horizontal<0?-1:1;
         double distance=0;
         for(unsigned c=0;c<3;++c)distance+=std::pow(label.position[c]-labels.billboard[c][3],2);

@@ -26,9 +26,23 @@ int main() {
     N::Layout layout;layout.shadow=false;layout.backdrop=false;
     N::WorldLabels labels{{{"Link",{0,0,-100}}},Math::Identity()};
     const auto close=N::Geometry(font,labels,scene,layout);assert(close.size()==24);
-    // Landscape presentation swaps the rotated framebuffer axes: displayed X
-    // increases with clip Y. Both glyph order and glyph UVs must run rightward.
-    const auto screen_x=[](const auto& v){return v.position[1]/v.position[3];};
+    // Follow the complete presentation path, not just the scene projection.
+    // Native tiled -> linear display transfer reverses source Y. Landscape
+    // presentation then samples that linear Y from 0 (left) to 1 (right).
+    const auto native_screen_x=[](const auto& v) {
+        const double framebuffer_y=(v.position[1]/v.position[3]+1)*.5;
+        return 1-framebuffer_y;
+    };
+    // DrawOotMidpoint bypasses the transfer and samples the rotated viewport
+    // directly: texcoords.left=(y+height)/H, texcoords.right=y/H. Use a
+    // nonzero viewport offset/subrect to cover the actual presentation mapping.
+    const auto screen_x=[](const auto& v) {
+        constexpr double y=23,height=400,texture_height=512;
+        const double source_y=(y+(v.position[1]/v.position[3]+1)*.5*height)/texture_height;
+        const double left=(y+height)/texture_height,right=y/texture_height;
+        return (source_y-left)/(right-left);
+    };
+    for(const auto& v:close)assert(near(screen_x(v),native_screen_x(v)));
     assert(screen_x(close[2])>screen_x(close[0]) && close[2].uv[0]>close[0].uv[0]);
     assert(screen_x(close[6])>screen_x(close[0]));
     // Regular and mirrored projections must both keep glyphs and letter order
@@ -40,12 +54,13 @@ int main() {
         assert(text.size()==close.size());
         for(unsigned glyph=0;glyph<text.size();glyph+=6) {
             assert(screen_x(text[glyph+2])>screen_x(text[glyph]));
+            assert(native_screen_x(text[glyph+2])>native_screen_x(text[glyph]));
             assert(text[glyph+2].uv[0]>text[glyph].uv[0]);
             if(glyph)assert(screen_x(text[glyph])>screen_x(text[glyph-6]));
         }
         const auto centered=N::Geometry(font,labels,mirrored,layout);
         for(unsigned i=0;i<text.size();++i)
-            assert(near(screen_x(text[i])-screen_x(centered[i]),projection_sign*clip_sign*12/100));
+            assert(near(screen_x(text[i])-screen_x(centered[i]),-projection_sign*clip_sign*12/200));
     }
     const auto height=[](const auto& g){return std::abs(g[0].position[0]/g[0].position[3]-g[1].position[0]/g[1].position[3]);};
     labels.anchors[0].position[2]=-200;

@@ -44,6 +44,10 @@ add_executable(oot3d_hd_numbers_config_check EXCLUDE_FROM_ALL ../../tools/oot3d/
 target_link_libraries(oot3d_hd_numbers_config_check PRIVATE oot3d_hd_font Qt6::Core)
 target_compile_options(oot3d_hd_numbers_config_check PRIVATE -UNDEBUG)
 
+add_executable(oot3d_remote_names_check EXCLUDE_FROM_ALL ../../tools/oot3d/remote-names-check.cpp)
+target_include_directories(oot3d_remote_names_check PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_compile_options(oot3d_remote_names_check PRIVATE -UNDEBUG)
+
 add_library(oot3d_randomizer_data STATIC
     randomizer/data.cpp randomizer/service.cpp randomizer/presets.cpp randomizer/oot_randomizer_assets.qrc)
 set_target_properties(oot3d_randomizer_data PROPERTIES AUTORCC ON)
