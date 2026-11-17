@@ -74,6 +74,8 @@ jobs:
     env:
       RELEASE_VERSION: ${{ needs.source.outputs.version }}
       RELEASE_PLATFORM: ${{ matrix.platform }}
+      CCACHE_MAXSIZE: 2G
+      CCACHE_COMPILERCHECK: content
       LINUX_BUILD_IMAGE: ${{ vars.OOT3D_LINUX_BUILD_IMAGE || 'opensauce04/azahar-build-environment:latest' }}
     steps:
       - uses: actions/checkout@v6
@@ -87,7 +89,7 @@ jobs:
           python-version: '3.13'
       - name: Install macOS build tools
         if: matrix.platform == 'macos-arm64'
-        run: brew install cmake ninja
+        run: brew install cmake ninja ccache
       - uses: msys2/setup-msys2@v2
         if: matrix.platform == 'windows-x64'
         with:
@@ -98,11 +100,18 @@ jobs:
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-ccache
             mingw-w64-ucrt-x86_64-python
             mingw-w64-ucrt-x86_64-qt6-base
             mingw-w64-ucrt-x86_64-qt6-multimedia
             mingw-w64-ucrt-x86_64-qt6-tools
             mingw-w64-ucrt-x86_64-SDL2
+      - name: Restore compiler cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .ccache
+          key: sariaui-${{ matrix.platform }}-ccache-v1-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: sariaui-${{ matrix.platform }}-ccache-v1-
       - name: Build, check and package Windows
         if: matrix.platform == 'windows-x64'
         shell: 'msys2 {0}'
@@ -125,9 +134,16 @@ jobs:
           docker run --rm --user "$(id -u):$(id -g)" \
             -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
             -e RELEASE_VERSION -e RELEASE_PLATFORM \
+            -e CCACHE_MAXSIZE -e CCACHE_COMPILERCHECK \
             "$LINUX_BUILD_IMAGE" \
             bash -c 'bash tools/oot3d/release/build.sh "$RELEASE_PLATFORM" "$RELEASE_VERSION"' \
             2>&1 | tee release-build.log
+      - name: Save compiler cache even after build failure
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: .ccache
+          key: sariaui-${{ matrix.platform }}-ccache-v1-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v7

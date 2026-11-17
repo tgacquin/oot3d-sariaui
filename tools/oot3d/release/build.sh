@@ -18,8 +18,8 @@ case "$platform" in
     ;;
   linux-x86_64)
     test "$(uname -m)" = x86_64
-    # SDL otherwise auto-enables the image's ccache, whose default directories
-    # may be inaccessible to the mapped runner UID. This job does not persist it.
+    # Use the shared CMake compiler launcher below instead of SDL's implicit
+    # ccache integration, which may select inaccessible default directories.
     flags+=(-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
             -DCMAKE_LINKER=/etc/bin/ld.lld -DSDL_CCACHE=OFF)
     export EXTRA_QT_PLUGINS=waylandcompositor
@@ -27,6 +27,20 @@ case "$platform" in
     ;;
   *) echo "Unsupported platform: $platform" >&2; exit 2 ;;
 esac
+if command -v ccache >/dev/null 2>&1; then
+  # This path is writable by the runner, including its mapped UID in Docker.
+  export CCACHE_DIR="$PWD/.ccache"
+  export CCACHE_BASEDIR="$PWD"
+  export CCACHE_TEMPDIR="$CCACHE_DIR/tmp"
+  export CCACHE_MAXSIZE="${CCACHE_MAXSIZE:-2G}"
+  export CCACHE_COMPILERCHECK="${CCACHE_COMPILERCHECK:-content}"
+  mkdir -p "$CCACHE_TEMPDIR"
+  ccache --zero-stats
+  trap 'ccache --show-stats || true' EXIT
+  flags+=(-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache)
+else
+  echo 'ccache unavailable; compiling without a compiler cache.'
+fi
 checks=(oot3d_atomic_shared_ptr_check oot3d_interpolation_rate_check oot3d_file_copy_check oot3d_uds_rejoin_check
         oot3d_release_defaults_check oot3d_player_controls_check)
 cmake -S . -B "$build_dir" -G Ninja \
