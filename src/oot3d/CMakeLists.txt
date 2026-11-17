@@ -174,6 +174,9 @@ add_executable(oot3d_graphics_memory_check EXCLUDE_FROM_ALL ../../tools/oot3d/gr
 target_link_libraries(oot3d_graphics_memory_check PRIVATE dynarmic)
 target_compile_options(oot3d_graphics_memory_check PRIVATE -UNDEBUG)
 
+add_executable(oot3d_save_wait_diagnostics_check EXCLUDE_FROM_ALL ../../tools/oot3d/save-wait-diagnostics-check.cpp)
+target_compile_options(oot3d_save_wait_diagnostics_check PRIVATE -UNDEBUG)
+
 add_executable(oot3d_file_particles_check EXCLUDE_FROM_ALL ../../tools/oot3d/file-particles-check.cpp)
 target_compile_options(oot3d_file_particles_check PRIVATE -UNDEBUG)
 

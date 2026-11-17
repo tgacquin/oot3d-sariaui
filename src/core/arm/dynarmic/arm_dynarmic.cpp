@@ -6,6 +6,8 @@
 #include "core/hle/service/service.h"
 #include "oot3d/actor_draw_distance.h"
 #include "oot3d/native_prompt_diagnostics.h"
+#include "oot3d/save_wait_diagnostics.h"
+#include "core/hle/kernel/thread.h"
 #include "oot3d/randomizer/hooks.h"
 #include "oot3d/room_join_chime.h"
 #include "common/cityhash.h"
@@ -312,6 +314,7 @@ class DynarmicUserCallbacks final : public Dynarmic::A32::UserCallbacks {
     std::array<u32,10> oot_keyboard_signature{};
     OOT3D::NativePromptDiagnostics::Trace oot_native_prompts;
     OOT3D::GraphicsMemory::Monitor oot_graphics_memory;
+    OOT3D::SaveWaitDiagnostics::Monitor oot_save_wait;
     OOT3D::DeathMenu::Hook oot_death_menu;
     OOT3D::SaveLoading::Hook oot_save_loading,oot_death_loading;
     OOT3D::BossChallenge::Hook oot_boss_challenge;
@@ -1534,6 +1537,43 @@ public:
             if(swi==OOT3D::PauseFramerate::FirstSVC &&
                parent.jit->Regs()[5]==OOT3D::PauseFramerate::Renderer) {
                 const auto now=parent.system.CoreTiming().GetGlobalTimeUs().count();
+                const auto save_page=guest.Read(0x50a508+0x28).value_or(~0u);
+                const auto save_state=guest.Read(0x50a508+0x24).value_or(~0u);
+                if(const auto sample=oot_save_wait.Poll(save_page==2 && save_state==9,now)) {
+                    if(sample->exited) {
+                        LOG_INFO(Core,"OoT save wait exited: elapsed_us={} page={} state={} (menu transition only)",
+                            sample->elapsed,save_page,save_state);
+                    } else {
+                        const auto job=guest.Read(0x50bb58).value_or(0);
+                        // Bounds/alignment checked before optional reads; never dump paths,
+                        // save contents, or the buffer addressed by the job.
+                        const auto process=parent.system.Kernel().GetCurrentProcess();
+                        const bool valid_job=OOT3D::TitleScreen::Pointer(job,0x118);
+                        const auto field=[&](u32 offset) {
+                            return valid_job && process && memory.IsValidVirtualAddress(*process,job+offset)
+                                ?guest.Read(job+offset).value_or(~0u):~0u;
+                        };
+                        LOG_INFO(Core,"OoT save wait: elapsed_us={} tick={} fast={} job={:08X} result={:08X} flags={:08X} op={} tail={:08X} queue_ring={:08X} capacity={} head={} count={} waiters={} producers={} worker_state={}",
+                            sample->elapsed,guest.Read(0x50a508+0x2c).value_or(~0u),
+                            oot_pause_framerate.fast,job,field(0),field(8),field(12),field(0x114),
+                            guest.Read(0x565510).value_or(~0u),
+                            guest.Read(0x565530).value_or(~0u),guest.Read(0x565534).value_or(~0u),
+                            guest.Read(0x565538).value_or(~0u),guest.Read(0x56553c).value_or(~0u),
+                            guest.Read(0x565540).value_or(~0u),guest.Read(0x5bdde0+0x488).value_or(~0u));
+                        if(sample->elapsed>=2000000) {
+                            for(u32 core=0;core<parent.system.GetNumCores();++core) {
+                                for(const auto& thread:parent.system.Kernel().GetThreadManager(core).GetThreadList()) {
+                                    if(thread->owner_process.lock()!=process)continue;
+                                    LOG_INFO(Core,"OoT save wait thread: core={} id={} status={} entry={:08X} saved_pc={:08X} saved_lr={:08X} arbiter={:08X} wait_objects={} priority={}",
+                                        core,thread->thread_id,static_cast<unsigned>(thread->status),
+                                        thread->entry_point,thread->context.GetProgramCounter(),
+                                        thread->context.GetLinkRegister(),thread->wait_address,
+                                        thread->wait_objects.size(),thread->current_priority);
+                                }
+                            }
+                        }
+                    }
+                }
                 const auto previous_sample=oot_graphics_memory.sample_at;
                 const auto s=oot_graphics_memory.Poll(guest,now);
                 if(previous_sample!=oot_graphics_memory.sample_at) {
