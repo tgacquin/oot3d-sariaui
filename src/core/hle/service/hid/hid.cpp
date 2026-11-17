@@ -425,6 +425,16 @@ void Module::UpdatePadCallback(std::uintptr_t user_data, s64 cycles_late) {
 #endif
     }
 
+#ifdef ENABLE_OOT3D_PRESENTATION
+    // Both developer and player builds use buttons for game interaction. Block
+    // mouse, touchscreen, touchpad and mapped touch input at the guest boundary,
+    // including movie playback. Keep the synthetic press used by pause controls.
+    auto& game_touch = mem->touch.entries[mem->touch.index];
+    game_touch.x = menu_touch ? OOT3D::PauseMenu::menu_input.touch_x : 0;
+    game_touch.y = menu_touch ? 220 : 0;
+    game_touch.valid.Assign(menu_touch ? 1 : 0);
+#endif
+
     // TODO(bunnei): We're not doing anything with offset 0xA8 + 0x18 of HID SharedMemory, which
     // supposedly is "Touch-screen entry, which contains the raw coordinate data prior to being
     // converted to pixel coordinates." (http://3dbrew.org/wiki/HID_Shared_Memory#Offset_0xA8).
