@@ -632,11 +632,14 @@ template<class M, class R> void Handle(M& memory, R& regs, unsigned site, const 
     } else if(site==2 && memory.Read(Action+0x2c)==std::optional<U32>{regs[4]}) {
         TimerNumberLayout(memory,*helper,layout);
     } else if(site==2 && memory.Read(SkulltulaCounter)==std::optional<U32>{regs[4]}) {
+        // Center visible digits for either font; HD-only edits stay optional.
         if(layout.hd_numbers && layout.hd_skulltula_numbers)
             // Native three-digit field starts at 112 (46734c/2fcc88), but
             // parks unused leading digits. Center only the visible run on
             // the token's x=128 before the shared gear-page transformations.
             NumberLayout(memory,*helper,layout.hd_skulltula_text,layout.hd_skulltula_spacing,true,128.f);
+        else
+            NumberLayout(memory,*helper,Pose{},0,true,128.f);
     } else if(site==2 && memory.Read(Action+0x30)==std::optional<U32>{regs[4]}) {
         if(layout.hd_numbers && layout.hd_score_numbers)
             NumberLayout(memory,*helper,layout.hd_score_text,layout.hd_score_spacing);

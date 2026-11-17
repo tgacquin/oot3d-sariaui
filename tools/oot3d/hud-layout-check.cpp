@@ -348,7 +348,7 @@ int main(int argc,char** argv) {
     m.words[SkulltulaCounter]=counter;
     const auto skull_mesh=Mesh(m,helper,true);assert(skull_mesh);
     apply(8,layout);assert(FindNumberMesh(skull_mesh->hash,5)==NumberKind::Skulltula);
-    // Per-category transforms and master-off preserve native placement and Z.
+    // HD-only transforms leave native size/Z intact; Skulltulas always center.
     for(unsigned category=0;category<4;++category) {
         const bool score=category==1;
         setup(2);regs[4]=counter;m.words[counter+8]=helper;
@@ -369,7 +369,10 @@ int main(int argc,char** argv) {
         for(bool master:{false,true}) {
             m.words=before;layout.hd_numbers=master;apply(2,layout);
             assert(m.Float(vertices+8)==7);
-            if(!master)assert(m.words==before);
+            if(!master) {
+                if(category==3)assert((m.Float(vertices+48)+m.Float(vertices+12))*.5f==128);
+                else assert(m.words==before);
+            }
             else {
                 assert(m.Float(vertices+12)-m.Float(vertices)==(category==2?6:24));
                 assert(m.Float(vertices)==(category==3?131:category==2?112:score?127:101));
@@ -378,20 +381,27 @@ int main(int argc,char** argv) {
         }
         m.words=before;layout.hd_numbers=true;layout.hd_score_numbers=layout.hd_ammo_numbers=false;
         layout.hd_skulltula_numbers=false;
-        apply(2,layout);assert(m.words==before);
+        apply(2,layout);
+        if(category==3)assert((m.Float(vertices+48)+m.Float(vertices+12))*.5f==128);
+        else assert(m.words==before);
     }
     // Skulltula's native three slots must share one center for 1/2/3 digits,
     // including edited scale/spacing. Parked slots remain byte-for-byte intact.
+    for(bool master:{false,true})for(bool hd:{false,true})
     for(unsigned digits=1;digits<=3;++digits)for(float scale:{.5f,1.f,2.f})for(float spacing:{0.f,2.f}) {
         setup(3);regs[4]=counter;m.words[counter+8]=helper;m.words[SkulltulaCounter]=counter;
         for(unsigned q=0;q<3;++q)for(unsigned v=0;v<4;++v)
             m.Float(vertices+q*48+v*12,q<digits?132.f-10*q+11*(v%2):400.f);
         const auto before=m.words;
         layout={};layout.hd_skulltula_text={3,4,scale};layout.hd_skulltula_spacing=spacing;
+        layout.hd_numbers=master;layout.hd_skulltula_numbers=hd;
         apply(2,layout);
         const float left=m.Float(vertices+(digits-1)*48),right=m.Float(vertices+12);
-        assert(std::abs((left+right)*.5f-131.f)<.0001f);
-        assert(std::abs((right-left)-(11+(digits-1)*(10+spacing))*scale)<.0001f);
+        const bool styled=master && hd;
+        assert(std::abs((left+right)*.5f-(styled?131.f:128.f))<.0001f);
+        assert(std::abs((right-left)-(11+(digits-1)*(10+(styled?spacing:0)))*(styled?scale:1))<.0001f);
+        if(!styled)for(unsigned q=0;q<digits;++q)for(unsigned v=0;v<4;++v)
+            for(unsigned axis:{1u,2u})assert(m.words.at(vertices+q*48+v*12+axis*4)==before.at(vertices+q*48+v*12+axis*4));
         for(unsigned q=digits;q<3;++q)for(unsigned i=0;i<12;++i)
             assert(m.words.at(vertices+q*48+i*4)==before.at(vertices+q*48+i*4));
     }
