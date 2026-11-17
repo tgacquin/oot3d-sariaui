@@ -134,6 +134,26 @@ class ReleaseChecks(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'ENABLE_OOT3D_PLAYER_MODE'):
                     smoke('windows-x64', root, root)
 
+    def test_linux_smoke_requires_bundled_offscreen_plugin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            seed = root / 'squashfs-root/usr/bin/oot3d-seed'
+            seed.parent.mkdir(parents=True)
+            seed.write_bytes(b'helper fixture')
+            with patch('package.subprocess.run') as run:
+                with self.assertRaisesRegex(ValueError, 'libqoffscreen'):
+                    smoke('linux-x86_64', root, root)
+                self.assertEqual(run.call_count, 1)  # Only extraction, no app launch.
+
+    def test_smoke_reports_application_stderr(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            error = subprocess.CalledProcessError(-6, ['AppRun', '--version'],
+                output='', stderr='Could not find the Qt platform plugin offscreen')
+            with patch('package.subprocess.run', side_effect=error):
+                with self.assertRaisesRegex(ValueError, 'Qt platform plugin offscreen'):
+                    smoke('windows-x64', root, root)
+
     def test_default_export_preserves_layouts_without_private_player_state(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

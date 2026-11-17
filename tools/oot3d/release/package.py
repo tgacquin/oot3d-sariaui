@@ -102,10 +102,15 @@ def smoke(platform, stage, work, expected_version=None):
         appdir = work / 'squashfs-root'
         program, seed = appdir / 'AppRun', appdir / 'usr/bin/oot3d-seed'
         require(seed)
+        require(appdir / 'usr/plugins/platforms/libqoffscreen.so')
         env['LD_LIBRARY_PATH'] = str(appdir / 'usr/lib')
         env['QT_PLUGIN_PATH'] = str(appdir / 'usr/plugins')
-    version_result = subprocess.run([str(program), '--version'], cwd=work, env=env,
-                                    check=True, timeout=60, capture_output=True, text=True)
+    try:
+        version_result = subprocess.run([str(program), '--version'], cwd=work, env=env,
+                                        check=True, timeout=60, capture_output=True, text=True)
+    except subprocess.CalledProcessError as error:
+        raise ValueError(f'Packaged application --version failed (exit {error.returncode}):\n'
+                         f'{error.stdout or ""}{error.stderr or ""}') from error
     if '[player]' not in version_result.stdout:
         raise ValueError('Release requires ENABLE_OOT3D_PLAYER_MODE; refusing developer frontend')
     expected_version = configured_version(expected_version)

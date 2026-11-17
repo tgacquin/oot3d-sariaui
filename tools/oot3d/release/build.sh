@@ -23,7 +23,8 @@ case "$platform" in
     flags+=(-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
             -DCMAKE_LINKER=/etc/bin/ld.lld -DSDL_CCACHE=OFF)
     export EXTRA_QT_PLUGINS=waylandcompositor
-    export EXTRA_PLATFORM_PLUGINS='libqwayland-egl.so;libqwayland-generic.so'
+    # The packaged-app smoke test initializes Qt without a display server.
+    export EXTRA_PLATFORM_PLUGINS='libqwayland-egl.so;libqwayland-generic.so;libqoffscreen.so'
     ;;
   *) echo "Unsupported platform: $platform" >&2; exit 2 ;;
 esac
