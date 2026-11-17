@@ -40,6 +40,8 @@ inline void LoadConfig(QSettings& config) {
     value.heart_spacing=ReadFloat(config,QStringLiteral("UserHUD/hearts/spacing"),0,-28,28);
     value.overall_scale=ReadFloat(config,QStringLiteral("UserHUD/overall_scale"),1,.5f,2);
     value.button_scale=ReadFloat(config,QStringLiteral("UserHUD/buttons/group_scale"),0,-90,200);
+    value.button_x=ReadFloat(config,QStringLiteral("UserHUD/buttons/group_x"),0,-400,400);
+    value.button_y=ReadFloat(config,QStringLiteral("UserHUD/buttons/group_y"),0,-240,240);
     value.magic_height=ReadFloat(config,QStringLiteral("UserHUD/magic/height"),0,0,8);
     value.magic_border=ReadFloat(config,QStringLiteral("UserHUD/magic/border"),0,0,4);
     value.magic_width=ReadFloat(config,QStringLiteral("UserHUD/magic/width"),1,.5f,4);
@@ -62,6 +64,8 @@ inline void SaveConfig(QSettings& config) {
     config.setValue(QStringLiteral("UserHUD/padding/left"),value.left);
     config.setValue(QStringLiteral("UserHUD/padding/right"),value.right);
     config.setValue(QStringLiteral("UserHUD/buttons/group_scale"),value.button_scale);
+    config.setValue(QStringLiteral("UserHUD/buttons/group_x"),value.button_x);
+    config.setValue(QStringLiteral("UserHUD/buttons/group_y"),value.button_y);
     config.setValue(QStringLiteral("UserHUD/hearts/spacing"),value.heart_spacing);
     config.setValue(QStringLiteral("UserHUD/magic/height"),value.magic_height);
     config.setValue(QStringLiteral("UserHUD/magic/border"),value.magic_border);

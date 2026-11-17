@@ -662,6 +662,8 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                             };
                             if(ImGui::CollapsingHeader("Buttons")) {
                                 ImGui::PushID("Buttons");
+                                changed|=ImGui::DragFloat("Group X",&layout.button_x,.1f,-400,400,"%.2f",ImGuiSliderFlags_AlwaysClamp);
+                                changed|=ImGui::DragFloat("Group Y",&layout.button_y,.1f,-240,240,"%.2f",ImGuiSliderFlags_AlwaysClamp);
                                 changed|=ImGui::SliderFloat("Group scale",&layout.button_scale,-90,200,"%.0f%%",ImGuiSliderFlags_AlwaysClamp);
                                 for(const auto i:UserHUD::ButtonElements) {
                                     ImGui::PushID(static_cast<int>(i));
@@ -670,7 +672,7 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                                 }
                                 if(ImGui::Button("Reset all buttons")) {
                                     for(const auto i:UserHUD::ButtonElements)layout[i]={};
-                                    layout[UserHUD::ItemButtons]={};layout.button_scale=0;changed=true;
+                                    layout[UserHUD::ItemButtons]={};layout.button_x=layout.button_y=layout.button_scale=0;changed=true;
                                 }
                                 ImGui::PopID();
                             }

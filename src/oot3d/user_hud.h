@@ -28,7 +28,7 @@ inline constexpr int SidePaddingLimit=100,VerticalPaddingLimit=40;
 struct Layout : std::array<Adjustment, Count> {
     int top=0,bottom=0,left=0,right=0;
     float overall_scale=1;
-    float button_scale=0;
+    float button_x=0,button_y=0,button_scale=0;
     float heart_spacing=0; // Extra spacing relative to the authored heart row.
     // Zero inherits the authored magic dimensions; width is a relative factor.
     float magic_height=0,magic_border=0,magic_width=1;
@@ -72,14 +72,18 @@ inline Layout GetEffectiveOffsets() {
             result[i].scale=100.f*((1.f+result[i].scale/100.f)*result.overall_scale-1.f);
         }
     }
-    for(auto e:{AButton,BButton,ItemButtons,DPad})
+    for(auto e:{AButton,BButton,ItemButtons,DPad}) {
+        result[e].x+=result.button_x;result[e].y+=result.button_y;
         result[e].scale=100.f*((1.f+result[e].scale/100.f)*(1.f+result.button_scale/100.f)-1.f);
+    }
     return result;
 }
 inline void SetLayout(Layout value,bool save=true) {
     for(auto& a:value)a=Sanitize(a);
     value.overall_scale=std::isfinite(value.overall_scale)?std::clamp(value.overall_scale,.5f,2.f):1.f;
     value.button_scale=Clean(value.button_scale,-90,200);
+    value.button_x=Clean(value.button_x,-400,400);
+    value.button_y=Clean(value.button_y,-240,240);
     value.heart_spacing=Clean(value.heart_spacing,-28,28);
     value.magic_height=value.magic_height==0?0:Clean(value.magic_height,1,8);
     value.magic_border=value.magic_border==0?0:Clean(value.magic_border,1,4);

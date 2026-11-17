@@ -189,6 +189,33 @@ int main() {
         assert(Near(after_a.x,before_a.x+7) && Near(after_a.y,before_a.y-9));
         assert(Same(HUDButtons::GetEffectiveLayout().buttons[HUDButtons::B].pose,before_b));
     }
+    // Group translation moves every button once, after scaling, without moving
+    // unrelated HUD elements or overwriting individual adjustments.
+    for(float scale:{.5f,1.f,1.5f}) {
+        UserHUD::Layout group;group.overall_scale=scale;group.button_scale=20;
+        group[UserHUD::AButton]={3,4,0};group[UserHUD::XButton]={-5,6,10};
+        UserHUD::SetLayout(group,false);
+        const auto hud=HUD::GetEffectiveLayout();const auto b=HUDButtons::GetEffectiveLayout();
+        const auto d=DPad::GetEffectiveLayout();
+        group.button_x=12.5f;group.button_y=-7.25f;UserHUD::SetLayout(group,false);
+        for(unsigned frame=0;frame<3;++frame) {
+            const auto moved=HUD::GetEffectiveLayout();const auto buttons_moved=HUDButtons::GetEffectiveLayout();
+            for(unsigned i=0;i<hud.size();++i) {
+                if(i==HUD::AButton) {
+                    assert(Near(moved[i].x,hud[i].x+12.5f) && Near(moved[i].y,hud[i].y-7.25f));
+                    assert(moved[i].scale==hud[i].scale);
+                } else assert(Same(moved[i],hud[i]));
+            }
+            for(unsigned i=0;i<HUDButtons::Count;++i) {
+                const auto old=*HUDButtons::ButtonPose(b,i),now=*HUDButtons::ButtonPose(buttons_moved,i);
+                assert(Near(now.x,old.x+12.5f) && Near(now.y,old.y-7.25f) && Near(now.scale,old.scale));
+            }
+            const auto now=DPad::GetEffectiveLayout().group;
+            assert(Near(now.x,d.group.x+12.5f) && Near(now.y,d.group.y-7.25f));
+            assert(now.scale_x==d.group.scale_x && now.scale_y==d.group.scale_y);
+        }
+    }
+    UserHUD::SetLayout({},false);unchanged();
     // Heart spacing composes with F1, resets to it, and never modifies it.
     auto spaced=baseline;spaced.heart_spacing=4;HUD::SetLayout(spaced,false);
     UserHUD::Layout hearts;hearts.heart_spacing=3;UserHUD::SetLayout(hearts,false);
@@ -219,7 +246,7 @@ int main() {
     config.setValue("HUD/hd_numbers",true);
     auto authored=baseline;UserHUD::LoadAuthoredTitles(config,authored);
     assert(authored.reposition_area_titles && authored.area_title_y==-48);
-    auto scaled=UserHUD::GetLayout();scaled.overall_scale=1.375f;UserHUD::SetLayout(scaled,false);
+    auto scaled=UserHUD::GetLayout();scaled.overall_scale=1.375f;scaled.button_x=12.5f;scaled.button_y=-7.25f;UserHUD::SetLayout(scaled,false);
     UserHUD::SaveConfig(config);config.sync();
     assert(!config.value("Restorations/area_titles").toBool());
     assert(config.value("UserHUD/area_title_y").toFloat()==-48);
@@ -233,6 +260,7 @@ int main() {
     assert(restored.heart_spacing==3);
     assert(!config.contains("HUD/hearts/spacing"));
     assert(restored.button_scale==50 && restored[UserHUD::XButton].x==7);
+    assert(restored.button_x==12.5f && restored.button_y==-7.25f);
     assert(restored.magic_height==4 && restored.magic_border==3 && restored.magic_width==1.5f);
     assert(UserHUD::hd_numbers_override==1);
     // Obsolete personal overrides cannot defeat the authored repositioning.
