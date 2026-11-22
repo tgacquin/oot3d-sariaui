@@ -27,7 +27,18 @@ jobs:
       - uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
-          install: mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-gdb
-      - name: Inspect Windows startup
+          install: mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-binutils mingw-w64-ucrt-x86_64-SDL3
+      - name: Verify SDL runtime deployment on captured Windows package
         shell: 'msys2 {0}'
-        run: python3 tools/oot3d/release/diagnose_windows_startup.py
+        run: |
+          set -euo pipefail
+          cp -r build-release-windows-x64 resolved-package
+          source_bundle="$(cygpath -m "$PWD/build-release-windows-x64/bundle")"
+          out="$(cygpath -m "$PWD/resolved-package")"
+          runtime="$(cygpath -m "$MINGW_PREFIX/bin")"
+          cmake -DBUNDLE_TARGET_EXECUTE=1 -DBINARY_PATH="$out" \
+            -DEXECUTABLE_PATH="$source_bundle/SariaUI.exe" \
+            -DBUNDLE_LIBRARY_PATHS="$source_bundle;$runtime" \
+            -P CMakeModules/BundleTarget.cmake
+          test -f resolved-package/bundle/SDL3.dll
+          python3 tools/oot3d/release/package.py windows-x64 resolved-package artifacts 1.0.0

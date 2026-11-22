@@ -204,6 +204,28 @@ if (BUNDLE_TARGET_EXECUTE)
                 POST_EXCLUDE_REGEXES ".*system32.*")
 
         if (WIN32)
+            # MSYS2's sdl2-compat loads SDL3 by name, outside the PE import table.
+            foreach (dep IN LISTS resolved_deps)
+                get_filename_component(dll_name "${dep}" NAME)
+                string(TOLOWER "${dll_name}" dll_name)
+                if (dll_name STREQUAL "sdl2.dll")
+                    file(STRINGS "${dep}" sdl3_name REGEX "^SDL3[.]dll$" LIMIT_COUNT 1)
+                    if (sdl3_name)
+                        get_filename_component(sdl_bin "${dep}" DIRECTORY)
+                        find_file(sdl3_runtime NAMES "${sdl3_name}" PATHS "${sdl_bin}" ${bundle_library_paths}
+                                  NO_DEFAULT_PATH NO_CACHE REQUIRED)
+                        file(GET_RUNTIME_DEPENDENCIES
+                             LIBRARIES "${sdl3_runtime}"
+                             RESOLVED_DEPENDENCIES_VAR sdl3_deps
+                             DIRECTORIES "${sdl_bin}" ${bundle_library_paths}
+                             PRE_EXCLUDE_REGEXES "^(api|ext)-ms-win-"
+                             POST_EXCLUDE_REGEXES ".*system32.*")
+                        list(APPEND resolved_deps "${sdl3_runtime}" ${sdl3_deps})
+                        list(REMOVE_DUPLICATES resolved_deps)
+                    endif()
+                    break()
+                endif()
+            endforeach()
             # Same directory since we don't have rpath.
             set(lib_dir "${executable_parent_dir}")
         else()
