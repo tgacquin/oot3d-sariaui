@@ -43,6 +43,11 @@ def run(pair):
   assert len(set(music[:85]))==85 and any(a>b for a,b in zip(music,music[1:]))
  if name=='exclude-inventory':
   assert package['config']['advanced']['Exclude/292']==1
+  rewards=struct.unpack('<9i',base64.b64decode(package['fields']['rDungeonRewardOverrides']))
+  assert rewards[-1]==-1 and sorted(rewards[:-1])==list(range(1,9))
+ if name=='base':
+  rewards=struct.unpack('<9i',base64.b64decode(package['fields']['rDungeonRewardOverrides']))
+  assert sorted(rewards)==list(range(9))
  return name,'passed' 
 with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
  for result in pool.map(run,checks.items()):print(result,flush=True)

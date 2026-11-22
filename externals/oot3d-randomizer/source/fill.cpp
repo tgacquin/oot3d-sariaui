@@ -720,7 +720,7 @@ static void AssumedFill(const std::vector<ItemKey>& items, const std::vector<Loc
 static void RandomizeDungeonRewards() {
 
     // quest item bit mask of each stone/medallion for the savefile
-    static constexpr std::array<u32, 9> bitMaskTable = {
+    static constexpr std::array<u32, DUNGEON_REWARDS_COUNT> bitMaskTable = {
         0x00040000, // Kokiri Emerald
         0x00080000, // Goron Ruby
         0x00100000, // Zora Sapphire
@@ -731,7 +731,8 @@ static void RandomizeDungeonRewards() {
         0x00000010, // Shadow Medallion
         0x00000020, // Light Medallion
     };
-    int baseOffset = ItemTable(KOKIRI_EMERALD).GetItemID();
+    const int baseOffset = ItemTable(KOKIRI_EMERALD).GetItemID();
+    LinksPocketRewardBitMask = 0;
 
     // End of Dungeons includes Link's Pocket
     if (ShuffleRewards.Is(REWARDSHUFFLE_END_OF_DUNGEON)) {
@@ -757,21 +758,18 @@ static void RandomizeDungeonRewards() {
             auto locKey = dungeonRewardLocations[i];
             auto loc    = Location(locKey);
 
-            s32 rewardId;
-            if (loc->GetPlacedItemKey() != NONE) {
-                rewardId = loc->GetPlacedItem().GetItemID() - baseOffset;
-            } else {
-                // Dungeon reward locations might not have an item placed yet if some reward items
-                // were added to the starting inventory.
-                rewardId = INVALID_DUNGEON_REWARD;
-            }
+            // Starting inventory can leave a boss slot empty or put a green rupee in Link's Pocket.
+            const auto& item = loc->GetPlacedItem();
+            const s32 rewardId = item.GetItemType() == ITEMTYPE_DUNGEONREWARD
+                                     ? item.GetItemID() - baseOffset
+                                     : INVALID_DUNGEON_REWARD;
 
             rDungeonRewardOverrides[i] = rewardId;
 
             // set the player's dungeon reward on file creation instead of pushing it to them at the
             // start. This is done mainly because players are already familiar with seeing their dungeon
             // reward before opening up their file
-            if (i == dungeonRewardLocations.size() - 1) {
+            if (locKey == LINKS_POCKET && rewardId != INVALID_DUNGEON_REWARD) {
                 LinksPocketRewardBitMask = bitMaskTable[rewardId];
             }
         }
