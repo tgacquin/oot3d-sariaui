@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <stdexcept>
+#include <string_view>
 #include <QCoreApplication>
 #include <QJsonArray>
 #include <QRandomGenerator>
@@ -173,14 +174,20 @@ int main(int argc, char** argv) {
             if(file.write(bytes)!=bytes.size())throw std::runtime_error("Cannot finish option catalog");
             return 0;
         }
-        if (argc != 4 && argc != 5) throw std::runtime_error("Usage: oot3d-seed config.json original|mq output.json [progress.txt]");
+        const bool replay = argc > 1 && std::string_view(argv[1]) == "--replay";
+        if ((argc != 4 && argc != 5) || (replay && argc != 4))
+            throw std::runtime_error("Usage: oot3d-seed config.json original|mq output.json [progress.txt], or oot3d-seed --replay report.json output.json");
         if(argc==5)progress_path=QString::fromLocal8Bit(argv[4]);
         fillAttemptCallback=ReportAttempt;
-        const auto input = R::ReadJson(QString::fromLocal8Bit(argv[1]));
+        const auto input = R::ReadJson(QString::fromLocal8Bit(argv[replay ? 2 : 1]));
         if (input.isEmpty()) throw std::runtime_error("Cannot read randomizer configuration");
+        if (replay && (input.value("seed").toString().isEmpty() || !input.value("mq").isBool() ||
+                       !R::ValidDifficulty(input.value("difficulty").toObject())))
+            throw std::runtime_error("Seed report requires a seed, quest mode and difficulty settings");
         auto config = R::FromJson(input);
         if (config.seed.empty()) config.seed = QString::number(QRandomGenerator::system()->generate64(), 16).toStdString();
-        const bool mq = std::string(argv[2]) == "mq";
+        const auto requested = R::ToJson(config);
+        const bool mq = replay ? input.value("mq").toBool() : std::string(argv[2]) == "mq";
         HintTable_Init(); ItemTable_Init(); LocationTable_Init(); Enemizer::InitEnemyTypes(); Settings::InitSettings();
         auto difficulty = input.value("difficulty").toObject();
         if (difficulty.isEmpty()) difficulty = R::CaptureDifficulty();
@@ -241,6 +248,7 @@ int main(int argc, char** argv) {
             {"message_entries", QString::fromLatin1(QByteArray(entries.first, entries.second).toBase64())},
             {"message_count", int(CustomMessages::NumMessages())},
             {"hash", QString::fromStdString(GetRandomizerHash()[0] + ", " + GetRandomizerHash()[1] + ", " + GetRandomizerHash()[2] + ", " + GetRandomizerHash()[3] + ", " + GetRandomizerHash()[4])}};
+        if (requested != result.value("config").toObject()) result["generation_config"] = requested;
         if (config.options[R::SpoilerLog]) {
             QJsonArray spoiler;
             for (auto key : allLocations) {

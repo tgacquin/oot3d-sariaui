@@ -78,7 +78,12 @@ Use a decrypted `.cci` or `.3ds` dump of your legally owned Ocarina of Time 3D (
 
 Found a bug or crash? Please report it in this repository's **Issues** tab.
 
-Include your version, operating system, and steps to reproduce the issue. For randomizer issues, include your seed and settings, and mention whether you were playing alone or in multiplayer.
+Include your version, operating system, and steps to reproduce the issue. For randomizer issues, mention whether you were playing alone or in multiplayer and attach the matching file from `user/config/oot3d-randomizer/` beside SariaUI.
+
+- If it failed at the Randomizing prompt, attach `last-generation.json` before trying another seed.
+- If it happened during gameplay, attach `last-played.json` before opening another randomized file. Include the area and what you were doing.
+
+Both reports include the seed, quest mode, difficulty and randomizer settings. To reproduce generation with the matching build, run `oot3d-seed --replay last-generation.json replayed-seed.json`. The same command accepts `last-played.json`.
 
 ## Note about this project
 

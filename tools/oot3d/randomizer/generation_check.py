@@ -80,8 +80,10 @@ with tempfile.TemporaryDirectory(prefix='oot-rando-generation-') as temp:
         package = json.loads(output)
         default_difficulty = package['difficulty']
         check(package)
-        if index == 0:
-            subprocess.run([helper, input_path, mode, output_path], check=True, capture_output=True)
+        if index in (0, 7):  # Replay one Original and one Master Quest report.
+            report = temp/'last-generation.json'
+            report.write_text(json.dumps(dict(config, difficulty=package['difficulty'], mq=mode == 'mq')))
+            subprocess.run([helper, '--replay', report, output_path], check=True, capture_output=True)
             assert output_path.read_bytes() == output
         print(f'Passed generation case {index+1}: {mode}, shops={package["config"]["shopsanity"]}, '
               f'tokens={package["config"]["tokensanity"]}', flush=True)

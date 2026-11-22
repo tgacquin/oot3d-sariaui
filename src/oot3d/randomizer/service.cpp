@@ -3,6 +3,7 @@
 #include "oot3d/randomizer/service.h"
 #include "oot3d/randomizer/presets.h"
 #include "common/logging/log.h"
+#include "common/scm_rev.h"
 #include "oot3d/randomizer/difficulty.h"
 #include "oot3d/randomizer/wire_validation.h"
 #include "oot3d/randomizer/generation_progress.h"
@@ -15,9 +16,11 @@
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QProcess>
+#include <QRandomGenerator>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QUuid>
@@ -49,6 +52,15 @@ unsigned preparing_slot = 3;
 std::array<Common::AtomicSharedPtr<const RoomFile>,3> room_files;
 std::atomic<unsigned> room_selected{3};
 bool preparing_mq = false, generation_failed = false;
+void WriteSeedReport(const QString& path, QJsonObject input, bool mq) {
+    input["mq"] = mq;
+    input["sariaui_version"] = QString::fromUtf8(Common::g_build_fullname);
+    input["sariaui_revision"] = QString::fromUtf8(Common::g_scm_rev);
+    if (!QDir().mkpath(QFileInfo(path).absolutePath()) || !WriteJson(path, input)) {
+        LOG_WARNING(Core, "Could not write randomizer report {}. Seed settings: {}", path.toStdString(),
+                    QJsonDocument(input).toJson(QJsonDocument::Compact).toStdString());
+    }
+}
 QString SlotDirectory(unsigned slot) { return directory + QStringLiteral("/slot%1").arg(slot); }
 QString SaveKey(const QByteArray& bytes) {
     return QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());
@@ -199,8 +211,16 @@ void SetError(FileStatus::Error error,const std::string& detail) {
 }
 std::optional<Config> CurrentConfig() { std::scoped_lock lock(mutex); return current; }
 void SetCurrent(const Package* package) {
-    std::scoped_lock lock(mutex);
-    current = package ? std::optional(package->config) : std::nullopt;
+    {
+        std::scoped_lock lock(mutex);
+        current = package ? std::optional(package->config) : std::nullopt;
+    }
+    if (package && !directory.isEmpty()) {
+        const auto requested = package->json.value("generation_config").toObject();
+        auto input = ToJson(requested.isEmpty() ? package->config : FromJson(requested));
+        input["difficulty"] = package->json.value("difficulty");
+        WriteSeedReport(QDir(directory).filePath("last-played.json"), input, package->mq);
+    }
 }
 std::optional<Package> DecodePackage(const QJsonObject& input) {
     const auto& data = Data();
@@ -373,10 +393,13 @@ int PrepareNew(unsigned slot, bool mq) {
     cancel_generation = std::make_shared<std::atomic<bool>>(false);
     const auto cancelled = cancel_generation;
     const auto progress=GenerationProgress::Begin();
-    generation = std::async(std::launch::async, [config, mq, program, difficulty, cancelled, progress, slot]() -> std::optional<Package> {
+    const auto reportPath = QDir(directory).filePath("last-generation.json");
+    generation = std::async(std::launch::async, [config, mq, program, difficulty, cancelled, progress, slot, reportPath]() -> std::optional<Package> {
         reporting_cancellation=cancelled;
         QTemporaryDir temp;
         auto input = ToJson(config); input["difficulty"] = difficulty;
+        if (config.seed.empty()) input["seed"] = QString::number(QRandomGenerator::system()->generate64(), 16);
+        WriteSeedReport(reportPath, input, mq);
         if (!temp.isValid() || !WriteJson(temp.filePath("config.json"), input)) {
             SetError(FileStatus::Error::Storage,"Could not create temporary seed files."); return {};
         }
