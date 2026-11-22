@@ -28,7 +28,7 @@ jobs:
         with:
           msystem: UCRT64
           update: true
-          install: git mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-binutils mingw-w64-ucrt-x86_64-SDL2
+          install: git mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-binutils mingw-w64-ucrt-x86_64-SDL2 mingw-w64-ucrt-x86_64-sdl3
       - name: Verify SDL runtime deployment on captured Windows package
         shell: 'msys2 {0}'
         run: |
