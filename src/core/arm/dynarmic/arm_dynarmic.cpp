@@ -5,7 +5,9 @@
 #include "core/hle/service/nwm/nwm_uds.h"
 #include "core/hle/service/service.h"
 #include "oot3d/actor_draw_distance.h"
+#ifdef OOT3D_DEV_NATIVE_PROMPT_TRACE
 #include "oot3d/native_prompt_diagnostics.h"
+#endif
 #include "oot3d/save_wait_diagnostics.h"
 #ifdef OOT3D_DEV_AREA_LOAD_TRACE
 #include "oot3d/area_load_trace.h"
@@ -410,7 +412,9 @@ class DynarmicUserCallbacks final : public Dynarmic::A32::UserCallbacks {
     OOT3D::FileSelect::Hook oot_file_select;
     unsigned oot_keyboard_frames=0,oot_keyboard_reports=0;
     std::array<u32,10> oot_keyboard_signature{};
+#ifdef OOT3D_DEV_NATIVE_PROMPT_TRACE
     OOT3D::NativePromptDiagnostics::Trace oot_native_prompts;
+#endif
     OOT3D::GraphicsMemory::Monitor oot_graphics_memory;
     OOT3D::SaveWaitDiagnostics::Monitor oot_save_wait;
     OOT3D::DeathMenu::Hook oot_death_menu;
@@ -1449,7 +1453,9 @@ public:
                 return;
             }
             if (auto d = OOT3D::HDFont::NativeTexture(guest, r[4])) {
+#ifdef OOT3D_DEV_NATIVE_PROMPT_TRACE
                 oot_native_prompts.Uploaded(memory,*d,r[4],r[5]);
+#endif
                 const auto ptr = memory.GetPointer(d->address);
                 const auto base = reinterpret_cast<std::uintptr_t>(memory.GetFCRAMPointer(0));
                 const auto at = reinterpret_cast<std::uintptr_t>(ptr);
@@ -2195,9 +2201,11 @@ public:
             }
             if(oot_file_select.Drawing() || oot_file_select.PromptDrawing()) {
                 auto& regs=parent.jit->Regs();regs[2]=regs[0]+0xc;
+#ifdef OOT3D_DEV_NATIVE_PROMPT_TRACE
                 if(oot_file_select.NativeDrawing())
                     oot_native_prompts.Draw(guest,memory,regs[0],
                         parent.system.CoreTiming().GetGlobalTimeUs().count()/16667);
+#endif
                 OOT3D::ScreenModels::Apply(guest,regs[1],regs[0],
                     oot_file_select.ModelTransform(guest,regs[0]));
                 return;
