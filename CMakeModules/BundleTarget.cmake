@@ -31,7 +31,7 @@ if (BUNDLE_TARGET_EXECUTE)
 
             # Create a qt.conf file pointing to the app directory.
             # This ensures Qt can find its plugins.
-            file(WRITE "${executable_parent_dir}/qt.conf" "[Paths]\nPrefix = .")
+            file(WRITE "${executable_parent_dir}/qt.conf" "[Paths]\nPrefix = .\nPlugins = plugins\n")
 
             find_program(windeployqt_executable windeployqt6 PATHS "${QT_HOST_PATH}/bin")
             find_program(qtpaths_executable qtpaths6 PATHS "${QT_HOST_PATH}/bin")

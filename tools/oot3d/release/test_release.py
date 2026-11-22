@@ -134,6 +134,20 @@ class ReleaseChecks(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'ENABLE_OOT3D_PLAYER_MODE'):
                     smoke('windows-x64', root, root)
 
+    def test_windows_smoke_uses_packaged_platform_and_reports_timeout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            error = subprocess.TimeoutExpired(['SariaUI.exe', '--version'], 60,
+                                             stderr=b'example loader diagnostic')
+            with patch.dict(os.environ, QT_QPA_PLATFORM='offscreen', QT_PLUGIN_PATH='runner'), \
+                 patch('package.subprocess.run', side_effect=error) as run:
+                with self.assertRaisesRegex(ValueError, r'(?s)timed out.*windows.*example loader diagnostic'):
+                    smoke('windows-x64', root, root)
+            env = run.call_args.kwargs['env']
+            self.assertEqual(env['QT_QPA_PLATFORM'], 'windows')
+            self.assertNotIn('QT_PLUGIN_PATH', env)
+            self.assertEqual(env['QT_FORCE_STDERR_LOGGING'], '1')
+
     def test_linux_smoke_requires_bundled_offscreen_plugin(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

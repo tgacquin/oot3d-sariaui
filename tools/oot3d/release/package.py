@@ -84,7 +84,8 @@ def smoke(platform, stage, work, expected_version=None):
     for key in ('QT_PLUGIN_PATH', 'QT_QPA_PLATFORM_PLUGIN_PATH', 'QTDIR',
                 'DYLD_LIBRARY_PATH', 'DYLD_FRAMEWORK_PATH', 'LD_LIBRARY_PATH'):
         env.pop(key, None)
-    env.update(OOT3D_USER_PATH=str(work / 'user'), QT_QPA_PLATFORM='offscreen')
+    env.update(OOT3D_USER_PATH=str(work / 'user'),
+               QT_QPA_PLATFORM='windows' if platform == 'windows-x64' else 'offscreen')
     if platform == 'macos-arm64':
         app = stage / 'SariaUI.app'
         verify_macos(app)
@@ -95,7 +96,9 @@ def smoke(platform, stage, work, expected_version=None):
         # Do not let the MSYS toolchain's DLLs conceal a missing bundled DLL.
         system_root = Path(env.get('SystemRoot', r'C:\Windows'))
         env['PATH'] = os.pathsep.join(map(str, (stage, system_root / 'System32', system_root)))
-        env['QT_PLUGIN_PATH'] = str(stage / 'plugins')
+        # Exercise the deployed qwindows plugin during QApplication startup.
+        # Let Qt find it via the packaged qt.conf, as it does for players.
+        env.update(QT_DEBUG_PLUGINS='1', QT_FORCE_STDERR_LOGGING='1')
     else:
         subprocess.run([str(stage / 'SariaUI.AppImage'), '--appimage-extract'],
                        cwd=work, check=True, stdout=subprocess.DEVNULL, timeout=120)
@@ -108,6 +111,12 @@ def smoke(platform, stage, work, expected_version=None):
     try:
         version_result = subprocess.run([str(program), '--version'], cwd=work, env=env,
                                         check=True, timeout=60, capture_output=True, text=True)
+    except subprocess.TimeoutExpired as error:
+        # TimeoutExpired stores captured streams as bytes even with text=True.
+        output = (error.stdout or b'') + (error.stderr or b'')
+        raise ValueError(f'Packaged application --version timed out after {error.timeout}s '
+                         f'(Qt platform {env["QT_QPA_PLATFORM"]}):\n'
+                         f'{output.decode(errors="replace")}') from error
     except subprocess.CalledProcessError as error:
         raise ValueError(f'Packaged application --version failed (exit {error.returncode}):\n'
                          f'{error.stdout or ""}{error.stderr or ""}') from error
