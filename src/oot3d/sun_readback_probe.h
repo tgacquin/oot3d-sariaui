@@ -77,22 +77,29 @@ inline int BeginPhase(I64 now = Now()) {
 }
 // Only set around the exact guest LDR. Ordinary downloads remain attributable
 // separately; no memory cache, scheduler or synchronization behavior is changed.
-inline thread_local bool sun_read{};
-inline thread_local Ticket sun_query;
-struct ReadScope {
-    bool previous = sun_read;
-    Ticket previous_query = sun_query;
-    explicit ReadScope(const Ticket& query) {sun_read = true;sun_query = query;}
-    ~ReadScope() {sun_read = previous;sun_query = previous_query;}
+// Keep the owning ticket on the stack. Only the active scope's address needs TLS.
+inline constinit thread_local const Ticket* sun_query = nullptr;
+class ReadScope {
+    const Ticket ticket;
+    const Ticket* previous;
+
+public:
+    explicit ReadScope(const Ticket& query) : ticket(query), previous(sun_query) {
+        sun_query = &ticket;
+    }
+    ~ReadScope() { sun_query = previous; }
+
+    ReadScope(const ReadScope&) = delete;
+    ReadScope& operator=(const ReadScope&) = delete;
 };
 struct DownloadScope {
     // Attribute all reads to the query's starting phase, even if a query
     // crosses the boundary while its first GPU download is in flight.
     Ticket ticket;
-    bool depth{}, sun = sun_read;
+    bool depth{}, sun = sun_query != nullptr;
     I64 start = ticket.Get() ? Now() : 0;
     explicit DownloadScope(bool is_depth, I64 now = Now())
-        : ticket(sun_read ? sun_query : Take(now)), depth(is_depth) {}
+        : ticket(sun_query ? *sun_query : Take(now)), depth(is_depth) {}
     ~DownloadScope() {
         if(auto* stats = ticket.Get()) {
             const auto elapsed = Now() - start;

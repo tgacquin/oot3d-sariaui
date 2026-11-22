@@ -21,7 +21,7 @@ struct Env : Dynarmic::A32::UserCallbacks {
     template<class T> void Put(U32 a,T v) {assert(std::uint64_t(a)+sizeof(T)<=bytes.size());std::memcpy(&bytes[a],&v,sizeof v);}
     std::optional<U32> Read(U32 a) {return Get<U32>(a);}
     void Write(U32 a,U32 v) {Put(a,v);}
-    U32 ReadDepth(U32 a) {assert(sun_read);return MemoryRead32(a);}
+    U32 ReadDepth(U32 a) {assert(sun_query);return MemoryRead32(a);}
     std::optional<U32> MemoryReadCode(U32 a) override {
         if(a==Stop)return 0xef000000;
         if(a==0x47c944)return 0xef000001;
@@ -108,7 +108,7 @@ int main(int argc,char** argv) {
             assert(*e.Read(0x531ed8)==(phase==1?0:result));
             assert(e.loads==(phase==1?0:reads));
             if(phase!=1) {assert(cpu.Regs()==registers);assert(cpu.Cpsr()==flags);}
-            assert(!sun_read);
+            assert(!sun_query);
         }
         assert(session->phases[1].queries==1 && session->phases[1].bypasses==1 && session->phases[1].reads==0);
         assert(session->phases[0].reads==reads && session->phases[2].reads==reads);
@@ -135,10 +135,14 @@ int main(int argc,char** argv) {
     session=Start(0);
     {
         ReadScope origin{Ticket{session,0}};
+        {
+            ReadScope nested{Ticket{session,2}};
+            DownloadScope download{true,session->begins+Duration};
+        }
         DownloadScope download{true,session->begins+Duration};
     }
     assert(session->phases[0].sun_downloads==1 && session->phases[1].sun_downloads==0);
-    assert(!sun_read && !sun_query.session);
+    assert(session->phases[2].sun_downloads==1 && !sun_query);
     // Execute the unchanged native visibility logic with asynchronous samples.
     // All nine taps must produce the same result and registers as native reads;
     // pending snapshots must never touch guest depth, even on the cold start.
