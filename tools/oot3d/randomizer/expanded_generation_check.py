@@ -6,6 +6,10 @@ exe=pathlib.Path(sys.argv[1]).resolve()
 out=pathlib.Path(sys.argv[2]);out.mkdir(exist_ok=True)
 checks={
 'base':{},'mq':{'mode':'mq'},
+'mq-start-stones':{'mode':'mq','advanced':dict(StartingKokiriEmerald=1,StartingGoronRuby=1,StartingZoraSapphire=1)},
+'all-start-rewards':{'advanced':{'Starting'+reward:1 for reward in (
+ 'KokiriEmerald','GoronRuby','ZoraSapphire','ForestMedallion','FireMedallion',
+ 'WaterMedallion','SpiritMedallion','ShadowMedallion','LightMedallion')}},
 'cosmetic':{'advanced':dict(ShuffleMusic=1,ShuffleSFX=1)},
 'logic':{'advanced':dict(Logic=1,LogicGrottosWithoutAgony=1,RestoreISG=1,GlitchISG=1)},
 'exclude-inventory':{'advanced':{'Exclude/292':1,'ShuffleKokiriSword':1,'StartingFireArrows':1,'StartingZeldasLullaby':1,'StartingKokiriEmerald':1,'HintSpecificity':1}},
@@ -27,9 +31,9 @@ def run(pair):
  p=out/(name+'-config.json');p.write_text(json.dumps(c))
  with (out/(name+'.log')).open('w') as log:
   try:r=subprocess.run([str(exe),str(p),mode,str(out/(name+'.json'))],stdout=log,stderr=subprocess.PIPE,timeout=240)
-  except subprocess.TimeoutExpired:return name,'TIMEOUT'
- if r.returncode:raise AssertionError((name,r.stderr.decode()[-1000:]))
- package=json.loads((out/(name+'.json')).read_text())
+  except subprocess.TimeoutExpired as error:raise AssertionError(f'{name} timed out') from error
+ if r.returncode:raise AssertionError((name,r.returncode,r.stderr.decode(errors='replace')[-1000:]))
+ package=json.loads((out/(name+'.json')).read_bytes())
  assert package['format']==2
  lengths={'rEntranceOverrides':2590,'rEnemyOverrides':6400,'rGsLocOverrides':2800,'rBGMOverrides':512,'rSfxData':23352,'rScrubRandomItemPrices':22}
  for key,length in lengths.items():assert len(base64.b64decode(package['fields'][key]))==length,(name,key)
@@ -43,17 +47,20 @@ def run(pair):
   assert len(set(music[:85]))==85 and any(a>b for a,b in zip(music,music[1:]))
  if name=='exclude-inventory':
   assert package['config']['advanced']['Exclude/292']==1
+ # These cases start with the first N rewards in the game's stone/medallion order.
+ starting_counts={'base':0,'mq':0,'exclude-inventory':1,'mq-start-stones':3,'all-start-rewards':9}
+ if name in starting_counts:
+  count=starting_counts[name]
   rewards=struct.unpack('<9i',base64.b64decode(package['fields']['rDungeonRewardOverrides']))
-  assert rewards[-1]==-1 and sorted(rewards[:-1])==list(range(1,9))
- if name=='base':
-  rewards=struct.unpack('<9i',base64.b64decode(package['fields']['rDungeonRewardOverrides']))
-  assert sorted(rewards)==list(range(9))
+  assert sorted(rewards)==[-1]*count+list(range(count,9)),(name,rewards)
+  if count:
+   assert rewards[-1]==-1,(name,"Link's Pocket",rewards[-1])
  return name,'passed' 
 with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
  for result in pool.map(run,checks.items()):print(result,flush=True)
 
 # Cosmetic audio choices must not change gameplay placement or the shared seed hash.
-base=json.loads((out/'base.json').read_text());cosmetic=json.loads((out/'cosmetic.json').read_text())
+base=json.loads((out/'base.json').read_bytes());cosmetic=json.loads((out/'cosmetic.json').read_bytes())
 assert base['fields']['rItemOverrides']==cosmetic['fields']['rItemOverrides']
 assert base['hash']==cosmetic['hash']
 # Deterministic placements, prices, music, SFX, native tables and messages.
@@ -61,14 +68,14 @@ for name in ('items','entrances','audio','enemies'):
  previous=(out/(name+'.json')).read_bytes()
  run((name,checks[name]))
  assert previous==(out/(name+'.json')).read_bytes(),name
-for name,mode,options in [
- ('mixed-layout','original',{'MQDungeonCount':6}),
- ('unsupported-mq','mq',{'Enemizer':1}),
- ('bad-triforce','original',{'TriforceHunt':1,'TriforcePiecesTotal':1,'TriforcePiecesRequired':10}),
- ('bad-option','original',{'Scrubsanity':99}),
- ('bad-exclusion','original',{'Exclude/99999999':1})]:
+for name,mode,options,reason in [
+ ('mixed-layout','original',{'MQDungeonCount':6},'Invalid randomizer option: MQDungeonCount'),
+ ('unsupported-mq','mq',{'Enemizer':1},'Master Quest logic does not support Enemizer'),
+ ('bad-triforce','original',{'TriforceHunt':1,'TriforcePiecesTotal':1,'TriforcePiecesRequired':10},'Triforce pieces required cannot exceed'),
+ ('bad-option','original',{'Scrubsanity':99},'Invalid randomizer option: Scrubsanity'),
+ ('bad-exclusion','original',{'Exclude/99999999':1},'Invalid randomizer option: Exclude/99999999')]:
  p=out/(name+'-config.json');p.write_text(json.dumps({'enabled':True,'seed':'reject','advanced':options}))
  r=subprocess.run([exe,p,mode,out/(name+'.json')],capture_output=True,timeout=30)
- assert r.returncode!=0,name
+ assert r.returncode==1 and reason.encode() in r.stderr,(name,r.returncode,r.stderr[-1000:])
  print(name,'correctly rejected',flush=True)
 print('Expanded generation, deterministic tables and settings validation passed',flush=True)

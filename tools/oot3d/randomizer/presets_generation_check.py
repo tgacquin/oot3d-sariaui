@@ -20,8 +20,8 @@ def run(case):
         result = subprocess.run([str(exe), str(out / f'{name}.json'), mode, str(work / 'seed.json')],
                                 cwd=work, stdout=log, stderr=subprocess.PIPE, timeout=180)
     assert result.returncode == 0, (case, result.stderr.decode(errors='replace'))
-    package = json.loads((work / 'seed.json').read_text())
-    expected = json.loads((out / f'{name}.json').read_text())
+    package = json.loads((work / 'seed.json').read_bytes())
+    expected = json.loads((out / f'{name}.json').read_bytes())
     assert package['format'] == 2 and package['mq'] == (mode == 'mq')
     assert package['fields']['rItemOverrides'] and package['hash']
     actual = package['config']

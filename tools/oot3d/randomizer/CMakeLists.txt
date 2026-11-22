@@ -24,5 +24,9 @@ else()
 endif()
 
 target_compile_definitions(oot3d-seed PRIVATE OOTR_HOST)
+if(APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_definitions(oot3d-seed PRIVATE
+        $<$<COMPILE_LANGUAGE:CXX>:_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_FAST>)
+endif()
 
 target_link_libraries(oot3d-seed PRIVATE oot3d_randomizer_data)

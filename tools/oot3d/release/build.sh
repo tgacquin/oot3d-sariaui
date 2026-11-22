@@ -55,9 +55,15 @@ cmake -S . -B "$build_dir" -G Ninja \
   -DENABLE_NATIVE_OPTIMIZATION=OFF "${flags[@]}"
 # Check the standalone presentation library before compiling the large dependencies.
 cmake --build "$build_dir" --target oot3d_hd_font oot3d_atomic_shared_ptr_check --parallel 3
+cmake --build "$build_dir" --target oot3d-seed oot3d_randomizer_presets_check --parallel 3
+suffix=''; if [[ "$platform" == windows-x64 ]]; then suffix=.exe; fi
+seed="$build_dir/bin/Release/oot3d-seed$suffix"
+python3 tools/oot3d/randomizer/expanded_generation_check.py "$seed" "$build_dir/generation-check"
+python3 tools/oot3d/randomizer/generation_check.py "$seed"
+python3 tools/oot3d/randomizer/presets_generation_check.py "$seed" \
+  "$build_dir/bin/Release/oot3d_randomizer_presets_check$suffix" "$build_dir/presets-check"
 cmake --build "$build_dir" --target citra_meta "${checks[@]}" --parallel 3
 for check in "${checks[@]}"; do
-  suffix=''; if [[ "$platform" == windows-x64 ]]; then suffix=.exe; fi
   "$build_dir/bin/Release/$check$suffix"
 done
 if [[ "$platform" == linux-x86_64 ]]; then
