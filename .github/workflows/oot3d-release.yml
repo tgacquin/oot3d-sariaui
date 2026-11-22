@@ -1,233 +1,33 @@
 name: SariaUI desktop release candidates
-run-name: SariaUI build — ${{ inputs.platform || 'linux-x86_64' }}
-
-# Preparation only: no push/tag trigger and no release publication permission.
+run-name: SariaUI probe — windows-x64
 on:
   workflow_dispatch:
     inputs:
       platform:
-        description: Platform to build (all builds Windows, macOS and Linux)
         type: choice
         required: true
-        default: linux-x86_64
-        options:
-          - linux-x86_64
-          - windows-x64
-          - macos-arm64
-          - all
-
+        options: [windows-x64]
 permissions:
+  actions: read
   contents: read
-
-concurrency:
-  group: oot3d-release-${{ github.ref }}-${{ inputs.platform || 'linux-x86_64' }}
-  cancel-in-progress: false
-
 jobs:
-  hook-sites:
-    uses: ./.github/workflows/oot3d-hook-sites.yml
-
-  source:
-    needs: hook-sites
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    outputs:
-      version: ${{ steps.release.outputs.version }}
-      matrix: ${{ steps.platforms.outputs.matrix }}
+  replay:
+    runs-on: windows-2022
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.sha }}
-          submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-      - name: Select build platforms
-        id: platforms
-        env:
-          SELECTED_PLATFORM: ${{ inputs.platform || 'linux-x86_64' }}
-        run: |
-          matrix=$(python3 tools/oot3d/release/platforms.py "$SELECTED_PLATFORM")
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-      - name: Read shared SariaUI version
-        id: release
-        run: |
-          release_version=$(python3 tools/oot3d/release/release_version.py)
-          echo "version=$release_version" >> "$GITHUB_OUTPUT"
-          echo "RELEASE_VERSION=$release_version" >> "$GITHUB_ENV"
-      - name: Validate committed release inputs
-        run: python3 tools/oot3d/release/preflight.py "$RELEASE_VERSION"
-      - name: Test packaging rules without a game
-        run: python3 -m unittest discover -s tools/oot3d/release -p 'test_*.py'
-      - name: Archive exact source and pinned submodules
-        run: python3 tools/mm3d/package_source.py "artifacts/SariaUI-$RELEASE_VERSION-Source.tar.gz"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: SariaUI-${{ steps.release.outputs.version }}-Source
-          path: artifacts/*-Source.tar.gz
-          if-no-files-found: error
-
-  desktop:
-    needs: source
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.source.outputs.matrix) }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 150
-    env:
-      RELEASE_VERSION: ${{ needs.source.outputs.version }}
-      RELEASE_PLATFORM: ${{ matrix.platform }}
-      CCACHE_MAXSIZE: 2G
-      CCACHE_COMPILERCHECK: content
-      LINUX_BUILD_IMAGE: ${{ vars.OOT3D_LINUX_BUILD_IMAGE || 'opensauce04/azahar-build-environment:latest' }}
-    steps:
-      - name: Free unused Linux runner SDKs before checkout and image pull
-        if: matrix.platform == 'linux-x86_64'
-        shell: bash
-        run: |
-          set -euo pipefail
-          df -h /
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
-          df -h /
-      - name: Set Windows checkout line endings and remember its Git
-        if: matrix.platform == 'windows-x64'
-        shell: pwsh
-        run: |
-          $gitExe = (Get-Command git.exe).Source
-          & $gitExe config --global core.autocrlf false
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          "CHECKOUT_GIT_DIR=$(Split-Path -Parent $gitExe)" >> $env:GITHUB_ENV
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.sha }}
-          submodules: recursive
-          persist-credentials: false
-      - uses: actions/setup-python@v6
-        if: matrix.platform != 'windows-x64'
-        with:
-          python-version: '3.13'
-      - name: Install macOS build tools
-        if: matrix.platform == 'macos-arm64'
-        run: brew install cmake ninja ccache
-      - uses: msys2/setup-msys2@v2
-        if: matrix.platform == 'windows-x64'
-        with:
-          msystem: UCRT64
-          update: true
-          install: >-
-            git
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-cmake
-            mingw-w64-ucrt-x86_64-ninja
-            mingw-w64-ucrt-x86_64-ccache
-            mingw-w64-ucrt-x86_64-python
-            mingw-w64-ucrt-x86_64-qt6-base
-            mingw-w64-ucrt-x86_64-qt6-multimedia
-            mingw-w64-ucrt-x86_64-qt6-tools
-            mingw-w64-ucrt-x86_64-SDL2
-      - name: Restore compiler cache
-        uses: actions/cache/restore@v5
-        with:
-          path: .ccache
-          key: sariaui-${{ matrix.platform }}-ccache-v1-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: sariaui-${{ matrix.platform }}-ccache-v1-
-      - name: Build, check and package Windows
-        if: matrix.platform == 'windows-x64'
-        shell: 'msys2 {0}'
-        run: |
-          set -euo pipefail
-          export PATH="$(cygpath -u "$CHECKOUT_GIT_DIR"):$PATH"
-          bash tools/oot3d/release/build.sh "$RELEASE_PLATFORM" "$RELEASE_VERSION" 2>&1 | tee release-build.log
-      - name: Build, check and package macOS
-        if: matrix.platform == 'macos-arm64'
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash tools/oot3d/release/build.sh "$RELEASE_PLATFORM" "$RELEASE_VERSION" 2>&1 | tee release-build.log
-      - name: Inspect timed-out Windows package startup
-        if: failure() && matrix.platform == 'windows-x64'
-        shell: 'msys2 {0}'
-        run: |
-          set -eu
-          pacman -S --needed --noconfirm mingw-w64-ucrt-x86_64-gdb
-          python3 tools/oot3d/release/diagnose_windows_startup.py
-      - name: Retain Windows startup reproduction
-        if: failure() && matrix.platform == 'windows-x64'
-        uses: actions/upload-artifact@v7
+      - uses: actions/download-artifact@v4
         with:
           name: windows-startup-reproduction
-          path: |
-            build-release-windows-x64/bundle/*.exe
-            build-release-windows-x64/bundle/*.dll
-            build-release-windows-x64/bundle/qt.conf
-            build-release-windows-x64/bundle/plugins/**/*.dll
-          retention-days: 1
-      - name: Build, check and package Linux in the existing toolchain image
-        if: matrix.platform == 'linux-x86_64'
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker pull "$LINUX_BUILD_IMAGE"
-          docker image inspect "$LINUX_BUILD_IMAGE" --format '{{json .RepoDigests}}' > linux-toolchain.log
-          df -h / "$GITHUB_WORKSPACE"
-          docker run --rm --user "$(id -u):$(id -g)" \
-            -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
-            -e RELEASE_VERSION -e RELEASE_PLATFORM \
-            -e CCACHE_MAXSIZE -e CCACHE_COMPILERCHECK \
-            -e LANG=C.UTF-8 -e LC_ALL=C.UTF-8 \
-            "$LINUX_BUILD_IMAGE" \
-            bash -c 'bash tools/oot3d/release/build.sh "$RELEASE_PLATFORM" "$RELEASE_VERSION"' \
-            2>&1 | tee release-build.log
-      - name: Save compiler cache even after build failure
-        if: always()
-        uses: actions/cache/save@v5
+          path: build-release-windows-x64/bundle
+          run-id: 45077772257
+          github-token: ${{ github.token }}
+      - uses: msys2/setup-msys2@v2
         with:
-          path: .ccache
-          key: sariaui-${{ matrix.platform }}-ccache-v1-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Upload diagnostics
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: SariaUI-${{ needs.source.outputs.version }}-diagnostics-${{ matrix.platform }}
-          path: |
-            release-build.log
-            linux-toolchain.log
-            build-release-*/CMakeFiles/CMakeConfigureLog.yaml
-          if-no-files-found: ignore
-      - uses: actions/upload-artifact@v7
-        with:
-          name: SariaUI-${{ needs.source.outputs.version }}-package-${{ matrix.platform }}
-          path: artifacts/*
-          if-no-files-found: error
-
-  candidate:
-    needs: [source, desktop]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    env:
-      RELEASE_VERSION: ${{ needs.source.outputs.version }}
-      SELECTED_PLATFORM: ${{ inputs.platform || 'linux-x86_64' }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: SariaUI-${{ needs.source.outputs.version }}-package-*
-          merge-multiple: true
-          path: artifacts
-      - uses: actions/download-artifact@v4
-        with:
-          name: SariaUI-${{ needs.source.outputs.version }}-Source
-          path: artifacts
-      - name: Verify selected packages and write checksums
-        run: python3 tools/oot3d/release/collect.py artifacts "$RELEASE_VERSION" "$GITHUB_SHA" --platform "$SELECTED_PLATFORM"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: SariaUI-${{ needs.source.outputs.version }}-release-candidate-${{ inputs.platform || 'linux-x86_64' }}
-          path: artifacts/*
-          if-no-files-found: error
-      - name: Explain publication status
-        run: echo 'Candidate artifacts only. No tag or GitHub Release was created.' >> "$GITHUB_STEP_SUMMARY"
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-gdb
+      - name: Inspect Windows startup
+        shell: 'msys2 {0}'
+        run: python3 tools/oot3d/release/diagnose_windows_startup.py

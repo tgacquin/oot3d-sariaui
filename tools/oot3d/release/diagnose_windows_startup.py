@@ -20,7 +20,7 @@ with tempfile.TemporaryDirectory() as tmp:
     env.pop('QT_PLUGIN_PATH', None)
     env.pop('QT_QPA_PLATFORM_PLUGIN_PATH', None)
     env.pop('QTDIR', None)
-    root = Path(env['SystemRoot'])
+    root = Path(os.environ['SYSTEMROOT'])
     env.update(PATH=os.pathsep.join(map(str,(stage,root/'System32',root))),
                QT_QPA_PLATFORM='windows', QT_DEBUG_PLUGINS='1', QT_FORCE_STDERR_LOGGING='1',
                OOT3D_USER_PATH=str(work/'user'))
