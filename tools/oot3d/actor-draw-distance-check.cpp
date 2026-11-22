@@ -90,7 +90,8 @@ int main(int argc,char** argv) {
         assert(Instruction(s.pc,s.word^1)==(s.word^1));
         e.Put(s.pc,s.word^1);assert(!CodeMatches(e));e.Put(s.pc,s.word);
     }
-    assert(Clamp(NAN)==1 && Clamp(INFINITY)==1 && Clamp(-5)==1 && Clamp(50)==5);
+    assert(Clamp(NAN)==1 && Clamp(INFINITY)==1 && Clamp(-5)==1);
+    assert(Clamp(3.5f)==3.5f && Clamp(3.75f)==3.75f && Clamp(5.f)==3.75f);
     for(const auto word:{0u,0x80000000u,0x7fc00001u,0x7f800000u,0xbf800000u,0x7f7fffffu}) {
         assert(Scale(word,1)==word);assert(Scale(word,5)==word);
     }
@@ -123,14 +124,14 @@ int main(int argc,char** argv) {
     // Run Fishing's real visibility branch: reeds (1200) and lily pads (800).
     // Both fade paths and the near interaction threshold remain native.
     constexpr std::array<U32,2> fishing_end{0x3b5f48,0x3b6004};
-    for(float radius:{800.f,1200.f})for(float factor:{1.f,2.f,5.f})
-        for(float z:{500.f,800.f,1000.f,1600.f,2400.f,3999.f,6000.f})
+    for(float radius:{800.f,1200.f})for(float factor:{1.f,2.f,3.75f,5.f})
+        for(float z:{500.f,800.f,1000.f,1600.f,2400.f,2999.f,3000.f,4499.f,4500.f,6000.f})
             for(float x:{0.f,7000.f}) {
                 e.Setup(0,0,0);e.Put<float>(Env::Actor+0x18,x);
                 e.Put<float>(Env::Actor+0x20,z);e.Put<float>(Env::Actor+0x38,radius);
                 e.Put<float>(Env::Actor+0x3c,.6f);
                 e.SameAtOne(0x3b5ea4,fishing_end);
-                const bool visible=z<radius*factor && std::abs(x)<z+100;
+                const bool visible=z<radius*std::min(factor,3.75f) && std::abs(x)<z+100;
                 assert(e.Run(0x3b5ea4,fishing_end,true,factor)==fishing_end[visible?0:1]);
                 assert(e.Get<float>(Env::Actor+0x38)==radius);
                 assert(e.Get<float>(Env::Actor+0x3c)==.6f);

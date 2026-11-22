@@ -359,7 +359,7 @@ void MultiplayerState::HideNotification() {
 void MultiplayerState::OnOpenNetworkRoom() {
     if(oot_mode) {
         OOT3D::MultiplayerSettings::select_tab=true;
-        OOT3D::player_view=false;OOT3D::visible=true;
+        OOT3D::settings_view=OOT3D::SettingsView::Editor;OOT3D::visible=true;
         return;
     }
     if (auto member = Network::GetRoomMember().lock()) {

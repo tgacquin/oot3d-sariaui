@@ -37,6 +37,8 @@ static Result hostNetworkError = 0;
 u32 rMultiplayerHold=0, rMultiplayerReady=0;
 char rMultiplayerUsername[33];
 static unsigned hostRole=0;
+// All sections in one managed-room reply describe the same emulation tick.
+static u32 snapshotGeneration;
 static bool hostConnecting=false;
 static u64 hostStarted=0, hostNextPoll=0;
 #define HOST_TICKS_PER_SECOND 268123480ULL
@@ -68,6 +70,7 @@ void Multiplayer_Shutdown(void) {
     hostSrvReady = false;
     udsSetNonblocking(false);
     rMultiplayerHold=0;rMultiplayerReady=0;hostRole=0;hostConnecting=false;hostStarted=hostNextPoll=0;
+    snapshotGeneration = 0;
     mSaveContextInit=false;
     if (mBuffer) SystemArena_Free(mBuffer);
     mBuffer = NULL; mBufSize = 0;
@@ -123,6 +126,54 @@ typedef struct {
 } MultiplayerSaveContext;
 
 static MultiplayerSaveContext mSaveContext;
+
+// Inventory metadata needed once at join. Ongoing sharing has separate rules.
+typedef struct {
+    ItemEquips childEquips, adultEquips;
+    u8 childMenu[sizeof(gSaveContext.itemMenuChild)];
+    u8 adultMenu[sizeof(gSaveContext.itemMenuAdult)];
+    u8 slotRecords[sizeof(gSaveContext.itemSlotDataRecords)];
+    u8 dekuShields, hylianShields, hasTimeTraveled, gloomedHeart;
+    s8 magic;
+} JoinInventory;
+static JoinInventory joinInventory;
+#define JOIN_INVENTORY_WORDS ((sizeof(JoinInventory) + 3) / 4)
+
+static void CaptureJoinInventory(void) {
+    joinInventory.childEquips = gSaveContext.childEquips;
+    joinInventory.adultEquips = gSaveContext.adultEquips;
+    ItemEquips* active = gSaveContext.linkAge == AGE_CHILD ? &joinInventory.childEquips : &joinInventory.adultEquips;
+    *active = gSaveContext.equips;
+    // Riding, fishing and minigames can temporarily replace the host's B item.
+    const u8 b = active->buttonItems[0];
+    if (b == ITEM_BOW || b == ITEM_SLINGSHOT || b == ITEM_FISHING_POLE || b == ITEM_BOMBCHU) {
+        active->buttonItems[0] = gSaveContext.buttonStatus[0];
+    }
+    memcpy(joinInventory.childMenu, gSaveContext.itemMenuChild, sizeof(joinInventory.childMenu));
+    memcpy(joinInventory.adultMenu, gSaveContext.itemMenuAdult, sizeof(joinInventory.adultMenu));
+    memcpy(joinInventory.slotRecords, gSaveContext.itemSlotDataRecords, sizeof(joinInventory.slotRecords));
+    joinInventory.dekuShields = gExtSaveData.dekuShieldsCount;
+    joinInventory.hylianShields = gExtSaveData.hylianShieldsCount;
+    joinInventory.hasTimeTraveled = gExtSaveData.hasTimeTraveled;
+    joinInventory.gloomedHeart = gExtSaveData.gloomedHeart;
+    joinInventory.magic = mSaveContext.magic;
+}
+
+static void ApplyJoinInventory(void) {
+    gSaveContext.childEquips = joinInventory.childEquips;
+    gSaveContext.adultEquips = joinInventory.adultEquips;
+    gSaveContext.equips = gSaveContext.linkAge == AGE_CHILD ? joinInventory.childEquips : joinInventory.adultEquips;
+    for (size_t i = 0; i < ARRAY_SIZE(joinInventory.childMenu); ++i) {
+        const u8 child = joinInventory.childMenu[i], adult = joinInventory.adultMenu[i];
+        gSaveContext.itemMenuChild[i] = child < ARRAY_SIZE(gSaveContext.items) ? child : SLOT_NONE;
+        gSaveContext.itemMenuAdult[i] = adult < ARRAY_SIZE(gSaveContext.items) ? adult : SLOT_NONE;
+    }
+    memcpy(gSaveContext.itemSlotDataRecords, joinInventory.slotRecords, sizeof(joinInventory.slotRecords));
+    gExtSaveData.dekuShieldsCount = joinInventory.dekuShields;
+    gExtSaveData.hylianShieldsCount = joinInventory.hylianShields;
+    gExtSaveData.hasTimeTraveled = joinInventory.hasTimeTraveled;
+    gExtSaveData.gloomedHeart = joinInventory.gloomedHeart;
+}
 
 static void Multiplayer_Overwrite_mSaveContext(void) {
     // SaveContext
@@ -488,7 +539,7 @@ void Multiplayer_Run(void) {
 
             if(hostRole) {
                 Multiplayer_Overwrite_mSaveContext();mSaveContextInit=true;
-                mp_isSyncing=hostRole==2 && gSettingsContext.mp_SharedProgress==ON;
+                mp_isSyncing = hostRole == 2;
                 mp_fullSyncerID=mp_isSyncing?1:0;
                 memset(mp_completeSyncs,0,sizeof(mp_completeSyncs));
                 hostNextPoll=0;
@@ -522,6 +573,7 @@ static void Multiplayer_StartupSync(void) {
     PacketMask empty={0};
     if(!memcmp(&needed,&empty,sizeof(needed))) {
         Multiplayer_Overwrite_gSaveContext();
+        ApplyJoinInventory();
         const unsigned scene=gGlobalContext->sceneNum;
         if(scene<ARRAY_SIZE(gSaveContext.sceneFlags)) {
             // The scene was instantiated before initial synchronization. Keep
@@ -1213,8 +1265,31 @@ void Multiplayer_Receive_FullSyncProviderOffer(u16 senderID) {
     mp_foundSyncer  = true;
 }
 
+static void CaptureLiveSceneFlags(void) {
+    const unsigned scene = gGlobalContext->sceneNum;
+    if (scene >= ARRAY_SIZE(gSaveContext.sceneFlags)) return;
+    SaveSceneFlags* flags = &gSaveContext.sceneFlags[scene];
+    flags->swch = gGlobalContext->actorCtx.flags.swch;
+    flags->chest = gGlobalContext->actorCtx.flags.chest;
+    flags->clear = gGlobalContext->actorCtx.flags.clear;
+    flags->collect = gGlobalContext->actorCtx.flags.collect;
+}
+
+static bool CanProvideSnapshot(void) {
+    return hostRole ? hostRole == 1 : gSettingsContext.mp_SharedProgress == ON;
+}
+
+static bool CanReceiveSnapshot(u16 senderID) {
+    return hostRole ? hostRole == 2 && mp_isSyncing && senderID == 1 : gSettingsContext.mp_SharedProgress == ON;
+}
+
+static void SendSnapshotSection(u16 words, u16 targetID) {
+    if (hostRole == 1) mBuffer[words++] = snapshotGeneration;
+    Multiplayer_SendPacket(words, targetID);
+}
+
 void Multiplayer_Send_FullSyncRequest(PacketMask neededPackets) {
-    if (!IsSendReceiveReady() || gSettingsContext.mp_SharedProgress == OFF) {
+    if (!IsSendReceiveReady() || !(hostRole == 2 || gSettingsContext.mp_SharedProgress == ON)) {
         return;
     }
     memset(mBuffer, 0, mBufSize);
@@ -1227,7 +1302,7 @@ void Multiplayer_Send_FullSyncRequest(PacketMask neededPackets) {
 }
 
 void Multiplayer_Receive_FullSyncRequest(u16 senderID) {
-    if (gSettingsContext.mp_SharedProgress == OFF || !IsInSameSyncGroup() || !mSaveContextInit) {
+    if (!CanProvideSnapshot() || !IsInSameSyncGroup() || !mSaveContextInit) {
         return;
     }
     u8 memSpacer = GetSharedProgressMemSpacerOffset();
@@ -1235,6 +1310,19 @@ void Multiplayer_Receive_FullSyncRequest(u16 senderID) {
     PacketMask neededPackets;
     memcpy(&neededPackets, &mBuffer[memSpacer], sizeof(PacketMask));
     memSpacer += sizeof(neededPackets);
+
+    if (hostRole == 1) {
+        if (!IsInGame()) return;
+        // With sharing enabled, ReceivePackets already refreshed the mirror
+        // and may have applied earlier packets in this very batch.
+        if (!gSettingsContext.mp_SharedProgress) {
+            CaptureLiveSceneFlags();
+            Multiplayer_Overwrite_mSaveContext();
+        }
+        CaptureJoinInventory();
+        ++snapshotGeneration;
+        memset(&neededPackets, 0xff, sizeof(neededPackets));
+    }
 
     if (PacketMask_GetBit(&neededPackets, FULLSYNC_BASE)) {
         Multiplayer_Send_BaseSync(senderID);
@@ -1255,7 +1343,7 @@ void Multiplayer_Receive_FullSyncRequest(u16 senderID) {
 }
 
 void Multiplayer_Send_BaseSync(u16 targetID) {
-    if (!IsSendReceiveReady() || gSettingsContext.mp_SharedProgress == OFF) {
+    if (!IsSendReceiveReady() || !CanProvideSnapshot()) {
         return;
     }
     memset(mBuffer, 0, mBufSize);
@@ -1306,11 +1394,15 @@ void Multiplayer_Send_BaseSync(u16 targetID) {
     mBuffer[memSpacer++] = mSaveContext.triforcePieces;
     mBuffer[memSpacer++] = mSaveContext.health;
     mBuffer[memSpacer++] = mSaveContext.rupees;
-    Multiplayer_SendPacket(memSpacer, targetID);
+    if (hostRole == 1) {
+        memcpy(&mBuffer[memSpacer], &joinInventory, sizeof(joinInventory));
+        memSpacer += JOIN_INVENTORY_WORDS;
+    }
+    SendSnapshotSection(memSpacer, targetID);
 }
 
 void Multiplayer_Receive_BaseSync(u16 senderID) {
-    if (!IsInSameSyncGroup() || gSettingsContext.mp_SharedProgress == OFF || mp_completeSyncs[FULLSYNC_BASE]) {
+    if (!IsInSameSyncGroup() || !CanReceiveSnapshot(senderID) || mp_completeSyncs[FULLSYNC_BASE]) {
         return;
     }
     u8 memSpacer = GetSharedProgressMemSpacerOffset();
@@ -1359,13 +1451,13 @@ void Multiplayer_Receive_BaseSync(u16 senderID) {
     }
     mSaveContext.worldMapAreaData = mBuffer[memSpacer++];
     mSaveContext.triforcePieces   = mBuffer[memSpacer++];
-    if (gSettingsContext.mp_SharedHealth) {
+    if (hostRole == 2 || gSettingsContext.mp_SharedHealth) {
         mSaveContext.health = mBuffer[memSpacer++];
     } else {
         mSaveContext.health = mSaveContext.healthCapacity;
         memSpacer++;
     }
-    if (gSettingsContext.mp_SharedRupees) {
+    if (hostRole == 2 || gSettingsContext.mp_SharedRupees) {
         mSaveContext.rupees = mBuffer[memSpacer++];
     } else if (gSettingsContext.startingMaxRupees) {
         static u16 maxRupees[] = { 99, 200, 500, 999 };
@@ -1373,11 +1465,15 @@ void Multiplayer_Receive_BaseSync(u16 senderID) {
         memSpacer++;
     }
 
+    if (hostRole == 2) {
+        memcpy(&joinInventory, &mBuffer[memSpacer], sizeof(joinInventory));
+        mSaveContext.magic = joinInventory.magic;
+    }
     mp_completeSyncs[FULLSYNC_BASE] = true;
 }
 
 void Multiplayer_Send_FullSceneFlagSync(u16 targetID, u8 partIdx) {
-    if (!IsSendReceiveReady() || gSettingsContext.mp_SharedProgress == OFF) {
+    if (!IsSendReceiveReady() || !CanProvideSnapshot()) {
         return;
     }
     memset(mBuffer, 0, mBufSize);
@@ -1395,11 +1491,11 @@ void Multiplayer_Send_FullSceneFlagSync(u16 targetID, u8 partIdx) {
         mBuffer[memSpacer++] = mSaveContext.sceneFlags[i].rooms1;
         mBuffer[memSpacer++] = mSaveContext.sceneFlags[i].rooms2;
     }
-    Multiplayer_SendPacket(memSpacer, targetID);
+    SendSnapshotSection(memSpacer, targetID);
 }
 
 void Multiplayer_Receive_FullSceneFlagSync(u16 senderID) {
-    if (!IsInSameSyncGroup() || gSettingsContext.mp_SharedProgress == OFF) {
+    if (!IsInSameSyncGroup() || !CanReceiveSnapshot(senderID)) {
         return;
     }
     u8 memSpacer = GetSharedProgressMemSpacerOffset();
@@ -1427,7 +1523,7 @@ void Multiplayer_Receive_FullSceneFlagSync(u16 senderID) {
 }
 
 void Multiplayer_Send_FullEntranceSync(u16 targetID) {
-    if (!IsSendReceiveReady() || gSettingsContext.mp_SharedProgress == OFF) {
+    if (!IsSendReceiveReady() || !CanProvideSnapshot()) {
         return;
     }
     memset(mBuffer, 0, mBufSize);
@@ -1439,11 +1535,11 @@ void Multiplayer_Send_FullEntranceSync(u16 targetID) {
     for (size_t i = 0; i < ARRAY_SIZE(mSaveContext.entrancesDiscovered); i++) {
         mBuffer[memSpacer++] = mSaveContext.entrancesDiscovered[i];
     }
-    Multiplayer_SendPacket(memSpacer, targetID);
+    SendSnapshotSection(memSpacer, targetID);
 }
 
 void Multiplayer_Receive_FullEntranceSync(u16 senderID) {
-    if (!IsInSameSyncGroup() || gSettingsContext.mp_SharedProgress == OFF || mp_completeSyncs[FULLSYNC_ENTRANCES]) {
+    if (!IsInSameSyncGroup() || !CanReceiveSnapshot(senderID) || mp_completeSyncs[FULLSYNC_ENTRANCES]) {
         return;
     }
     u8 memSpacer = GetSharedProgressMemSpacerOffset();
@@ -1459,7 +1555,7 @@ void Multiplayer_Receive_FullEntranceSync(u16 senderID) {
 }
 
 void Multiplayer_Send_FullExtInfSync(u16 targetID, u8 partIdx) {
-    if (!IsSendReceiveReady() || gSettingsContext.mp_SharedProgress == OFF) {
+    if (!IsSendReceiveReady() || !CanProvideSnapshot()) {
         return;
     }
     memset(mBuffer, 0, mBufSize);
@@ -1476,11 +1572,11 @@ void Multiplayer_Send_FullExtInfSync(u16 targetID, u8 partIdx) {
     memcpy(&mBuffer[memSpacer], mSaveContext.extInf + EXTINF_SYNC_PART_SIZE * partIdx, partSize);
     memSpacer += partSize / 4 + 1;
 
-    Multiplayer_SendPacket(memSpacer, targetID);
+    SendSnapshotSection(memSpacer, targetID);
 }
 
 void Multiplayer_Receive_FullExtInfSync(u16 senderID) {
-    if (!IsInSameSyncGroup() || gSettingsContext.mp_SharedProgress == OFF) {
+    if (!IsInSameSyncGroup() || !CanReceiveSnapshot(senderID)) {
         return;
     }
     u16 memSpacer = GetSharedProgressMemSpacerOffset();
@@ -2881,10 +2977,7 @@ void Multiplayer_ReceivePackets() {
     }
 
     if (gSettingsContext.mp_SharedProgress == ON && IsInGame() && !(hostRole && mp_isSyncing)) {
-        gSaveContext.sceneFlags[gGlobalContext->sceneNum].swch    = gGlobalContext->actorCtx.flags.swch;
-        gSaveContext.sceneFlags[gGlobalContext->sceneNum].chest   = gGlobalContext->actorCtx.flags.chest;
-        gSaveContext.sceneFlags[gGlobalContext->sceneNum].clear   = gGlobalContext->actorCtx.flags.clear;
-        gSaveContext.sceneFlags[gGlobalContext->sceneNum].collect = gGlobalContext->actorCtx.flags.collect;
+        CaptureLiveSceneFlags();
         Multiplayer_Overwrite_mSaveContext();
     }
 
@@ -2898,6 +2991,10 @@ void Multiplayer_ReceivePackets() {
         hostPacketBytes=actual_size;
         if (actual_size>=4 && actual_size<=mBufSize && !(actual_size&3)) {
             Multiplayer_UnpackPacket(src_NetworkNodeID);
+            if (hostRole == 2 && mp_isSyncing) {
+                const PacketMask needed = Multiplayer_GetNeededPacketsMask(), empty = { 0 };
+                if (!memcmp(&needed, &empty, sizeof(needed))) break;
+            }
         }
     } while (actual_size && mp_receivedPackets<32);
 
@@ -2909,9 +3006,10 @@ void Multiplayer_ReceivePackets() {
 static void Multiplayer_UnpackPacket(u16 senderID) {
     mp_receivedPackets++;
     PacketIdentifier identifier = mBuffer[0];
-    if(hostRole && mp_isSyncing && (senderID!=1 ||
-       (identifier!=PACKET_BASESYNC && identifier!=PACKET_FULLSCENEFLAGSYNC &&
-        identifier!=PACKET_FULLENTRANCESYNC && identifier!=PACKET_FULLEXTINFSYNC)))return;
+    const bool section = identifier == PACKET_BASESYNC || identifier == PACKET_FULLSCENEFLAGSYNC ||
+                         identifier == PACKET_FULLENTRANCESYNC || identifier == PACKET_FULLEXTINFSYNC;
+    if (hostRole && mp_isSyncing && !section) return;
+    if (hostRole && section && !CanReceiveSnapshot(senderID)) return;
     if(identifier>=PACKET_MAX)return;
     size_t minWords=7;
     switch(identifier) {
@@ -2938,6 +3036,16 @@ static void Multiplayer_UnpackPacket(u16 senderID) {
         case PACKET_FULLSYNCPROVIDERREQUEST:case PACKET_FULLSYNCPROVIDEROFFER:
         case PACKET_KOKIRISWORDEQUIP:case PACKET_BGSFLAG:break;
         default:minWords=8;break;
+    }
+    if (hostRole && section) {
+        if (identifier == PACKET_BASESYNC) minWords += JOIN_INVENTORY_WORDS;
+        if (hostPacketBytes != (minWords + 1) * sizeof(u32) || !IsInSameSyncGroup()) return;
+        const u32 generation = mBuffer[minWords];
+        if ((s32)(generation - snapshotGeneration) < 0) return;
+        if (generation != snapshotGeneration) {
+            snapshotGeneration = generation;
+            memset(mp_completeSyncs, 0, sizeof(mp_completeSyncs));
+        }
     }
     if(hostPacketBytes<minWords*4)return;
 

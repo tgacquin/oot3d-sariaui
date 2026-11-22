@@ -109,7 +109,16 @@ int main(int argc, char** argv) {
         }
         assert(EffectiveFov(memory,view+0x200,80.f,configured)==80.f);
     }
-    for(U32 scene:{0x23u,0x24u,0x43u,0x64u}) {
+    for(U32 scene:{0x23u,0x24u}) {
+        memory.words[play+0x104]=scene;
+        for(float configured:{52.f,60.f,62.f,77.f}) {
+            const float capped=std::min(configured,62.f);
+            assert(Near(EffectiveFov(memory,view,52.f,configured),capped));
+            assert(Near(EffectiveFov(memory,view,30.f,configured),Widen(30.f,capped)));
+            assert(Near(EffectiveFov(memory,view,80.f,configured),62.f));
+        }
+    }
+    for(U32 scene:{0x43u,0x64u}) {
         memory.words[play+0x104]=scene;
         assert(Near(EffectiveFov(memory,view,52.f,77.f),77.f));
     }
@@ -212,6 +221,11 @@ int main(int argc, char** argv) {
     clipped[0][0] = 1;
     for (auto& v : clipped) v[2] = -2.f/3;
     assert(FadeClipGeometry(clipped));
+    assert(FadeState(shader,swizzle,4,1,0xf10,0,false,false,{1,0,1,0}));
+    for(auto& v:clipped)v[2]=-.25f;
+    assert(FadeClipGeometry(clipped));
+    clipped[0][2]=-.5f;assert(!FadeClipGeometry(clipped));
+    clipped[0][2]=-.25f;
     clipped[1][1] = -.9375f; assert(!FadeClipGeometry(clipped));
     // Native Z-target/first-person bars: every opening/closing height and
     // both edges must expand horizontally in GPU- and CPU-shaded paths.

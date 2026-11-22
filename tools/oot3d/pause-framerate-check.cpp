@@ -4,6 +4,7 @@
 #include "oot3d/pause_framerate.h"
 #include "oot3d/pause_description.h"
 #include "oot3d/pause_header.h"
+#include "oot3d/menu_cursor_draw.h"
 #include "dynarmic/interface/A32/a32.h"
 #include <cassert>
 #include <cstring>
@@ -374,13 +375,98 @@ int main(int argc,char** argv) {
     if(argc==3 && std::string_view(argv[2])=="--boss-only")return 0;
     e.bytes=saved_bytes;r=saved_regs;f=saved_ext;cpu.SetCpsr(saved_cpsr);e.hook=saved_hook;
     }
+    // Run the native cursor placement routine, then match the same selection
+    // through either backing buffer used to submit its corners.
+    {
+        using namespace Interpolation;
+        constexpr U32 item_root=0x5066f8,owner=0xc00000,model=0xc01000,mesh=0xc02000;
+        constexpr U32 helper=0xc03000,origins=0xc04000,live=0xc06000,alternate=0xc07000;
+        e.Write(owner,mesh);e.Write(owner+4,model);e.Write(model+4,mesh);e.Write(model+0x174,48);
+        e.Write(owner+8,helper);e.Write(owner+12,8);e.Write(helper+0x1c,origins);
+        e.Write(mesh+0x1a0,alternate);e.Write(mesh+0x1a4,live);
+        const auto resolve=[&](U32 at){return e.bytes.data()+at;};
+        for(const U32 offset:{0x30u,0x28u,0x2cu,0xb0u,0xb4u}) {
+            const auto saved=*e.Read(item_root+offset);
+            e.Write(item_root+offset,owner);
+            const auto x=std::bit_cast<U32>(float(offset)),y=std::bit_cast<U32>(48.f);
+            f[0]=x;f[1]=y;r[0]=owner;r[13]=0xbf0000;r[14]=0x700000;
+            e.Run(0x2f7af4,0x700000);
+            const std::array<U32,3> key{owner,x,y};
+            for(U32 bank:{0u,1u}) {
+                e.Write(mesh+0x124,bank);
+                MenuCursor::Capture(e,MenuPage::Items,model,model,resolve);
+                const auto buffer=bank?live:alternate;
+                assert(MenuCursor::Selection(resolve(buffer),48,guest_frames,generation)==key);
+                assert(MenuCursor::Selection(resolve(buffer),48,guest_frames+1,generation)==key);
+                assert(!MenuCursor::Selection(resolve(buffer),48,guest_frames+2,generation)[0]);
+                assert(!MenuCursor::Selection(resolve(buffer),48,guest_frames,generation+1)[0]);
+                assert(!MenuCursor::Selection(resolve(buffer),42,guest_frames,generation)[0]);
+            }
+            e.Write(item_root+offset,saved);
+        }
+        // Change only the native focus, while keeping the same model, UVs and
+        // DMA pointer. A selected floor can also be submitted on a copied mesh.
+        const auto saved_bytes=e.bytes;
+        constexpr U32 copy=0xc08000,copy_mesh=0xc09000,copy_live=0xc0a000;
+        e.Write(copy+4,copy_mesh);e.Write(copy+0x174,300);e.Write(copy_mesh+0x124,0);
+        e.Write(copy_mesh+0x1a0,copy_live);
+        const auto check=[&](MenuPage page,U32 slot,U32 selection,U32 draw,U32 stream,U32 indices) {
+            e.Write(slot,owner);
+            std::array<U32,3> previous{};
+            for(U32 selected:{1u,2u}) {
+                e.Write(selection,selected);
+                MenuCursor::Capture(e,page,draw,model,resolve);
+                const auto key=MenuCursor::Selection(resolve(stream),indices,guest_frames,generation);
+                assert(key[0]==owner && key!=previous);
+                previous=key;
+            }
+            e.bytes=saved_bytes;
+        };
+        check(MenuPage::Map,0x506cb0+0x1c,0x506cb0+0x30,copy,copy_live,300);
+        check(MenuPage::Map,0x506cb0+0x4c,0x506cb0+0x48,model,live,48);
+        check(MenuPage::Gear,0x50446c+0x14,0x50446c+0x20,model,live,48);
+        e.Write(0x504fa0+0x10,3);
+        check(MenuPage::FileSelect,0x504fa0+0x34,0x504fa0+0x14,model,live,48);
+        e.Write(0x5077f0+8,0);e.Write(0x5077f0+0x14,0);
+        check(MenuPage::NameEntry,0x5077f0,0x5077f0+0x10,model,live,48);
+    }
+    // Identify both sides of a tab switch even when they share a source rate.
+    e.Pause(true);e.Write(0x5066f8+0x34,0);e.Write(0x50446c+0x18,2);e.Begin();
+    assert(Interpolation::menu_page==Interpolation::MenuPage::Gear);
+    e.Write(0x50446c+0x18,0);
+    e.Pause(true);e.Write(0x5066f8+0x34,1);e.Begin();assert(Interpolation::menu_page==Interpolation::MenuPage::Items);
+    e.Write(SaveMenu::Owner+0x28,1);e.Begin();assert(Interpolation::menu_page==Interpolation::MenuPage::Save);
+    e.Write(SaveMenu::Owner+0x28,0);e.Write(0x5066f8+0x34,0);e.Begin();
+    assert(Interpolation::menu_page==Interpolation::MenuPage::Map);
+    for(const auto page:{Interpolation::MenuPage::Gear,Interpolation::MenuPage::Items,Interpolation::MenuPage::Map}) {
+        e.Write(0x5066f8+0x34,page==Interpolation::MenuPage::Items?2:0);
+        e.Write(0x50446c+0x18,page==Interpolation::MenuPage::Gear?2:0);
+        for(const int target:{60,120}) {
+            Interpolation::target_fps=target;e.waits=0;
+            for(unsigned tick=0;tick<60;++tick) {
+                e.Begin();assert(Interpolation::menu_page==page && e.hook.fast);e.End();
+            }
+            assert(e.waits==60);
+        }
+    }
+    Interpolation::target_fps=60;
     e.Pause(true);e.Begin();e.Pause(false);e.waits=0;e.End();assert(e.waits==1);
     e.Begin();assert(!e.hook.fast);
     for(U32 save:{1u,2u,3u}) {
         e.Pause(true);e.Write(SaveMenu::Owner+0x28,save);
         e.Write(0x54cc3c,0);e.Write(Renderer+0x88,0);e.waits=0;
-        for(unsigned n=0;n<60;++n) {e.Begin();assert(e.hook.fast);e.End();}
-        assert(e.waits==60 && *e.Read(Renderer+0x88)==60);
+        for(int rate:{60,90,120}) {
+            Interpolation::target_fps=rate;
+            Interpolation::RateClock clock;unsigned presented=0;
+            for(unsigned n=0;n<60;++n) {
+                e.Begin();assert(e.hook.fast && Interpolation::menu_page==Interpolation::MenuPage::Save);
+                presented+=clock.Next(n,rate,Interpolation::SourceFPS(Interpolation::menu_page)).count;
+                e.End();
+            }
+            assert(presented==unsigned(rate));
+        }
+        Interpolation::target_fps=60;
+        assert(e.waits==180 && *e.Read(Renderer+0x88)==180);
         e.Pause(false);e.Write(SaveMenu::Owner+0x28,save);e.Begin();assert(!e.hook.fast);
     }
     e.Pause(true);e.Write(0x800100,2);e.Begin();assert(!e.hook.fast);
@@ -489,6 +575,14 @@ int main(int argc,char** argv) {
         std::array<U32,16> regs{};std::array<U32,64> ext{};
         for(unsigned j=0;j<regs.size();++j)regs[j]=j+37;
         for(unsigned j=0;j<ext.size();++j)ext[j]=j+11;
+        // These unconditional Save menu redirects have their own destinations.
+        if(i==38 || i==39) {
+            r=regs;r[4]=SaveMenu::Owner;e.patched=true;e.Write(r[4]+0x38,1);
+            e.Run(Sites[i].pc,i==38?0x4395e8:0x439720);
+            if(i==38)assert(*e.Read(r[4]+0x38)==0);
+            else assert(r[3]==0);
+            continue;
+        }
         regs[15]=Sites[i].pc;const U32 flags=0x90000010;
         r=regs;f=ext;cpu.SetCpsr(flags);e.patched=false;
         e.Run(Sites[i].pc,Sites[i].pc+4);const auto native_r=r;const auto native_f=f;const auto native_c=cpu.Cpsr();
@@ -634,8 +728,22 @@ int main(int argc,char** argv) {
     e.Write(FileSelect::Owner+0x30,0xb02000);e.Write(0xb02000,184);
     e.Write(FileSelect::Owner+0x34,0xb03000);
     e.Write(0x54cc3c,0);e.Write(Renderer+0x88,0);e.waits=0;
-    for(unsigned n=0;n<60;++n) {e.Begin();assert(e.hook.file.active && !e.hook.fast);e.End();}
+    for(unsigned n=0;n<60;++n) {
+        e.Begin();assert(e.hook.file.active && !e.hook.fast);
+        assert(Interpolation::menu_page==Interpolation::MenuPage::FileSelect);e.End();
+    }
     assert(e.waits==60 && *e.Read(Renderer+0x88)==60);
+    {
+        const auto state=*e.Read(FileSelect::NameOwner+4);
+        const auto atlas=*e.Read(FileSelect::NameOwner+0x64),keys=*e.Read(FileSelect::NameOwner+0x68);
+        e.Write(FileSelect::NameOwner+4,4);
+        e.Write(FileSelect::NameOwner+0x64,0xc08000);e.Write(FileSelect::NameOwner+0x68,0xc09000);
+        for(U32 model:{0xc08000u,0xc09000u}) {e.Write(model,0x4ebd60);e.Write(model+4,model+0x400);}
+        e.Begin();assert(Interpolation::menu_page==Interpolation::MenuPage::NameEntry);
+        e.Write(FileSelect::NameOwner+4,state);
+        e.Write(FileSelect::NameOwner+0x64,atlas);e.Write(FileSelect::NameOwner+0x68,keys);
+        e.Begin();assert(Interpolation::menu_page==Interpolation::MenuPage::FileSelect);
+    }
     for(float velocity:{-80.f,80.f}) {
         const float initial=velocity<0?336:16,target=velocity<0?16:336;
         for(unsigned i=0;i<3;++i) {
@@ -714,7 +822,8 @@ int main(int argc,char** argv) {
             e.hook.file={};e.hook.file.active=true;e.hook.file.half=true;
             e.Write(FileSelect::Owner+0x10,4);e.Write(FileSelect::Owner+0x14,selected);
             e.Write(FileSelect::Owner+0x28,0);e.Write(FileSelect::Owner+0x54,0);
-            FileSelect::action_opening=true;FileSelect::action_frames=1;
+            // The fixture enters the dispatcher before drawing its first sample.
+            FileSelect::action_opening=true;FileSelect::action_frames=0;
             e.Write(0x55b564,0x900000); // Existing prompt; constructor need not allocate.
             for(unsigned i=0;i<3;++i) {
                 e.Put<float>(0x55b5f8+4*i,16);e.Put<float>(0x55b604+4*i,48+52*i);
@@ -925,6 +1034,7 @@ int main(int argc,char** argv) {
     }
     // Execute the actual file-menu sound blocks and their new return hooks.
     // The audio engine alone is stubbed, allowing us to inspect exact IDs and ABI.
+    e.menu_sounds.clear();
     e.patched=true;e.Write(MasterQuest::Owner+0x10,3);e.Write(MasterQuest::Owner+0x14,1);
     e.Write(MasterQuest::Exists+4,0);e.Write(0x55b53c+4,0);e.Write(0x55b548+0x18,0);
     for(U32 at:{0x50af14u,0x50af18u,0x50af2cu,0x50af30u})e.Write(at,0);

@@ -124,6 +124,8 @@ template<class M> bool Copy(M& m,U32 mesh,U32 dst,U32 src,U32 bytes) {
             m.Read(model)==std::optional<U32>{0x4ebd60} && m.Read(model+4)==std::optional<U32>{mesh} &&
             m.Read(helper)==std::optional<U32>{count} && m.Read(helper+0x14)==std::optional<U32>{src};
     };
+    // hud_all00 (256x256) places localized A actions directly next to other labels.
+    const bool action=owned(m.Read(0x4fc648+0x20).value_or(0),m.Read(0x4fc648+0x18).value_or(0),8);
     const bool magic=owned(m.Read(0x50af34+0xc).value_or(0),m.Read(0x50af34+4).value_or(0),92);
     const bool world=owned(m.Read(0x506cb0+4).value_or(0),m.Read(0x506cb0+0x10).value_or(0),30);
     const bool dungeon=owned(m.Read(0x506cb0+0xc).value_or(0),m.Read(0x506cb0+0x14).value_or(0),50);
@@ -149,7 +151,7 @@ template<class M> bool Copy(M& m,U32 mesh,U32 dst,U32 src,U32 bytes) {
     const U32 banner=m.Read(0x4fc648+0x38).value_or(0);
     const bool parchment=TitleScreen::Pointer(banner,0x18) &&
         owned(m.Read(banner+0x10).value_or(0),m.Read(banner+0x14).value_or(0),3);
-    if(!magic && !world && !parchment && !dungeon && !map_sprites && !save && !song && !gear)return false;
+    if(!action && !magic && !world && !parchment && !dungeon && !map_sprites && !save && !song && !gear)return false;
     std::vector<U32> uv(bytes/4);
     for(unsigned i=0;i<uv.size();++i) {
         const auto word=m.Read(src+4*i);if(!word || !m.Read(dst+4*i))return false;uv[i]=*word;
@@ -198,7 +200,7 @@ template<class M> bool Copy(M& m,U32 mesh,U32 dst,U32 src,U32 bytes) {
             for(unsigned c=0;c<8;c+=2)if(uv[q*8+c]==std::bit_cast<U32>(144.f/256)) {
                 uv[q*8+c]=std::bit_cast<U32>(143.5f/256);changed=true;
             }
-        } else if(map_sprites || (world && q>=12 && q<=17) || (dungeon && (q==19 || (q>=21 && q<=35))) ||
+        } else if((action && q==1) || map_sprites || (world && q>=12 && q<=17) || (dungeon && (q==19 || (q>=21 && q<=35))) ||
                   (gear && GearDecoration(q))) {
             // 480bb8: rounded location plate (12..14), name (15), and
             // Skulltula icons (16/17). Clamp each sprite to its own texels;
@@ -215,7 +217,7 @@ template<class M> bool Copy(M& m,U32 mesh,U32 dst,U32 src,U32 bytes) {
                 for(unsigned v=0;v<4;++v) {const float f=std::bit_cast<float>(uv[q*8+v*2+axis]);lo=std::min(lo,f);hi=std::max(hi,f);}
                 // Also collapse the frame's one-texel stretched strips to
                 // their texel center; never sample adjacent corners/markers.
-                const float half=.5f/(map_sprites?128:(axis?256:512));
+                const float half=.5f/(map_sprites?128:(action || axis?256:512));
                 if(lo<0 || hi>1 || hi-lo<2*half)continue;
                 for(unsigned v=0;v<4;++v) {
                     auto& u=uv[q*8+v*2+axis];const float f=std::bit_cast<float>(u);

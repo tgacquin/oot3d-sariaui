@@ -4,6 +4,7 @@
 #include "oot3d/model_effect_interpolation.h"
 #include "oot3d/textbox_interpolation.h"
 #include "oot3d/circle_wipe_interpolation.h"
+#include "oot3d/sun_flare_interpolation.h"
 #endif
 // Copyright 2023-2026 Citra Emulator Project / Azahar Emulator Project
 // Licensed under GPLv2 or any later version
@@ -1131,11 +1132,18 @@ void PicaCore::DrawArrays(bool is_indexed) {
         bool accelerate_draw = Settings::values.use_hw_shader && primitive_assembler.IsEmpty();
 #if defined(ENABLE_MM3D_PRESENTATION) || defined(ENABLE_OOT3D_PRESENTATION)
 #ifdef ENABLE_OOT3D_PRESENTATION
+        const auto menu_page=OOT3D::Interpolation::menu_page.load();
         if (OOT3D::Interpolation::Replaying() && (OOT3D::Interpolation::cpu_vertices.load() ||
+            (menu_page!=OOT3D::Interpolation::MenuPage::None &&
+             OOT3D::Interpolation::PresentationFPS(menu_page,Settings::values.use_vsync.GetValue())>60 &&
+             vs_setup.GetProgramCodeHash()==0x6352a3be33cb99c6ULL &&
+             vs_setup.GetSwizzleDataHash()==0xba817d0ef27276d0ULL) ||
             (vs_setup.GetProgramCodeHash()==0x6352a3be33cb99c6ULL &&
              vs_setup.GetSwizzleDataHash()==0xba817d0ef27276d0ULL &&
              OOT3D::Interpolation::SurfaceEffects::enabled &&
              OOT3D::Interpolation::ModelEffects::Candidate(regs.internal)==OOT3D::Interpolation::ModelEffects::Biri) ||
+            (OOT3D::Interpolation::SurfaceEffects::enabled && OOT3D::SunFlare::Identify(regs.internal,
+                vs_setup.uniforms,vs_setup.GetProgramCodeHash(),vs_setup.GetSwizzleDataHash())) ||
             OOT3D::CircleWipe::Candidate(regs.internal,vs_setup.GetProgramCodeHash(),vs_setup.GetSwizzleDataHash()) ||
             OOT3D::Interpolation::SurfaceEffects::Candidate(regs.internal,
                 vs_setup.GetProgramCodeHash(),vs_setup.GetSwizzleDataHash()) ||

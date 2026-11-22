@@ -60,6 +60,42 @@ inline float Alpha(const std::vector<MapFrame::Point>& boundary,float feather,fl
     const float t=std::clamp(std::sqrt(distance)/feather,0.f,1.f);
     return t*t*(3-2*t);
 }
+// A scanline shares its crossings and all edges within feathering distance.
+class OutlineRow {
+    struct Edge {float x,dy_from_start,dx,dy,length,left,right;};
+    std::vector<float> crossings;
+    std::vector<Edge> nearby;
+    float feather{};
+public:
+    void Prepare(const std::vector<MapFrame::Point>& points,float width,float y) {
+        crossings.clear();nearby.clear();feather=width;
+        for(unsigned i=0;i<points.size();++i) {
+            const auto a=points[i],b=points[(i+1)%points.size()];
+            // Match Inside's ray from b toward a, including on the boundary.
+            if((b.y>y)!=(a.y>y))crossings.push_back((a.x-b.x)*(y-b.y)/(a.y-b.y)+b.x);
+            if(width<=0 || y<std::min(a.y,b.y)-width || y>std::max(a.y,b.y)+width)continue;
+            const float dx=b.x-a.x,dy=b.y-a.y;
+            nearby.push_back({a.x,y-a.y,dx,dy,dx*dx+dy*dy,
+                std::min(a.x,b.x)-width,std::max(a.x,b.x)+width});
+        }
+        std::sort(crossings.begin(),crossings.end());
+    }
+    float At(float x) const {
+        const auto after=std::upper_bound(crossings.begin(),crossings.end(),x);
+        if((crossings.end()-after)%2==0)return 0;
+        if(feather<=0)return 1;
+        float distance=feather*feather;
+        for(const auto& e:nearby) {
+            if(x<e.left || x>e.right)continue;
+            const float ax=x-e.x,ay=e.dy_from_start;
+            const float t=e.length>0?std::clamp((ax*e.dx+ay*e.dy)/e.length,0.f,1.f):0;
+            const float rx=ax-t*e.dx,ry=ay-t*e.dy;
+            distance=std::min(distance,rx*rx+ry*ry);
+        }
+        const float t=std::clamp(std::sqrt(distance)/feather,0.f,1.f);
+        return t*t*(3-2*t);
+    }
+};
 inline float Alpha(const Outline& o,float x,float y) {return Alpha(Boundary(o),o.feather,x,y);}
 bool ApplyOutline(const Outline& value);
 void LoadOutline();

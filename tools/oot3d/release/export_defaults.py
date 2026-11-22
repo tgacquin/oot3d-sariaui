@@ -66,6 +66,8 @@ def export(editor, runtime, output):
     if 'Graphics' not in presentation:
         presentation['Graphics'] = {}
     presentation['Graphics'].setdefault('disable_fog', 'false')
+    presentation['Graphics']['actor_draw_distance'] = '3.75'
+    # Explicit player choices in player.ini take precedence over this F1 baseline.
     presentation['Interpolation']['enabled'] = 'true'
     presentation['Interpolation']['target_fps'] = '60'
     presentation['Interpolation']['match_refresh_rate'] = 'false'

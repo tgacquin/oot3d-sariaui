@@ -389,6 +389,68 @@ int main(int argc,char** argv) {
         assert(*e.Read(Owner+0x18)+4**e.Read(Owner+0x1c)==x+y*columns && e.sounds==1);
     }
     SetLayout(Layout{},false);
+    {
+        // Two separate taps within a single guest update: keep both stones
+        // and present each jump on its first eligible 120 Hz sample.
+        e.Setup(4);Input sampled;
+        sampled.sample_directions=true;
+        e.Write(Owner+0x18,0);e.Write(Owner+0x1c,0);
+        e.Write(0x50af0c+0x24,0x10);
+        sampled.PollDirections(0x10,0,105000);
+        sampled.PollDirections(0,0,110000);
+        sampled.PollDirections(0x10,0,120000);
+        std::array<U32,16> registers{};registers[5]=Owner;
+        sampled.Navigate(e,registers,true,133333);
+        assert(sampled.move_count==2 && e.Read(Owner+0x18)==2 && sampled.navigation_sound);
+        assert(sampled.moves[0].time==105000 && sampled.moves[1].time==120000);
+        e.Write(0x50af0c+0x0c,0x10);
+        sampled.Navigate(e,registers,true,200000);
+        assert(sampled.move_count==0 && e.Read(Owner+0x18)==2);
+        e.Write(0x50af0c+0x0c,0);
+        sampled.Navigate(e,registers,true,400000);
+        assert(sampled.move_count==1 && e.Read(Owner+0x18)==0); // native held repeat
+        // A single slow tilt crosses the HID threshold first, jitters there,
+        // then crosses the game's menu threshold several 60 Hz frames later.
+        e.Write(0x50af0c+0x24,0);e.Write(0x50af0c+0x20,0);
+        sampled.PollDirections(0,0x10,500000);
+        sampled.Navigate(e,registers,true,516667);
+        assert(!sampled.navigation_sound && e.Read(Owner+0x18)==0);
+        sampled.PollDirections(0,0,520000);
+        sampled.PollDirections(0,0x10,526000);
+        sampled.PollDirections(0,0x90,540000);
+        e.Write(0x50af0c+0x20,0x10);
+        sampled.Navigate(e,registers,true,566667);
+        assert(sampled.move_count==1 && sampled.moves[0].time==540000 && e.Read(Owner+0x18)==1);
+        e.Write(0x50af0c+0x20,0);
+        sampled.PollDirections(0,0,571000);
+        sampled.Navigate(e,registers,true,600000);
+        assert(!sampled.navigation_sound && e.Read(Owner+0x18)==1);
+        // The native horizontal direction can be mirrored in Master Quest.
+        sampled.PollDirections(0,0x10,610000);
+        e.Write(0x50af0c+0x20,0x20);
+        sampled.Navigate(e,registers,true,633333);
+        assert(sampled.move_count==1 && sampled.moves[0].time==610000 && e.Read(Owner+0x18)==0);
+        sampled.Navigate(e,registers,true,1100000);
+        assert(sampled.move_count==1 && sampled.moves[0].time==1100000 && e.Read(Owner+0x18)==2);
+        OcarinaSlide::Route route;
+        route.stones[0]={{-100,0,0},.15f};route.stones[1]={{-50,0,0},.6f};route.stone_count=2;
+        for(const float phase:{0.f,.25f,.5f,.75f,1.f})
+            assert(route.At(phase)[0]==(phase<.15f?-100:phase<.6f?-50:0));
+        for(bool entering:{true,false}) {
+            Slide slide;slide.Advance(0,entering);slide.progress=entering?0:1;
+            for(unsigned tick=1;tick<=6;++tick) {
+                const float start=OcarinaSlide::Interval::Remaining(slide.progress);
+                slide.Advance(tick*33333,entering);
+                const float end=OcarinaSlide::Interval::Remaining(slide.progress);
+                route.stone_count=0;route.interval=slide.interval;route.translation[0]=(start-end)*.5f;
+                for(float phase:{.25f,.5f,.75f,1.f}) {
+                    const float time=(float(tick-1)+phase)*33333/180000;
+                    const float expected=OcarinaSlide::Interval::Remaining(entering?time:1-time);
+                    assert(Near(end+route.At(phase)[0],expected));
+                }
+            }
+        }
+    }
     // Build the actual native atlas rectangles from cartridge data, then verify
     // layout, hidden-quad clipping and read-only source arrays.
     e.Setup(4);constexpr U32 model=0x900000,mesh=0x910000,pos=0xa10000,uv=0xa20000,color=0xa30000;
@@ -555,6 +617,32 @@ int main(int argc,char** argv) {
         OcarinaSlide::Capture(e,model,view,-60);
         assert(OcarinaSlide::capture_published.load()==published);
         e.bytes=saved_mesh;
+    }
+    // The title can submit fewer glyphs than its allocated upload. Both topologies
+    // and both upload banks must follow the same timeline as the bottom panel.
+    {
+        const auto saved=e.bytes;
+        constexpr unsigned capacity=64,active=12;
+        constexpr U32 live=0xd30000;
+        for(unsigned bank:{0u,1u})for(bool strip:{false,true}) {
+            e.Write(desc+12,capacity);e.Write(desc+0x1c,strip?0x80:0xa0);
+            e.Write(mesh+0x124,bank);e.Write(mesh+0x1a0+4*bank,live);
+            e.Write(model+0x174,active/4*6-(strip?2:0));
+            auto hash=HUD::HashStart;
+            for(auto [offset,stride]:std::array<std::pair<unsigned,unsigned>,3>{{{0,12},{12,8},{20,16}}})
+                for(unsigned i=0;i<active*stride;i+=4) {
+                    const auto word=1+i+offset+bank+unsigned(strip);
+                    e.Write(live+capacity*offset+i,word);
+                    hash=HUD::HashWord(hash,word);
+                }
+            OcarinaSlide::Interval interval{.2f,.4f};
+            OcarinaSlide::Capture(e,model,view,0,8,interval,{},true);
+            for(float phase:{.25f,.5f,.75f,1.f}) {
+                const auto title=OcarinaSlide::Find(hash,active,tag_frame,epoch,phase);
+                assert(title && (*title)[0]==16*interval.PreviousWeight(phase) && (*title)[1]==0);
+            }
+        }
+        e.bytes=saved;
     }
     Interpolation::enabled=enabled;Interpolation::present_60=present;
     // The backdrop borrows only the black interior and right edge of the staff.

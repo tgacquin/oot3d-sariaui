@@ -234,7 +234,7 @@ struct Hook {
     U32 visible_pane=0,visible_flags=0;
     U32 owner=0,selection=0xffffffff;
     unsigned next=0,submitted=0,current_pane=0;
-    bool route=false;
+    bool route=false,native_top_draw=false;
     U32 fading_owner=0;
     std::array<U32,16> update_saved{};
     U32 update_owner=0,update_message=0;
@@ -438,7 +438,7 @@ struct Hook {
     }
     bool Drawing() const {return stage==Stage::Panes;}
     template<class M> std::optional<ScreenModels::Transform> NativeFadeTransform(M& m,U32 model) const {
-        if(stage!=Stage::Native || !route || !Widescreen::Active() || !Drawable(m,owner))return {};
+        if(stage!=Stage::Native || !native_top_draw || !Widescreen::Active())return {};
         const U32 pane=m.Read(owner+LayoutOffset+0x418+250*4).value_or(0);
         if(!TitleScreen::Pointer(pane,0xb4) || m.Read(pane+4)!=owner+PaneResourcesOffset ||
            (m.Read(pane+0x64)!=model && m.Read(pane+0x68)!=model))return {};
@@ -530,7 +530,10 @@ struct Hook {
             on_top.store(false);owner=r[0];const auto play_state=m.Read(r[1]+0x100).value_or(0);
             const bool native_visible=(play_state&255)!=3 || ((play_state>>8)&255)==0 ||
                 ((play_state>>8)&255)==2;
-            route=supported && native_visible && Drawable(m,owner);
+            // 427a18 can still submit the top layout after the last menu state.
+            // Keep its own fade wide for as long as the native pane draws.
+            native_top_draw=supported && native_visible && owner && owner==Controller(m);
+            route=native_top_draw && Drawable(m,owner);
             // Game Over is native top-layout pane 1, outside the bottom
             // save panes routed below. Filter its original foreground/shadow
             // for this draw too; the Native return restores both samplers.

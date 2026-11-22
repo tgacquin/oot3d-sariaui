@@ -29,7 +29,13 @@ inline constexpr PriceEdit Price001C_1_1[]{
 inline constexpr PriceEdit Price001C_5_0[]{
     {19,2,80},
 };
+inline constexpr PriceEdit Price001C_5_1[]{
+    {19,2,80},
+};
 inline constexpr PriceEdit Price001C_7_0[]{
+    {18,2,80},
+};
+inline constexpr PriceEdit Price001C_7_1[]{
     {18,2,80},
 };
 inline constexpr PriceEdit Price001D_1_0[]{
@@ -41,7 +47,13 @@ inline constexpr PriceEdit Price001D_1_1[]{
 inline constexpr PriceEdit Price001D_5_0[]{
     {19,3,120},
 };
+inline constexpr PriceEdit Price001D_5_1[]{
+    {19,3,120},
+};
 inline constexpr PriceEdit Price001D_7_0[]{
+    {18,3,120},
+};
+inline constexpr PriceEdit Price001D_7_1[]{
     {18,3,120},
 };
 inline constexpr PriceEdit Price001E_1_0[]{
@@ -323,7 +335,13 @@ inline constexpr PriceEdit Price00A3_1_1[]{
 inline constexpr PriceEdit Price00A3_5_0[]{
     {18,2,25},
 };
+inline constexpr PriceEdit Price00A3_5_1[]{
+    {18,2,25},
+};
 inline constexpr PriceEdit Price00A3_7_0[]{
+    {17,2,25},
+};
+inline constexpr PriceEdit Price00A3_7_1[]{
     {17,2,25},
 };
 inline constexpr PriceEdit Price00A5_1_0[]{
@@ -398,7 +416,13 @@ inline constexpr PriceEdit Price00B1_1_1[]{
 inline constexpr PriceEdit Price00B1_5_0[]{
     {19,2,50},
 };
+inline constexpr PriceEdit Price00B1_5_1[]{
+    {19,2,50},
+};
 inline constexpr PriceEdit Price00B1_7_0[]{
+    {18,2,50},
+};
+inline constexpr PriceEdit Price00B1_7_1[]{
     {18,2,50},
 };
 inline constexpr PriceEdit Price00B2_1_0[]{
@@ -509,7 +533,13 @@ inline constexpr PriceEdit Price00CB_1_1[]{
 inline constexpr PriceEdit Price00CB_5_0[]{
     {18,2,35},
 };
+inline constexpr PriceEdit Price00CB_5_1[]{
+    {18,2,35},
+};
 inline constexpr PriceEdit Price00CB_7_0[]{
+    {17,2,35},
+};
+inline constexpr PriceEdit Price00CB_7_1[]{
     {17,2,35},
 };
 inline constexpr PriceEdit Price00DE_1_0[]{
@@ -1002,11 +1032,15 @@ inline constexpr PriceMessage PriceMessages[]{
     {0x001C,1,0xB60F178D38EE77CBULL,113,Price001C_1_0},
     {0x001C,1,0x7BBB2271490C8793ULL,104,Price001C_1_1},
     {0x001C,5,0xEBB75830BC3BA73BULL,119,Price001C_5_0},
+    {0x001C,5,0x842AE776D25EDC0DULL,100,Price001C_5_1},
     {0x001C,7,0x22B2C5265493D8BFULL,102,Price001C_7_0},
+    {0x001C,7,0xB659B9054D4B2AF6ULL,100,Price001C_7_1},
     {0x001D,1,0x46967B34FCC81CA1ULL,114,Price001D_1_0},
     {0x001D,1,0x9BC237399F983EB5ULL,105,Price001D_1_1},
     {0x001D,5,0x37BD3B2E95F7719DULL,120,Price001D_5_0},
+    {0x001D,5,0xB59AC969B60DCD77ULL,101,Price001D_5_1},
     {0x001D,7,0x9747D2D908B47307ULL,103,Price001D_7_0},
+    {0x001D,7,0xAB3E3F7BEDA91F6EULL,101,Price001D_7_1},
     {0x001E,1,0x60858C5D9D9C4ACDULL,58,Price001E_1_0},
     {0x001E,5,0xC09BFBDA3B5440F2ULL,68,Price001E_5_0},
     {0x001E,7,0x881CF325E8E6024BULL,64,Price001E_7_0},
@@ -1100,7 +1134,9 @@ inline constexpr PriceMessage PriceMessages[]{
     {0x00A3,1,0x7D121451ED732736ULL,113,Price00A3_1_0},
     {0x00A3,1,0xC891F1A21409E647ULL,105,Price00A3_1_1},
     {0x00A3,5,0x656CAD4FD3ACE3C7ULL,147,Price00A3_5_0},
+    {0x00A3,5,0x5509750611682705ULL,147,Price00A3_5_1},
     {0x00A3,7,0x2BE4330E5D0BBAA0ULL,129,Price00A3_7_0},
+    {0x00A3,7,0xF224C62FC0FB6ECDULL,127,Price00A3_7_1},
     {0x00A5,1,0xB2FEE8A69D6DB1F2ULL,101,Price00A5_1_0},
     {0x00A5,5,0xD698B4C25F08342AULL,84,Price00A5_5_0},
     {0x00A5,7,0xA4736850A01651F1ULL,86,Price00A5_7_0},
@@ -1125,7 +1161,9 @@ inline constexpr PriceMessage PriceMessages[]{
     {0x00B1,1,0x627FB04CF1C3958CULL,114,Price00B1_1_0},
     {0x00B1,1,0x9A6BAA2CAD5CF27DULL,106,Price00B1_1_1},
     {0x00B1,5,0x5F79923D0E03DA9BULL,148,Price00B1_5_0},
+    {0x00B1,5,0x575C23027900A518ULL,146,Price00B1_5_1},
     {0x00B1,7,0x8FDF53A5B08B24A3ULL,131,Price00B1_7_0},
+    {0x00B1,7,0x02516EEF1FE08608ULL,129,Price00B1_7_1},
     {0x00B2,1,0x3D07D40C9E0B0151ULL,119,Price00B2_1_0},
     {0x00B2,5,0x465B11BE9FCF70E3ULL,94,Price00B2_5_0},
     {0x00B2,7,0x41660AF8D7EC273CULL,125,Price00B2_7_0},
@@ -1162,7 +1200,9 @@ inline constexpr PriceMessage PriceMessages[]{
     {0x00CB,1,0x74CBD021A9A9A995ULL,113,Price00CB_1_0},
     {0x00CB,1,0xBC85F1224EF5F4F8ULL,105,Price00CB_1_1},
     {0x00CB,5,0xD59CEA0BBEFDCF60ULL,147,Price00CB_5_0},
+    {0x00CB,5,0x000348F333D161E2ULL,147,Price00CB_5_1},
     {0x00CB,7,0x5CC495355A42DD06ULL,130,Price00CB_7_0},
+    {0x00CB,7,0xDC771C1B4688F195ULL,128,Price00CB_7_1},
     {0x00DE,1,0x4F0853DF45346CF1ULL,62,Price00DE_1_0},
     {0x00DE,5,0x77C39034FBB65596ULL,73,Price00DE_5_0},
     {0x00DE,7,0xF4EB491155AFB8AAULL,70,Price00DE_7_0},

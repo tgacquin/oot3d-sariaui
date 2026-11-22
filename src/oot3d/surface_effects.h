@@ -7,6 +7,7 @@
 #include "oot3d/effect_strip_replay.h"
 #include "oot3d/debris_interpolation.h"
 #include "oot3d/green_particle_interpolation.h"
+#include "oot3d/combat_sprite_interpolation.h"
 #include "oot3d/warp_sparkle_interpolation.h"
 #include "oot3d/warp_trail_interpolation.h"
 #include "oot3d/water_sprite_interpolation.h"
@@ -22,7 +23,8 @@ inline std::atomic<unsigned> forest_pairs{}, ring_pairs{}, shockwave_pairs{}, re
 // Native draw -> camera replay -> valid connector mapping -> changed vertices.
 // A frame replay can succeed while a particular effect remains unchanged.
 struct ReplayCounts {std::atomic<unsigned> seen{},attempted{},canonical{},changed{};};
-inline std::array<ReplayCounts,16> replay_counts;
+inline constexpr unsigned PondRings=CombatSprites::Streaks+1;
+inline std::array<ReplayCounts,PondRings+1> replay_counts;
 
 // Numeric PICA enums: strip=1, IA8=7, src-alpha=6, one=1, add=0.
 // No texture addresses are hardcoded: bindings change with scene allocation.
@@ -36,8 +38,7 @@ template<class Regs> unsigned Candidate(const Regs& r, std::uint64_t shader, std
     if (!enabled || shader != 0x6352a3be33cb99c6ULL || swizzle != 0xba817d0ef27276d0ULL ||
         unsigned(r.pipeline.triangle_topology.Value()) != 1 || !r.pipeline.num_vertices ||
         r.pipeline.num_vertices > 768 || r.pipeline.num_vertices % 6 ||
-        r.vs.GetRegisterForAttribute(0) != 0 || r.vs.GetRegisterForAttribute(1) != 2 ||
-        r.vs.GetRegisterForAttribute(2) != 3) return 0;
+        r.vs.GetRegisterForAttribute(0) != 0) return 0;
     const auto& t = r.texturing;
     const auto& m = r.framebuffer.output_merger;
     if (!t.main_config.texture0_enable || t.main_config.texture1_enable || t.main_config.texture2_enable ||
@@ -50,6 +51,16 @@ template<class Regs> unsigned Candidate(const Regs& r, std::uint64_t shader, std
         t.tev_stage0.ops_raw != 0 || t.tev_stage0.scales_raw != 2 ||
         t.tev_stage1.sources_raw != 0x0eee0efe || t.tev_stage1.modifiers_raw != 0 ||
         t.tev_stage1.ops_raw != 1) return 0;
+    const bool soft_sprite = t.texture0.width == 64 && t.texture0.height == 64 &&
+        unsigned(t.texture0.wrap_s.Value()) == 0 && unsigned(t.texture0.wrap_t.Value()) == 0 &&
+        t.tev_stage2.sources_raw == 0x0ee00f30 && t.tev_stage2.ops_raw == 8 &&
+        !t.tev_stage2.modifiers_raw;
+    if (r.vs.GetRegisterForAttribute(1) == 3)
+        return soft_sprite && r.vs.GetRegisterForAttribute(2) == 7 && r.pipeline.num_vertices == 96
+            ? CombatSprites::Streaks : 0;
+    if (r.vs.GetRegisterForAttribute(1) != 2 || r.vs.GetRegisterForAttribute(2) != 3) return 0;
+    if (soft_sprite && r.pipeline.num_vertices == 6 && (t.tev_stage1.const_color >> 24) == 0)
+        return CombatSprites::Charge;
     if(t.texture0.width==16 && t.texture0.height==16 &&
        unsigned(t.texture0.wrap_s.Value())==3 && unsigned(t.texture0.wrap_t.Value())==3)return 6;
     if(t.texture0.width!=64)return 0;
@@ -58,9 +69,13 @@ template<class Regs> unsigned Candidate(const Regs& r, std::uint64_t shader, std
         // Trails and forest sprites share this material. Use the paired-node
         // geometry below to distinguish them; vertex/combiner tints are native data.
         return r.pipeline.num_vertices<=180 && r.pipeline.num_vertices%12==0 ? 7 : 1;
+    if (t.texture0.height==32 && unsigned(t.texture0.wrap_s.Value())==0 &&
+        unsigned(t.texture0.wrap_t.Value())==0 && r.pipeline.num_vertices%12==0 &&
+        t.tev_stage2.sources_raw==0x0ee00f30 && t.tev_stage2.ops_raw==8 &&
+        t.tev_stage2.modifiers_raw==0)return PondRings;
     if (t.texture0.height == 32 && unsigned(t.texture0.wrap_s.Value()) == 3 &&
         unsigned(t.texture0.wrap_t.Value()) == 3) return 2;
-    if (r.pipeline.num_vertices == 6 && t.texture0.height == 64 &&
+    if ((r.pipeline.num_vertices == 6 || r.pipeline.num_vertices == 12) && t.texture0.height == 64 &&
         unsigned(t.texture0.wrap_s.Value()) == 3 && unsigned(t.texture0.wrap_t.Value()) == 3 &&
         t.tev_stage2.sources_raw == 0x0ee00f30 && t.tev_stage2.ops_raw == 8) return 4;
     return 0;
@@ -138,14 +153,16 @@ inline bool ForestTrailPair(const std::vector<Quad>& now,const std::vector<Quad>
     return true;
 }
 inline std::optional<W::Rings> Rings(std::span<const Vertex> inputs,
-                                    std::span<const std::uint32_t> order) {
+                                    std::span<const std::uint32_t> order,bool pond=false) {
     const auto quads=W::DecodeQuads(inputs,order);
     if (!quads || quads->size()%2) return {};
-    W::Rings out;
+    W::Rings out;out.mesh.tinted=pond;
     // The ring matcher expects corners across each half, while native strips
     // can run down it. Resolve corners by UV, preserving the original indices
     // so interpolation writes back into the unchanged native strip ordering.
-    for (const auto& q:*quads) {
+    for (unsigned half=0;half<quads->size();++half) {
+        // The Fishing Pond submits the positive-Z half of each ring first.
+        const auto& q=(*quads)[pond?(half^1u):half];
         std::array<unsigned,4> corners{};unsigned used=0;
         for(unsigned i=0;i<4;++i) {
             const auto& v=q.vertices[i];unsigned corner=4;
@@ -164,21 +181,18 @@ inline std::optional<W::Rings> Rings(std::span<const Vertex> inputs,
     out.mesh.points.push_back({});out.mesh.colors.push_back({});
     return out;
 }
-inline std::optional<Quad> Shockwave(std::span<const Vertex> inputs,
-                                     std::span<const std::uint32_t> order) {
-    const auto quads = W::DecodeQuads(inputs, order);
-    if (!quads || quads->size() != 1) return {};
+inline std::optional<Quad> OrderShockwave(const Quad& input) {
     // Replay inputs retain the native strip ordering, which can run down
     // rather than across the quad. Identify corners by UV and retain their
     // original indices for writeback; never change the submitted strip.
     Quad q{};unsigned used=0;
     for (unsigned i=0; i<4; ++i) {
-        const auto& v=quads->front().vertices[i];
+        const auto& v=input.vertices[i];
         unsigned corner=4;
         for(unsigned k=0;k<4;++k)
             if(F::Near(v[2][0],float(k%2)*2) && F::Near(v[2][1],float(1-k/2)*2))corner=k;
         if(corner==4 || (used&(1u<<corner)))return {};
-        used|=1u<<corner;q.vertices[corner]=v;q.indices[corner]=quads->front().indices[i];
+        used|=1u<<corner;q.vertices[corner]=v;q.indices[corner]=input.indices[i];
     }
     // Native waves align to the floor normal, including sloped terrain.
     // Validate a nearly square, perpendicular pair of edges in 3D instead
@@ -195,18 +209,41 @@ inline std::optional<Quad> Shockwave(std::span<const Vertex> inputs,
        std::abs(uu-vv)>.01f*std::max(uu,vv) || std::abs(uv)>.001f*std::sqrt(uu*vv))return {};
     return q;
 }
+inline std::optional<std::vector<Quad>> Shockwaves(std::span<const Vertex> inputs,
+                                                   std::span<const std::uint32_t> order) {
+    if(order.size()!=6 && order.size()!=12)return {};
+    auto waves=W::DecodeQuads(inputs,order);
+    if(!waves)return {};
+    for(auto& wave:*waves) {
+        const auto sorted=OrderShockwave(wave);
+        if(!sorted)return {};
+        wave=*sorted;
+    }
+    return waves;
+}
+inline bool SameShockwave(const Quad& current,const Quad& old) {
+    const auto a=F::Center(current),b=F::Center(old);
+    for(unsigned c=0;c<3;++c)
+        if(std::abs(a[c]-b[c])>.03f ||
+           std::abs(current.vertices[0][1][c]-old.vertices[0][1][c])>.05f)return false;
+    const float growth=Debris::Size(current)-Debris::Size(old);
+    const float fade=current.vertices[0][1][3]-old.vertices[0][1][3];
+    return growth>=-.01f && growth<=40 && fade<=.001f && fade>=-.15f;
+}
 class History {
     struct Entry { std::uint64_t frame{}; std::vector<Quad> quads; };
     std::map<std::array<std::uint32_t,2>,Entry> forest;
     std::map<unsigned,Entry> shockwaves;
-    R::History rings;
+    R::History rings,pond_rings;
     GreenParticles::History green;
     WarpSparkles::History sparkles;
     WarpTrail::History trail;
     WaterSprites::History water_sprites;
+    CombatSprites::History combat;
     unsigned epoch{}, scene{};
 public:
-    void Reset() { forest.clear();shockwaves.clear();rings={};green.Reset();sparkles.Reset();trail.Reset();water_sprites.Reset(); }
+    void Reset() { forest.clear();shockwaves.clear();rings={};pond_rings={};green.Reset();sparkles.Reset();trail.Reset();water_sprites.Reset();combat.Reset(); }
+    auto CombatColor() const { return combat.constant; }
     auto SparkleColor() const {return sparkles.color;}
     const auto& OldSpriteInputs() const {return water_sprites.old_inputs;}
     void Context(unsigned next_epoch,unsigned next_scene) {
@@ -217,6 +254,13 @@ public:
     std::optional<std::vector<Vertex>> Apply(unsigned kind,std::uint64_t frame,unsigned texture,
         std::span<const Vertex> inputs,std::span<const std::uint32_t> order,WarpSparkles::Color constant={}) {
         std::vector<Vertex> out(inputs.begin(),inputs.end());
+        // The eye cancels the room's red and green tint in its vertex colors.
+        // Other single sprites can share the combiner; keep their forest path.
+        if (kind == CombatSprites::Charge &&
+            (order.empty() || order.front() >= inputs.size() ||
+             !CombatSprites::ChargeTint(inputs[order.front()][1], constant))) kind = 1;
+        if(kind==CombatSprites::Charge || kind==CombatSprites::Streaks)
+            return combat.Apply(kind,frame,texture,inputs,order,constant);
         if(kind>=8 && kind<=15)return water_sprites.Apply(kind,frame,texture,inputs,order);
         if(kind==7) {
             const bool transport=bool(WarpTrail::Decode(inputs,order));
@@ -229,37 +273,41 @@ public:
         if(kind==6)return sparkles.Apply(frame,texture,inputs,order,constant);
         if(kind==5)return green.Apply(frame,texture,inputs,order);
         if(kind==4) {
-            const auto current=Shockwave(inputs,order);
+            auto current=Shockwaves(inputs,order);
             if(!current){shockwaves.erase(texture);++rejected_batches;return {};}
             for(auto it=shockwaves.begin();it!=shockwaves.end();)
                 if(it->second.frame>frame || frame-it->second.frame>1)it=shockwaves.erase(it);else ++it;
             if(!shockwaves.contains(texture) && shockwaves.size()>=8)return {};
             auto& previous=shockwaves[texture];
             if(previous.frame==frame){previous.quads.clear();return {};}
-            bool valid=previous.frame+1==frame && previous.quads.size()==1;
-            if(valid) {
-                const auto& old=previous.quads.front();
-                const auto a=F::Center(*current),b=F::Center(old);
-                for(unsigned c=0;c<3;++c)if(std::abs(a[c]-b[c])>.03f ||
-                    // Bomb light fades across the expanding ring (~.021 per
-                    // captured tick). Blend that tint along with its alpha.
-                    std::abs(current->vertices[0][1][c]-old.vertices[0][1][c])>.05f)valid=false;
-                const float growth=Debris::Size(*current)-Debris::Size(old);
-                const float fade=current->vertices[0][1][3]-old.vertices[0][1][3];
-                if(growth<-.01f || growth>40 || fade>.001f || fade<-.15f)valid=false;
-                if(valid)for(unsigned k=0;k<4;++k)for(unsigned c=0;c<4;++c) {
-                    out[current->indices[k]][0][c]=SampleMix(old.vertices[k][0][c],current->vertices[k][0][c]);
-                    out[current->indices[k]][1][c]=SampleMix(old.vertices[k][1][c],current->vertices[k][1][c]);
+            // Bomb and Beamos rings can enter or leave the same strip independently.
+            // Interpolate only unambiguous one-to-one matches on consecutive native frames.
+            bool matched=false;
+            if(previous.frame+1==frame)for(const auto& wave:*current) {
+                const Quad* match=nullptr;
+                for(const auto& old:previous.quads)if(SameShockwave(wave,old)) {
+                    if(match) {match=nullptr;break;}
+                    match=&old;
                 }
+                if(!match || std::any_of(current->begin(),current->end(),[&](const Quad& other) {
+                    return &other!=&wave && SameShockwave(other,*match);
+                }))continue;
+                for(unsigned k=0;k<4;++k)for(unsigned c=0;c<4;++c) {
+                    out[wave.indices[k]][0][c]=SampleMix(match->vertices[k][0][c],wave.vertices[k][0][c]);
+                    out[wave.indices[k]][1][c]=SampleMix(match->vertices[k][1][c],wave.vertices[k][1][c]);
+                }
+                matched=true;
             }
-            previous={frame,{*current}};
-            if(valid){++shockwave_pairs;return out;}
+            previous={frame,std::move(*current)};
+            if(matched){++shockwave_pairs;return out;}
             return {};
         }
-        if(kind==2) {
-            const auto current=Rings(inputs,order);
+        if(kind==2 || kind==PondRings) {
+            const bool pond=kind==PondRings;
+            auto& history=pond?pond_rings:rings;
+            const auto current=Rings(inputs,order,pond);
             if(!current){++rejected_batches;return {};}
-            const auto half=rings.Apply(frame,texture,epoch,current->mesh,sample_fraction);
+            const auto half=history.Apply(frame,texture,epoch,current->mesh,sample_fraction);
             if(!half)return {};
             for(unsigned i=0;i<current->indices.size();++i) {
                 auto& v=out[current->indices[i]];

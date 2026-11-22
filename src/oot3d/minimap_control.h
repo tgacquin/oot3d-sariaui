@@ -250,6 +250,7 @@ template<class M> bool CopyArrows(M& m,U32 mesh,U32 dst,U32 src,U32 bytes,float 
        m.Read(model)!=std::optional<U32>{0x4ebd60} ||
        m.Read(model+4)!=std::optional<U32>{mesh} ||
        m.Read(helper)!=std::optional<U32>{8} || m.Read(helper+0x18)!=std::optional<U32>{src})return false;
+    opacity*=UserHUD::GetLayout().minimap_opacity;
     const float map_alpha=DungeonMarkerOpacity(m);
     if(opacity==1 && map_alpha==1)return false;
     std::array<U32,8*16> colors{};

@@ -88,7 +88,11 @@ constexpr std::array<TitleScreen::Site,2> Sites{{
     {0x2d88e4,0xe12fff31,0xea00000b}, // BLX r1
     {0x2d88e8,0xea00000b,0xe59400d8}, // B native continuation
 }};
+// Player_Update already has a focus actor and the enemy-lock bit on this
+// branch. Keep its battle camera (mode 2) when the boomerang leaves the hand.
+constexpr U32 LockedBoomerangMode=0x252ebc;
 inline U32 Instruction(U32 pc,U32 word) {
+    if(pc==LockedBoomerangMode && word==0x13a08014)return 0x13a08002; // MOVNE r8,#2
     for (unsigned i=0;i<Sites.size();++i)
         if(pc==Sites[i].pc && word==Sites[i].instruction) return 0xef000000|FirstSVC+i;
     return word;
@@ -97,7 +101,10 @@ template<class M> bool CodeMatches(M& m) {
     for(const auto& s:Sites)
         if(m.Read(s.pc)!=std::optional<U32>{s.instruction} ||
            m.Read(s.pc+4)!=std::optional<U32>{s.following}) return false;
-    return m.Read(Collision)==std::optional<U32>{0xe92d4070} &&
+    return m.Read(LockedBoomerangMode-8)==0xe3100402 && // TST boomerang-in-flight flag.
+           m.Read(LockedBoomerangMode-4)==0x03a08002 &&
+           m.Read(LockedBoomerangMode)==0x13a08014 &&
+           m.Read(Collision)==std::optional<U32>{0xe92d4070} &&
            m.Read(Collision+4)==std::optional<U32>{0xe24dd040} &&
            m.Read(0x2d84c4)==std::optional<U32>{0xe92d4ff0} &&
            m.Read(0x354dac)==std::optional<U32>{0xe3e00000} && // Quick chest: -1.

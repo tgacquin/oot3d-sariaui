@@ -28,6 +28,17 @@ int main(int argc,char** argv) {
     assert(!R::FromJson(QJsonObject{}).advanced.contains("MP_Enabled"));
     for (const auto& preset : P::BuiltIns())
         assert(P::Apply(preset, R::GetConfig()).advanced.at("MP_Enabled") == 1);
+    assert(R::GetConfig().advanced.at("MP_SharedProgress") == 1);
+    assert(!R::FromJson(QJsonObject{}).advanced.contains("MP_SharedProgress"));
+    settings.setValue("Randomizer/advanced/MP_SharedProgress", 0);
+    R::Initialize(settings, dir.path().toStdString());
+    for (const auto& preset : P::BuiltIns()) {
+        const auto applied=P::Apply(preset,R::GetConfig());
+        assert(applied.advanced.at("MP_Enabled")==1 && applied.advanced.at("MP_SharedProgress")==0);
+    }
+    R::SaveConfig(settings);
+    assert(settings.contains("Randomizer/advanced/MP_SharedProgress") &&
+           settings.value("Randomizer/advanced/MP_SharedProgress").toInt()==0);
     settings.setValue("Randomizer/advanced/MP_Enabled", 0);
     R::Initialize(settings, dir.path().toStdString());
     assert(R::GetConfig().advanced.at("MP_Enabled") == 0);

@@ -223,9 +223,8 @@ void RendererVulkan::PrepareRendertarget() {
 void RendererVulkan::PrepareDraw(Frame* frame, const Layout::FramebufferLayout& layout) {
     const auto sampler = present_samplers[!Settings::values.filter_mode.GetValue()];
     const auto present_set = present_heap.Commit();
-    for (u32 index = 0; index < screen_infos.size(); index++) {
-        update_queue.AddImageSampler(present_set, 0, index, screen_infos[index].image_view,
-                                     sampler);
+    for (u32 index = 0; index < screen_infos.size(); ++index) {
+        update_queue.AddImageSampler(present_set, 0, index, screen_infos[index].image_view, sampler);
     }
 
     renderpass_cache.EndRendering();
@@ -341,7 +340,7 @@ void RendererVulkan::RenderToWindow(PresentWindow& window, const Layout::Framebu
                     d.hits,d.first.renderer,d.first.primitive,d.second.renderer,d.second.primitive,d.description);
         }
         const bool ready=rasterizer.OotMidpointReady();
-        const auto plan=oot_midpoint_clock.Next(guest_frames.load(),0,ready,guest_time_us.load()/1000);
+        const auto plan=oot_midpoint_clock.Next(guest_frames.load(),0,ready,guest_time_us.load()/1000,rasterizer.OotRatePlan().source_fps);
         replay_status=ready?ReplayStatus::Cadence:ReplayStatus::Incomplete;
         static std::uint64_t surface_present_frame=~std::uint64_t{};
         if(SurfaceCapture::active.load() && surface_present_frame!=guest_frames.load()) {
@@ -1134,7 +1133,6 @@ void RendererVulkan::DrawSingleScreen(u32 screen_id, float x, float y, float w, 
     draw_info.o_resolution = Common::MakeVec(h, w, 1.0f / h, 1.0f / w);
     draw_info.screen_id_l = screen_id;
     draw_info.opacity = opacity;
-
     scheduler.Record([this, offset = offset, info = draw_info](vk::CommandBuffer cmdbuf) {
         const u32 first_vertex = static_cast<u32>(offset) / sizeof(ScreenRectVertex);
         cmdbuf.pushConstants(*present_pipeline_layout,
@@ -1267,7 +1265,8 @@ void RendererVulkan::DrawOotMidpoint(const Common::Rectangle<u32>& top) {
     if(!layer || !layer->Visible())return;
     const auto saved=screen_infos[2].texcoords;
     auto set=present_heap.Commit();
-    for(u32 i=0;i<3;++i)update_queue.AddImageSampler(set,0,i,layer->View(),present_samplers[0]);
+    for(u32 i=0;i<3;++i)
+        update_queue.AddImageSampler(set,0,i,layer->View(),present_samplers[0]);
     scheduler.Record([this,set](vk::CommandBuffer cmd) {
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics,midpoint_pipeline);
         cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,*present_pipeline_layout,0,set,{});

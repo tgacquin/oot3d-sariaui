@@ -136,8 +136,8 @@ struct Skeleton {
     std::vector<Bone> bones;
 };
 using SkeletonHalf=std::vector<std::optional<Matrix>>;
-inline bool LinkModel(const std::string& name) {
-    return name=="childlink_v2" || name=="link_v2";
+inline bool HierarchyModel(const std::string& name) {
+    return name=="childlink_v2" || name=="link_v2" || name=="rb_cap";
 }
 inline std::optional<Matrix> InverseBone(const Matrix& m) {
     if(!Math::Near(m,m,0))return {};
@@ -213,6 +213,8 @@ struct Sample {
     // Immutable host-only snapshot shared by all meshes of this skeleton.
     std::shared_ptr<const Skeleton> skeleton_pose;
     Matrix vertex_offset=Math::Identity();
+    unsigned shop_slot=8;
+    std::int64_t shop_press_us=0;
 };
 inline bool FishingPlant(const Sample& s) {
     return (s.model=="turi_kusa_model" || s.model=="turi_hasu_model") &&
@@ -238,7 +240,7 @@ inline bool GohmaEgg(const Sample& s) {
         s.key.count==1 && s.bone_ids[0]==11;
 }
 inline std::optional<Matrix> HalfElasticPalette(const Matrix& a,const Matrix& b,
-        double fraction,double max_shear) {
+        double fraction,double max_shear,double min_volume=.8) {
     // Animated nonuniform scale can precede rotation, producing deliberate
     // shear. Blend that small elastic deformation intact.
     // Guard the basis to exclude collapsed hatching poses, flips and large turns.
@@ -262,7 +264,7 @@ inline std::optional<Matrix> HalfElasticPalette(const Matrix& a,const Matrix& b,
         const double det=n[0][0]*(n[1][1]*n[2][2]-n[1][2]*n[2][1])-
             n[0][1]*(n[1][0]*n[2][2]-n[1][2]*n[2][0])+
             n[0][2]*(n[1][0]*n[2][1]-n[1][1]*n[2][0]);
-        if(det<.8)return {};
+        if(det<min_volume)return {};
     }
     for(unsigned c=0;c<3;++c) {
         const double ratio=scales[0][c]/scales[1][c];
@@ -288,6 +290,27 @@ inline bool TorchSlugSkin(const Sample& s) {
     constexpr std::array<unsigned,5> body{0,1,2,3,4};
     return s.model=="torchsrag" && s.bone_count==5 && s.skinning==2 &&
         s.key.count==body.size() && std::equal(body.begin(),body.end(),s.bone_ids.begin());
+}
+inline bool CowSkin(const Sample& s) {
+    if((s.model!="cow" && s.model!="cow2") || s.bone_count!=10 || s.skinning!=2)return false;
+    constexpr std::array<unsigned,10> body{0,6,5,7,8,9,2,4,1,3};
+    return (s.key.count==body.size() && s.bone_ids==body) ||
+           (s.key.count==2 && s.bone_ids[0]==1 && s.bone_ids[1]==3);
+}
+inline bool PeahatBody(const Sample& s) {
+    if(s.model!="peehat" || s.bone_count!=10 || s.bone_ids[0]!=1)return false;
+    if(s.skinning==0)return s.key.count==1;
+    if(s.skinning==2)return s.key.count==2 && s.bone_ids[1]==9;
+    constexpr std::array<unsigned,4> left{1,8,4,6},right{1,5,7,3};
+    return s.skinning==1 && s.key.count==4 &&
+        (std::equal(left.begin(),left.end(),s.bone_ids.begin()) ||
+         std::equal(right.begin(),right.end(),s.bone_ids.begin()));
+}
+inline bool WastelandFlagCloth(const Sample& s) {
+    if(s.model!="ht_hata" || s.bone_count!=20 || s.skinning!=2 || s.key.count!=4)return false;
+    constexpr std::array<unsigned,4> first{15,17,13,19},second{8,10,6,4};
+    return std::equal(first.begin(),first.end(),s.bone_ids.begin()) ||
+           std::equal(second.begin(),second.end(),s.bone_ids.begin());
 }
 inline bool LikeLikeBody(const Sample& s) {
     constexpr std::array<unsigned,5> body{3,4,2,1,0};
@@ -347,14 +370,53 @@ inline std::optional<Matrix> HalfMorphaCore(const Matrix& a,const Matrix& b,doub
         shape[r][c]=std::lerp(stretch[0][r][c],stretch[1][r][c],fraction);
     return Math::Multiply(Math::Blend(rotations[0],rotations[1],fraction),shape);
 }
+inline bool ShopSelectionChanged(const Sample& a,const Sample& b) {
+    return a.shop_slot<8 && b.shop_slot<8 && a.shop_slot!=b.shop_slot;
+}
+// Stalfos removes individual pieces by zeroing their entire world transform.
+inline bool HiddenStalfosBone(const Sample& s,unsigned slot) {
+    const auto& m=s.native[slot];
+    for(unsigned r=0;r<3;++r) {
+        if(m[r][0]!=0 || m[r][1]!=0 || m[r][2]!=0 || m[r][3]!=s.draw_view[r][3])return false;
+    }
+    return s.model=="stalfos" && s.bone_count==25;
+}
+inline bool StalfosVisibilityChange(const Sample& a,const Sample& b,unsigned slot) {
+    return (HiddenStalfosBone(a,slot) || HiddenStalfosBone(b,slot)) &&
+        a.model==b.model && a.bone_count==b.bone_count && a.skinning==b.skinning &&
+        a.bone_ids==b.bone_ids;
+}
 inline std::optional<Matrix> BlendPalette(const Sample& a,const Sample& b,unsigned slot,double fraction=.5) {
+    if(StalfosVisibilityChange(a,b,slot)) {
+        // Snap visibility at the native tick. Blending to zero would drag a
+        // disappearing limb to the world origin and stretch its triangles.
+        return fraction<1?a.world[slot]:b.world[slot];
+    }
+    if(ShopSelectionChanged(a,b)) {
+        // Sample the discrete selection at the HID edge. Native repeats with
+        // no fresh press use the current item. Never blend across the shelf.
+        const auto displacement=std::llround(double(b.time-a.time)*fraction);
+        return a.time+displacement<b.shop_press_us?a.world[slot]:b.world[slot];
+    }
     if(MorphaCore(a) && MorphaCore(b) && a.model==b.model) {
         if(const auto rigid=Half(a.world[slot],b.world[slot],fraction))return rigid;
         return HalfMorphaCore(a.world[slot],b.world[slot],fraction);
     }
-    // Like Like's stretching body has slight shear (up to .074 in capture).
-    // Keep its five verified joints elastic without changing other actors.
-    if(LikeLikeBody(a) && LikeLikeBody(b)) {
+    if(CowSkin(a) && CowSkin(b) && a.model==b.model && a.key.count==b.key.count && a.bone_ids==b.bone_ids) {
+        if(const auto rigid=Half(a.world[slot],b.world[slot],fraction))return rigid;
+        // The swinging tail reaches .665 normalized shear and .722 normalized
+        // volume at the tip. One rejected joint drops the entire body draw.
+        return HalfElasticPalette(a.world[slot],b.world[slot],fraction,.70,.70);
+    }
+    // Adults reach .145 shear, while the flying larvae reach .472 on the same rig.
+    // Keep the root identical across the blade and body material passes.
+    if(PeahatBody(a) && PeahatBody(b) && a.skinning==b.skinning && a.bone_ids==b.bone_ids) {
+        if(const auto rigid=Half(a.world[slot],b.world[slot],fraction))return rigid;
+        return HalfElasticPalette(a.world[slot],b.world[slot],fraction,.5);
+    }
+    // Captured normalized shear reaches .074 on Like Like and .095 on the flag cloth.
+    if((LikeLikeBody(a) && LikeLikeBody(b)) ||
+       (WastelandFlagCloth(a) && WastelandFlagCloth(b) && a.bone_ids==b.bone_ids)) {
         if(const auto rigid=Half(a.world[slot],b.world[slot],fraction))return rigid;
         return HalfElasticPalette(a.world[slot],b.world[slot],fraction,.1);
     }
@@ -473,7 +535,7 @@ public:
         Pair pair;pair.ready=elapsed>=20000 && elapsed<=50000 && next.frame==previous.frame+1;
         if(FishingPlant(next) && (!next.instance || !next.instance_owner))pair.ready=false;
         if(!pair.ready)++bad_cadence;
-        if(pair.ready && (LinkModel(previous.model) || LinkModel(next.model))) {
+        if(pair.ready && (HierarchyModel(previous.model) || HierarchyModel(next.model))) {
             pair.ready=previous.model==next.model && previous.skeleton_pose && next.skeleton_pose &&
                 previous.bone_ids==next.bone_ids && previous.skinning==next.skinning &&
                 previous.vertex_offset==next.vertex_offset;
@@ -492,7 +554,9 @@ public:
             for(unsigned axis=0;axis<3;++axis)distance+=std::pow(next.world[i][axis][3]-previous.world[i][axis][3],2);
             const auto limit=distance_limit.load();
             const auto half=BlendPalette(previous,next,i);
-            pair.ready=half && std::isfinite(limit) && distance<=double(limit)*limit;
+            pair.ready=half && std::isfinite(distance) &&
+                ((std::isfinite(limit) && distance<=double(limit)*limit) ||
+                 ShopSelectionChanged(previous,next) || StalfosVisibilityChange(previous,next,i));
             if(!pair.ready)++bad_transform;
             if(pair.ready)pair.half[i]=*half;
         }
@@ -523,18 +587,33 @@ inline bool SamePalettePrefix(const Sample& a,const Sample& b) {
         if(a.bone_ids[i]>=a.bone_count || a.bone_ids[i]!=b.bone_ids[i])return false;
     return true;
 }
-inline bool TorchSlugRootPrefix(const Pair& body,const Pair& root) {
-    // The body includes bone 0 with an identity bind; its separate rigid mesh
-    // uploads that same root and leaves the other palette registers intact.
+inline bool SkinnedRootPrefix(const Pair& body,const Pair& root) {
+    // Torch Slug and Peahat each draw a single rigid joint also used by their
+    // skinned mesh. The short upload leaves the other palette registers intact.
     // Require both endpoints and ownership to agree before accepting overlap.
     const auto layout=[](const Sample& skin,const Sample& rigid) {
-        return TorchSlugSkin(skin) && rigid.model=="torchsrag" && rigid.bone_count==5 &&
-            rigid.skinning==0 && rigid.key.count==1 && rigid.bone_ids[0]==0 &&
+        const bool shared_root=(TorchSlugSkin(skin) && rigid.model=="torchsrag" &&
+            rigid.bone_count==5 && rigid.bone_ids[0]==0) ||
+            (PeahatBody(skin) && skin.skinning==2 && PeahatBody(rigid));
+        return shared_root && rigid.skinning==0 && rigid.key.count==1 &&
             skin.key.renderer==rigid.key.renderer && skin.key.skeleton==rigid.key.skeleton &&
             skin.key.resource==rigid.key.resource && skin.frame==rigid.frame &&
             skin.vertex_offset==rigid.vertex_offset && PaletteNear(skin.world[0],rigid.world[0]);
     };
     return layout(body.previous,root.previous) && layout(body.current,root.current);
+}
+// In the castle-escape cutscene the two-joint mesh starts with joint 8,
+// which can coincide with rigid joint 11. Require both sampled endpoints to
+// agree, since the two joints can move independently in another animation.
+inline bool GanondorfIntroPrefix(const Pair& mesh,const Pair& rigid) {
+    const auto shared=[](const Sample& a,const Sample& b) {
+        return a.model=="ganondorfchild" && b.model==a.model && a.bone_count==22 && b.bone_count==22 &&
+            a.skinning==1 && a.key.count==2 && a.bone_ids[0]==8 && a.bone_ids[1]==1 &&
+            b.skinning==0 && b.key.count==1 && b.bone_ids[0]==11 &&
+            a.key.renderer==b.key.renderer && a.key.skeleton==b.key.skeleton && a.key.resource==b.key.resource &&
+            a.frame==b.frame && a.vertex_offset==b.vertex_offset && PaletteNear(a.world[0],b.world[0]);
+    };
+    return shared(mesh.previous,rigid.previous) && shared(mesh.current,rigid.current);
 }
 inline bool GraveyardMaskPrefix(const Pair& actor,const Pair& mask) {
     // The graveyard boy's Spooky Mask is a separate renderer attached to
@@ -579,7 +658,7 @@ public:
 // Native palette values establish ownership; draw order and vertex count do not.
 // Equivalent-looking actors with different intermediate poses are ambiguous.
 inline std::optional<Override> Resolve(const std::vector<Pair>& pairs,const Palette& native,
-        const CameraSample& camera,std::uint64_t frame,std::int64_t now,PhaseSkeletonCache* cache=nullptr) {
+        const CameraSample& camera,std::uint64_t frame,std::int64_t now,PhaseSkeletonCache* cache=nullptr,unsigned vertices=0) {
     std::optional<Override> result;
     const Pair* selected=nullptr;
     ++match_calls;
@@ -591,6 +670,16 @@ inline std::optional<Override> Resolve(const std::vector<Pair>& pairs,const Pale
         bool match=true;
         for(unsigned i=0;i<s.key.count && match;++i)match=PaletteNear(native[i],s.native[i]);
         if(!match)continue;
+        // At rest the face can match the first two body matrices. Both cow
+        // CMBs submit 126 indices for the face and 2274 for the body/tail.
+        if(vertices && CowSkin(s) && vertices!=(s.key.count==10?2274u:126u))continue;
+        // A hidden rigid piece otherwise matches any skin whose first bone
+        // has disappeared. Disambiguate the captured Stalfos accessory draws.
+        if(vertices && s.key.count==1 && HiddenStalfosBone(s,0)) {
+            const auto bone=s.bone_ids[0];
+            if((bone==5 && vertices!=24) || (bone==9 && vertices!=144) ||
+               (bone==12 && vertices!=12 && vertices!=90 && vertices!=192))continue;
+        }
         ++matched_palettes;
         if(!p.ready) {++unpaired_matches;Diagnose(p,nullptr);return {};}
         Override next;next.count=s.key.count;
@@ -600,7 +689,7 @@ inline std::optional<Override> Resolve(const std::vector<Pair>& pairs,const Pale
         auto world=p.half;
         if(sample_fraction!=.5f) {
             const auto& old=p.previous;
-            if(LinkModel(s.model)) {
+            if(HierarchyModel(s.model)) {
                 if(!old.skeleton_pose || !s.skeleton_pose)return {};
                 SkeletonHalf temporary;
                 if(!cache)temporary=BlendSkeleton(*old.skeleton_pose,*s.skeleton_pose,
@@ -621,8 +710,9 @@ inline std::optional<Override> Resolve(const std::vector<Pair>& pairs,const Pale
         for(unsigned i=0;i<next.count;++i)next.palette[i]=Math::Multiply(s.draw_view,world[i]);
         if(result) {
             if(result->count!=next.count && !SamePalettePrefix(selected->current,s) &&
+               !GanondorfIntroPrefix(*selected,p) && !GanondorfIntroPrefix(p,*selected) &&
                !GraveyardMaskPrefix(*selected,p) && !GraveyardMaskPrefix(p,*selected) &&
-               !TorchSlugRootPrefix(*selected,p) && !TorchSlugRootPrefix(p,*selected)) {
+               !SkinnedRootPrefix(*selected,p) && !SkinnedRootPrefix(p,*selected)) {
                 ++ambiguous_matches;Diagnose(*selected,&p);return {};
             }
             for(unsigned i=0;i<std::min(result->count,next.count);++i)
@@ -665,12 +755,12 @@ public:
         return found;
     }
     std::optional<Override> Select(const Palette& native,const CameraSample& camera,
-                                  std::uint64_t frame,std::int64_t now) {
+                                  std::uint64_t frame,std::int64_t now,unsigned vertices=0) {
         if(!enabled.load() || !camera.valid)return {};
         if(seen!=revision.load()) {
             std::scoped_lock lock{mutex};pairs=history.Pairs();seen=revision.load();
         }
-        return Resolve(pairs,native,camera,frame,now,&phase_cache);
+        return Resolve(pairs,native,camera,frame,now,&phase_cache,vertices);
     }
 };
 }

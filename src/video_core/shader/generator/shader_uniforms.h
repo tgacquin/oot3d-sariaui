@@ -63,9 +63,20 @@ struct FSUniformData {
     alignas(16) Common::Vec4f blend_color;
     // Zero outside an OoT atlas replay. UV1 holds the previous cell.
     alignas(16) Common::Vec4f sprite_atlas_blend{};
+#ifdef ENABLE_OOT3D_PRESENTATION
+    alignas(16) Common::Vec4f heart_contour_shape[4]{};
+    alignas(16) Common::Vec4f heart_contour_color[4]{};
+    alignas(16) Common::Vec4f heart_contour_softness{};
+    alignas(16) Common::Vec4f heart_pigment{};
+    alignas(16) Common::Vec4f rupee_digit_outline{};
+#endif
 };
 
+#ifdef ENABLE_OOT3D_PRESENTATION
+static_assert(sizeof(FSUniformData) == 0x5f0,
+#else
 static_assert(sizeof(FSUniformData) == 0x540,
+#endif
               "The size of the UniformData does not match the structure in the shader");
 static_assert(sizeof(FSUniformData) < 16384,
               "UniformData structure must be less than 16kb as per the OpenGL spec");

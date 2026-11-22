@@ -19,8 +19,11 @@
 #include "oot3d/ocarina_slide.h"
 #include "oot3d/textbox_interpolation.h"
 #include "oot3d/circle_wipe_interpolation.h"
+#include "oot3d/sun_flare_interpolation.h"
+#include "oot3d/items_interpolation.h"
 #include "oot3d/sun_visibility.h"
 #include "video_core/renderer_vulkan/vk_visibility_depth.h"
+#include "video_core/renderer_vulkan/vk_scene_effects.h"
 #include "mm3d/prompt_layer.h"
 #endif
 #include "mm3d/glare_interpolation.h"
@@ -62,6 +65,7 @@
 #include "mm3d/pause_capture.h"
 #include "mm3d/visibility_depth.h"
 #include "video_core/renderer_vulkan/vk_visibility_depth.h"
+#include "video_core/renderer_vulkan/vk_scene_effects.h"
 #endif
 
 #include "video_core/rasterizer_accelerated.h"
@@ -145,7 +149,7 @@ public:
     std::optional<OOT3D::SunVisibility::Sample> ReadSunDepth(
         u32 address, const OOT3D::SunVisibility::Context& context) override;
     void ResetSunDepth() override;
-    std::optional<std::pair<unsigned, bool>> OotHudMesh(bool* rupees=nullptr);
+    std::optional<std::pair<unsigned, bool>> OotHudMesh(bool* counter=nullptr);
     bool OotMidpointReady() const {
         return oot_replay_frame.Complete(OOT3D::Interpolation::guest_frames.load()) &&
             oot_replay_slots[0].layer && oot_replay_slots[0].layer->Visible();
@@ -172,6 +176,10 @@ private:
 #ifdef ENABLE_OOT3D_PRESENTATION
     std::unique_ptr<VisibilityDepthCache> oot_sun_depth;
     std::unique_ptr<RemoteNameRenderer> oot_name_renderer;
+    std::unique_ptr<SceneEffects> oot_scene_effects;
+    u64 oot_scene_effects_frame = ~u64{};
+    PAddr oot_scene_effects_target = 0;
+    bool oot_scene_effects_applied = false;
     struct OotNameScene {
         OOT3D::RemoteNames::Scene scene;
         u64 frame=~u64{};
@@ -188,6 +196,8 @@ private:
         OotNameScene names;
         OOT3D::TextboxInterpolation::History<HardwareVertex> textboxes;
         OOT3D::CircleWipe::History<HardwareVertex> circle_wipe;
+        OOT3D::SunFlare::History<HardwareVertex> sun_flare;
+        OOT3D::Interpolation::MenuGeometry::History<HardwareVertex> menu_geometry;
         OOT3D::Interpolation::SurfaceEffects::History effects;
         OOT3D::Interpolation::Debris::History debris;
         OOT3D::Interpolation::Waterfall::History waterfall;
@@ -195,7 +205,7 @@ private:
         OOT3D::Interpolation::SongVisual::History songs;
         OOT3D::Interpolation::ModelEffects::History models;
         void Reset() {
-            names={};camera.Reset();textboxes.Reset();circle_wipe.Reset();effects.Reset();
+            names={};camera.Reset();textboxes.Reset();circle_wipe.Reset();sun_flare={};menu_geometry={};effects.Reset();
             debris.Reset();waterfall.Reset();fairy.Reset();songs.Reset();models.Reset();
             if(layer)layer->NextFrame();
         }
@@ -222,8 +232,16 @@ private:
     vk::DescriptorSet oot_native_texture_set{};
     std::optional<std::array<float,4>> oot_sparkle_color;
     OOT3D::Interpolation::SongVisual::Layer oot_song_visual_layer{};
+    struct MagicReplay {
+        std::array<HardwareVertex,24> native;
+        OOT3D::HUD::Layout layout;
+        std::size_t begin{},end{};
+        std::int64_t lens_elapsed{};
+    };
+    std::optional<MagicReplay> oot_magic_replay;
     std::vector<HardwareVertex> oot_hud_midpoint;
     std::optional<OOT3D::HUD::AmmoBackdrop> oot_number_backdrop;
+    std::optional<OOT3D::HUD::RupeeDigitOutline> oot_rupee_digit_outline;
 #endif
 #ifdef ENABLE_MM3D_PRESENTATION
     std::map<std::string,std::unique_ptr<MM3D::PromptLayer>> prompt_layers;
@@ -329,7 +347,7 @@ private:
     void UploadUniforms(bool accelerate_draw);
 
     /// Generic draw function for DrawTriangles and AccelerateDrawBatch
-    bool Draw(bool accelerate, bool is_indexed);
+    bool Draw(bool accelerate, bool is_indexed, bool hud_colors = false, bool outline_rupees = false);
 
     /// Internal implementation for AccelerateDrawBatch
     bool AccelerateDrawBatchInternal(bool is_indexed);

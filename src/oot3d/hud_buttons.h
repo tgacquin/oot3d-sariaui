@@ -33,17 +33,10 @@ inline std::optional<PausePrompts::Pose> ButtonPose(const Layout& l,unsigned i,b
         if(!std::isfinite(l.item_scale) || l.item_scale<.1f || l.item_scale>4 ||
            !std::isfinite(l.item_x) || !std::isfinite(l.item_y))return {};
         // Hidden buttons still participate in the pivot.
-        float cx=0,cy=0;
-        for(unsigned j=X;j<Count;++j) {cx+=l.buttons[j].pose.x/4;cy+=l.buttons[j].pose.y/4;}
-        if(!std::isfinite(cx) || !std::isfinite(cy))return {};
-        p.x=cx+(p.x-cx)*l.item_scale+l.item_x;
-        p.y=cy+(p.y-cy)*l.item_scale+l.item_y;
-        p.scale*=l.item_scale;
-        // Apply individual offsets after the shared pivot transform. Clamp the
-        // offset, not the final center: a scaled group can cross the screen edge.
-        const auto personal=UserHUD::Sanitize(l.user_items[i-X]);
-        p.x+=personal.x;p.y+=personal.y;
-        if(personal.scale!=0)p.scale=std::clamp(p.scale*UserHUD::Factor(personal),.1f,16.f);
+        const auto pivot=ItemPivot(l);
+        if(!std::isfinite(pivot[0]) || !std::isfinite(pivot[1]))return {};
+        p=ItemPose(l,i,pivot);
+
     }
     return p;
 }
@@ -52,14 +45,14 @@ inline Pair MakeGeometry(const Layout& l,const PausePrompts::Assets& assets,floa
     for(unsigned i=0;i<Count;++i) {
         const auto pose=ButtonPose(l,i,native_b);if(!pose)continue;
         const auto p=*pose;const float scale=p.scale;
-        const float size=(i==B?48.f:40.f)*scale,left=p.x-size/2,top=p.y-size*47/48/2;
+        const float size=BubbleWidth(i)*scale,left=p.x-size/2,top=p.y-size*BubbleAspectY/2;
         if(i==B) {
-            out.circles.Add(left,top,size,size*47/48,16.5f/256,246.5f/256,63.5f/256,200.5f/256);
+            out.circles.Add(left,top,size,size*BubbleAspectY,16.5f/256,246.5f/256,63.5f/256,200.5f/256);
         } else {
             // Native A tile: (64,0), 38x38 in the HUD atlas. Reflect its
             // lower half upward to remove the letter, retaining the native
             // material/texture-pack lookup and the existing bubble bounds.
-            const float half_height=size*47/48/2;
+            const float half_height=size*BubbleAspectY/2;
             constexpr float u0=64.5f/256,u1=101.5f/256;
             constexpr float middle_v=237.f/256,bottom_v=218.5f/256;
             out.circles.Add(left,top,size,half_height,u0,bottom_v,u1,middle_v);

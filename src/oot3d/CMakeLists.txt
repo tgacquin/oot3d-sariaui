@@ -12,7 +12,7 @@ add_executable(oot3d_release_defaults_check EXCLUDE_FROM_ALL
     world_map_outline.cpp map_cutout.cpp)
 set_target_properties(oot3d_release_defaults_check PROPERTIES AUTORCC ON)
 target_include_directories(oot3d_release_defaults_check PRIVATE "${PROJECT_SOURCE_DIR}/src")
-target_link_libraries(oot3d_release_defaults_check PRIVATE Qt6::Core citra_common)
+target_link_libraries(oot3d_release_defaults_check PRIVATE Qt6::Core Qt6::Gui citra_common)
 if (APPLE)
     target_link_libraries(oot3d_release_defaults_check PRIVATE
         "-framework Cocoa" "-framework AVFoundation" "-framework CoreGraphics")
@@ -104,6 +104,12 @@ add_executable(oot3d_sun_depth_gpu_check EXCLUDE_FROM_ALL
 target_link_libraries(oot3d_sun_depth_gpu_check PRIVATE oot3d_overlay video_core
     tsl::robin_map Qt6::Core ${PLATFORM_LIBRARIES})
 target_compile_definitions(oot3d_sun_depth_gpu_check PRIVATE QT_NO_KEYWORDS)
+
+if (ENABLE_VULKAN)
+    add_executable(oot3d_bloom_gpu_check EXCLUDE_FROM_ALL ../../tools/oot3d/bloom-gpu-check.cpp)
+    target_link_libraries(oot3d_bloom_gpu_check PRIVATE oot3d_overlay video_core tsl::robin_map Qt6::Core ${PLATFORM_LIBRARIES})
+    target_compile_definitions(oot3d_bloom_gpu_check PRIVATE QT_NO_KEYWORDS)
+endif()
 
 add_executable(oot3d_ocarina_check EXCLUDE_FROM_ALL ../../tools/oot3d/ocarina-check.cpp)
 target_link_libraries(oot3d_ocarina_check PRIVATE dynarmic)
@@ -270,6 +276,9 @@ target_compile_options(oot3d_randomizer_presets_check PRIVATE -UNDEBUG)
 if (ENABLE_OOT3D_PLAYER_MODE)
     set_source_files_properties(player_mode.cpp overlay.cpp PROPERTIES
         COMPILE_DEFINITIONS ENABLE_OOT3D_PLAYER_MODE)
+else()
+    set_source_files_properties(player_mode.cpp PROPERTIES
+        COMPILE_DEFINITIONS "OOT3D_DEFAULTS_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/defaults\"")
 endif()
 
 add_executable(oot3d_fast_loading_check EXCLUDE_FROM_ALL

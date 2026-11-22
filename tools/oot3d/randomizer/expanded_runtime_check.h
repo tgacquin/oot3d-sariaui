@@ -84,6 +84,9 @@ void CheckMultiplayerRuntime(Env& env,Dynarmic::A32::Jit& jit) {
     const auto symbol=[](const char* name){const auto at=R::Data().Find(name).address;assert(at);return at;};
     const U32 settings=symbol("gSettingsContext"),buffer=0xc40000;
     if(!env.Get<std::uint8_t>(settings+offsetof(SettingsContext,mp_Enabled)))return;
+    // The item-packet fixture exercises shared progress even for an offline seed.
+    const auto old_progress=env.Get<std::uint8_t>(settings+offsetof(SettingsContext,mp_SharedProgress));
+    env.Put<std::uint8_t>(settings+offsetof(SettingsContext,mp_SharedProgress),1);
     env.Run("Multiplayer_OnFileLoad");
     env.Write(symbol("mBuffer"),buffer);env.Write(symbol("mBufSize"),0x1000);
     env.Put<std::uint8_t>(symbol("netStage"),3);
@@ -191,17 +194,66 @@ void CheckMultiplayerRuntime(Env& env,Dynarmic::A32::Jit& jit) {
     assert(Startup::phase==Startup::Phase::Ready);
     assert(R::ReadBytes(env,symbol("rMultiplayerUsername"),8)=="FileName");
     assert(env.Get<std::uint8_t>(symbol("hostNonblocking"))==1);
-    // Produce a full snapshot through the actual ARM serializers.
-    const auto old_progress=env.Get<std::uint8_t>(settings+offsetof(SettingsContext,mp_SharedProgress));
-    env.Put<std::uint8_t>(settings+offsetof(SettingsContext,mp_SharedProgress),1);
+    // Collect an unsaved token and item after the host mirror was initialized.
+    // Exercise the real request handler with the seed's ongoing sharing flags.
+    constexpr U32 save = 0x587958;
+    constexpr U32 tokens = save+0xe8, slot = save+0x8c, ammo = save+0xa6;
+    constexpr U32 menu = save+0x138a, rupees = save+0x48, magic = save+0x47;
+    constexpr U32 giftEvent = save+0xeec+12*2;
+    const auto originalSave = R::ReadBytes(env, save, 0x15c4);
+    env.Put<std::uint8_t>(settings+offsetof(SettingsContext,mp_SharedProgress),old_progress);
+    env.Put<std::uint16_t>(tokens,17);
+    env.Put<std::uint8_t>(slot,0);
+    env.Put<std::uint8_t>(save+0xeb4,0x10);
+    env.Put<std::uint8_t>(save+0x81,0);
+    env.Put<std::uint8_t>(ammo,8);
+    env.Put<std::uint8_t>(menu,0);
+    env.Put<std::uint16_t>(rupees,41);
+    env.Put<std::uint8_t>(magic,13);
+    env.Put<std::uint16_t>(giftEvent,2);
+    env.Write(global_pointer,play);
+    mock("IsInGame",[&]{jit.Regs()[0]=1;});
     std::vector<QByteArray> fullsync;
     mock("udsSendTo",[&]{fullsync.push_back(R::ReadBytes(env,jit.Regs()[3],env.Get<U32>(jit.Regs()[13])));jit.Regs()[0]=0;});
-    jit.ClearCache();
-    env.Run("Multiplayer_Send_BaseSync",2);
-    env.Run("Multiplayer_Send_FullEntranceSync",2);
-    for(unsigned i=0;i<4;++i)env.Run("Multiplayer_Send_FullSceneFlagSync",2,i);
-    for(unsigned i=0;i<R::Data().Find("mp_completeSyncs").size-6;++i)env.Run("Multiplayer_Send_FullExtInfSync",2,i);
+    QByteArray request(36,0);
+    request[0]=6; // PACKET_FULLSYNCREQUEST
+    request[4]=env.Get<std::uint8_t>(settings+offsetof(SettingsContext,mp_SyncId));
+    for(unsigned i=0;i<5;++i)request[8+4*i]=env.Get<std::uint8_t>(settings+offsetof(SettingsContext,hashIndexes)+i);
+    bool requested=false;
+    mock("udsPullPacket",[&]{
+        auto& r=jit.Regs();
+        if(!requested) {R::WriteBytes(env,r[1],request);env.Write(r[3],request.size());requested=true;}
+        else env.Write(r[3],0);
+        env.Put<std::uint16_t>(env.Get<U32>(r[13]),2);r[0]=0;
+    });
+    jit.ClearCache();env.Run("Multiplayer_ReceivePackets");
     assert(fullsync.size()==R::Data().Find("mp_completeSyncs").size);
+    auto interrupted = std::move(fullsync);
+    fullsync.clear();
+    requested=false;
+    env.Put<std::uint16_t>(tokens,18);
+    env.Run("Multiplayer_ReceivePackets");
+    assert(fullsync.size()==interrupted.size());
+    // Lose one section, then interleave a stale reply and a duplicate with the retry.
+    fullsync.insert(fullsync.begin(),interrupted.front());
+    fullsync.insert(fullsync.begin()+2,interrupted.back());
+    const auto duplicate=fullsync[1];
+    fullsync.insert(fullsync.begin()+3,duplicate);
+    const auto health=env.Get<std::uint16_t>(save+0x42);
+    env.Put<std::uint16_t>(tokens,53); // A more advanced rejoin must also take the host's exact count.
+    env.Put<std::uint8_t>(slot,0xff);
+    env.Put<std::uint8_t>(save+0xeb4,0x80);
+    env.Put<std::uint8_t>(save+0x81,0xff);
+    env.Put<std::uint8_t>(ammo,0);
+    env.Put<std::uint8_t>(menu,0xff);
+    env.Put<std::uint16_t>(rupees,0);
+    env.Put<std::uint8_t>(magic,0);
+    env.Put<std::uint16_t>(giftEvent,0);
+    unsigned bridgeGifts=0;
+    mock("Entrance_SceneAndSpawnAre",[&]{jit.Regs()[0]=1;});
+    mock("ItemOverride_PushDelayedOverride",[&]{assert(jit.Regs()[0]==2);++bridgeGifts;});
+    jit.ClearCache();env.Run("ItemOverride_GiveSariasGift");
+    assert(jit.Regs()[0]==1 && bridgeGifts==0 && env.Get<std::uint16_t>(giftEvent)==0);
     R::multiplayer_command=2;env.Run("Multiplayer_Run");
     assert(srvStops==1 && udsStops==1 && destroys==1 && unbinds==1);
     Startup::SetSession(2,"Guest");R::multiplayer_command=1;
@@ -230,7 +282,8 @@ void CheckMultiplayerRuntime(Env& env,Dynarmic::A32::Jit& jit) {
     mock("Multiplayer_Ghosts_Tick",[&]{});
     mock("Multiplayer_Ghosts_SpawnPuppets",[&]{});
     mock("udsSendTo",[&]{jit.Regs()[0]=0;});
-    const auto health=env.Get<std::uint16_t>(0x587958+0x42);
+    unsigned requestsSent=0;
+    mock("udsSendTo",[&]{assert(jit.Regs()[0]==1 && env.Get<U32>(jit.Regs()[3])==6);++requestsSent;jit.Regs()[0]=0;});
     env.Put<std::uint16_t>(0x587958+0x42,health+0x10);
     for(unsigned i=0;i<fullsync.size();++i) {
         bool delivered=false;
@@ -242,11 +295,24 @@ void CheckMultiplayerRuntime(Env& env,Dynarmic::A32::Jit& jit) {
         jit.ClearCache();env.Run("Multiplayer_Run");
         if(i+1<fullsync.size()) {
             assert(env.Get<U32>(symbol("rMultiplayerHold"))==1);
-            assert(env.Get<std::uint16_t>(0x587958+0x42)==health+0x10);
+            assert(env.Get<std::uint16_t>(0x587958+0x42)==health+0x10 && env.Get<std::uint16_t>(tokens)==53);
         }
     }
     assert(env.Get<U32>(symbol("rMultiplayerReady"))==1 && env.Get<U32>(symbol("rMultiplayerHold"))==0);
     assert(env.Get<std::uint16_t>(0x587958+0x42)==health);
+    assert(requestsSent && env.Get<std::uint16_t>(tokens)==18 && env.Get<std::uint8_t>(slot)==0);
+    assert(env.Get<std::uint8_t>(save+0xeb4)==0x10 && env.Get<std::uint8_t>(save+0x81)==0);
+    assert(env.Get<std::uint8_t>(ammo)==8 && env.Get<std::uint8_t>(menu)==0);
+    assert(env.Get<std::uint16_t>(rupees)==41 && env.Get<std::uint8_t>(magic)==13);
+    assert(env.Get<std::uint16_t>(giftEvent)==2);
+    env.Run("ItemOverride_CheckStartingItem");
+    assert(!bridgeGifts);
+    env.Put<std::uint16_t>(giftEvent,0); // Legitimate first visit still awards exactly once.
+    env.Run("ItemOverride_GiveSariasGift");env.Run("ItemOverride_CheckStartingItem");
+    assert(bridgeGifts==1 && env.Get<std::uint16_t>(giftEvent)==2);
+    env.Run("ItemOverride_GiveSariasGift");env.Run("ItemOverride_CheckStartingItem");
+    assert(bridgeGifts==1);
+    R::WriteBytes(env,save,originalSave);
     // Losing the room shuts down the guest connection and releases gameplay,
     // without falling back to the old automatic wireless discovery path.
     const auto scans_before_leave=scans,starts_before_leave=srvStarts;
@@ -295,5 +361,5 @@ void CheckMultiplayerRuntime(Env& env,Dynarmic::A32::Jit& jit) {
     env.Put<std::uint8_t>(settings+offsetof(SettingsContext,mp_SharedProgress),old_progress);
     Startup::SetSession(0);Startup::phase=Startup::Phase::Idle;
     env.mocks.clear();jit.ClearCache();
-    std::cout<<"Multiplayer startup: offline isolation, direct host, polled guest, atomic full sync, room loss, bounded failure and native gameplay hold passed\n";
+    std::cout<<"Multiplayer startup: offline isolation, direct host, polled guest, authoritative inventory, Skulltulas, snapshot retries, bridge gift, room loss, bounded failure and native gameplay hold passed\n";
 }

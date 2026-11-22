@@ -610,8 +610,8 @@ static void OotEditorKey(QKeyEvent* event,bool down) {
 
 void GRenderWindow::keyPressEvent(QKeyEvent* event) {
 #ifdef ENABLE_OOT3D_PRESENTATION
-    if (!is_secondary && (event->key() == Qt::Key_F1 || event->key() == Qt::Key_F2) && OOT3D::available.load()) {
-        OOT3D::HandleSettingsFunctionKey(event->key() == Qt::Key_F1 ? 1 : 2, event->isAutoRepeat());
+    if (!is_secondary && (event->key() >= Qt::Key_F1 && event->key() <= (OOT3D::IsPlayerBuild() ? Qt::Key_F2 : Qt::Key_F3)) && OOT3D::available.load()) {
+        OOT3D::HandleSettingsFunctionKey(event->key() - Qt::Key_F1 + 1, event->isAutoRepeat());
         if (!event->isAutoRepeat()) {
             TouchReleased();
             InputCommon::GetMotionEmu()->EndTilt();
@@ -622,7 +622,7 @@ void GRenderWindow::keyPressEvent(QKeyEvent* event) {
     if (!is_secondary && OOT3D::visible.load()) {
         OotEditorKey(event,true);
         if (!OOT3D::text_input.load()) {
-            if (!OOT3D::IsPlayerBuild() && !OOT3D::player_view.load() && event->key() == Qt::Key_C && !event->isAutoRepeat()) OOT3D::Textures::Start();
+            if (!OOT3D::IsPlayerBuild() && OOT3D::settings_view.load()==OOT3D::SettingsView::Editor && event->key() == Qt::Key_C && !event->isAutoRepeat()) OOT3D::Textures::Start();
             if (event->key() == Qt::Key_Escape) OOT3D::visible = false;
         }
         event->accept();
@@ -661,7 +661,7 @@ void GRenderWindow::keyPressEvent(QKeyEvent* event) {
 void GRenderWindow::keyReleaseEvent(QKeyEvent* event) {
 #ifdef ENABLE_OOT3D_PRESENTATION
     if (!is_secondary && OOT3D::visible.load()) OotEditorKey(event,false);
-    if (!is_secondary && (event->key() == Qt::Key_F1 || event->key() == Qt::Key_F2) && OOT3D::available.load()) {
+    if (!is_secondary && (event->key() >= Qt::Key_F1 && event->key() <= (OOT3D::IsPlayerBuild() ? Qt::Key_F2 : Qt::Key_F3)) && OOT3D::available.load()) {
         event->accept();
         return;
     }

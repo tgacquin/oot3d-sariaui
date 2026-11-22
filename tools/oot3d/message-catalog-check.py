@@ -36,13 +36,16 @@ def widths(s):
     s=re.sub(r'\{24:[0-9a-f]+\}', '□',s).replace('{0b}','WWWWWWWW').replace('{01}','\n')
     lines=re.sub(r'\{[^}]+\}','',s).splitlines()
     return [sum(16 if c=='□' else advances[ord(c)] for c in line) for line in lines]
-review=['CONTROLLER TEXT: 78 English messages; 6 Navi/View tutorials each in French and Spanish.',
+review=['CONTROLLER TEXT: 78 controller messages each in English, French and Spanish.',
         'Labels in brackets represent native icons.\n']
 expected_changes=set()
 for language in ('english','french','spanish'):
     catalog=json.loads((root/f'src/oot3d/messages/{language}.json').read_text())
     slot=catalog['language_slot'];compiled,_=m['compile'](original,catalog)
-    assert len(compiled)==(78 if slot==1 else 6)
+    assert len(compiled)==78
+    ids={entry[0] for entry in compiled}
+    if slot==1:english_ids=ids
+    else:assert ids==english_ids
     for mid,h,size,edits in compiled:
         source=old[mid][slot];result=bytearray();cursor=0
         for off,remove,insert in edits:
@@ -51,6 +54,11 @@ for language in ('english','french','spanish'):
         text=m['decode'](result);before=m['decode'](source)
         assert m['script_controls'](text)==m['script_controls'](before),(language,hex(mid))
         assert max(widths(text))<=max(310,max(widths(before))),(language,hex(mid),max(widths(text)))
+        plain=' '.join(visible(text).split())
+        assert not re.search(r"écran (tactile|supérieur|inférieur)|pantalla (táctil|superior|inferior)",plain,re.I),(language,hex(mid))
+        assert not re.search(r"\{24:(16|17|18|19|1a|1b|1c|1d)\}",text),(language,hex(mid))
+        for old_page,new_page in zip(re.split(r'\{(?:01|08:..)\}\n?',before),re.split(r'\{(?:01|08:..)\}\n?',text)):
+            assert len(new_page.splitlines())<=max(4,len(old_page.splitlines())),(language,hex(mid))
         if slot==1:
             assert not re.search(r'\b(tap|touch|subscreen|upper.screen|lower.screen)\b',visible(text),re.I),hex(mid)
         assert new[mid][slot]==result,(language,hex(mid))
@@ -60,10 +68,11 @@ for mid,locales in old.items():
     for slot in range(10):
         if (mid,slot) not in expected_changes:
             assert new[mid][slot]==locales[slot],(hex(mid),slot)
-        # Audit the whole three-language archive for references to the retired
-        # touchscreen Navi/eye controls, not just the known tutorial IDs.
+        # Scan all populated messages, including IDs outside the controller catalogs.
         if slot in (1,5,7) and new[mid][slot]:
             text=m['decode'](new[mid][slot])
-            assert '{24:17}' not in text and '{24:18}' not in text,(hex(mid),slot)
+            assert not re.search(r"\{24:(16|17|18|19|1a|1b|1c|1d)\}",text),(hex(mid),slot)
+            plain=' '.join(visible(text).split())
+            assert not re.search(r"écran (tactile|inférieur|supérieur)|pantalla (táctil|inferior|superior)",plain,re.I),(hex(mid),slot)
 if len(sys.argv)>4:Path(sys.argv[4]).write_text('\n'.join(review))
-print('90 localized rewrites match catalogs; script controls, native-font widths, retired Navi/View references and untouched payloads verified')
+print('234 localized rewrites match catalogs; script controls, native-font widths, retired Navi/View references and untouched payloads verified')

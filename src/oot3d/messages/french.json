@@ -2,14 +2,307 @@
   "language": "French",
   "language_slot": 5,
   "notes": [
-    "Navi uses D-pad Up; the right-stick click controls first-person view. Only these related tutorials are translated here."
+    "Controller instructions for the USA message archive."
   ],
   "messages": {
+    "0002": {
+      "edits": [
+        {
+          "find": "l'écran de carte",
+          "replace": "la carte"
+        }
+      ]
+    },
+    "0003": {
+      "edits": [
+        {
+          "find": "l'écran de carte",
+          "replace": "la carte"
+        }
+      ]
+    },
+    "0004": {
+      "edits": [
+        {
+          "find": "l'écran de carte",
+          "replace": "la carte"
+        }
+      ]
+    },
+    "0005": {
+      "edits": [
+        {
+          "find": "l'écran de carte",
+          "replace": "la carte"
+        }
+      ]
+    },
+    "0008": {
+      "edits": [
+        {
+          "find": "l'écran de carte",
+          "replace": "la carte"
+        }
+      ]
+    },
+    "0009": {
+      "edits": [
+        {
+          "find": "l'écran de carte",
+          "replace": "la carte"
+        }
+      ]
+    },
+    "000D": {
+      "edits": [
+        {
+          "find": "l'écran de\ncarte",
+          "replace": "la carte"
+        }
+      ]
+    },
+    "000E": {
+      "edits": [
+        {
+          "find": "l'écran de carte",
+          "replace": "la carte"
+        }
+      ]
+    },
+    "0010": {
+      "edits": []
+    },
+    "0011": {
+      "edits": []
+    },
+    "0012": {
+      "edits": []
+    },
+    "0013": {
+      "edits": []
+    },
+    "0014": {
+      "edits": []
+    },
+    "0015": {
+      "edits": []
+    },
+    "0016": {
+      "edits": []
+    },
+    "0017": {
+      "edits": []
+    },
+    "001C": {
+      "edits": [
+        {
+          "find": " Un sac est\nindispensable pour en acheter.",
+          "replace": "\nSans sac, pas de bombes."
+        }
+      ]
+    },
+    "001D": {
+      "edits": [
+        {
+          "find": " Un sac est\nindispensable pour en acheter.",
+          "replace": "\nSans sac, pas de bombes."
+        }
+      ]
+    },
+    "0026": {
+      "edits": [
+        {
+          "find": "à\nl'{1d:42}écran de quête ",
+          "replace": "dans\nle menu {1d:42}Quête "
+        },
+        {
+          "find": "à l'{1d:41}écran de carte",
+          "replace": "sur la {1d:41}carte"
+        }
+      ]
+    },
+    "0030": {
+      "edits": [
+        {
+          "find": "Touchez {24:1a} sur l'écran tactile pour\nafficher l'{1d:43}écran des objets {1d:00}et\nassignez-le à {24:1c}, {24:1e}, {24:1f} ou {24:1d}.",
+          "replace": "Appuyez sur SELECT pour ouvrir\nles {1d:43}objets{1d:00}. Choisissez un objet et\nassignez-le à {24:1e}, {24:1f}, ZL ou ZR."
+        }
+      ]
+    },
+    "0031": {
+      "edits": []
+    },
+    "0032": {
+      "edits": [
+        {
+          "find": "pour brandir,\npuis poser",
+          "replace": "pour sortir\net poser"
+        }
+      ]
+    },
+    "0033": {
+      "edits": [
+        {
+          "find": "pour brandir,\npuis poser",
+          "replace": "pour sortir\net poser"
+        }
+      ]
+    },
+    "0034": {
+      "edits": [
+        {
+          "find": "Touchez {24:1a} sur l'écran tactile pour\nafficher l'{1d:43}écran des objets {1d:00}et\nassignez-les à {24:1c}, {24:1e}, {24:1f} ou {24:1d}.",
+          "replace": "Appuyez sur SELECT pour ouvrir\nles {1d:43}objets{1d:00}. Choisissez un objet et\nassignez-le à {24:1e}, {24:1f}, ZL ou ZR."
+        }
+      ]
+    },
+    "0035": {
+      "edits": []
+    },
+    "0036": {
+      "edits": []
+    },
+    "0037": {
+      "edits": [
+        {
+          "find": "Touchez {24:1a} sur l'écran tactile pour\nafficher l'{1d:43}écran des objets {1d:00}et\nassignez-le à {24:1c}, {24:1e}, {24:1f} ou {24:1d}.",
+          "replace": "Appuyez sur SELECT pour ouvrir\nles {1d:43}objets{1d:00}. Choisissez un objet et\nassignez-le à {24:1e}, {24:1f}, ZL ou ZR."
+        }
+      ]
+    },
+    "0038": {
+      "edits": []
+    },
+    "0039": {
+      "edits": []
+    },
+    "0042": {
+      "edits": []
+    },
+    "0043": {
+      "edits": []
+    },
+    "0044": {
+      "edits": []
+    },
+    "0045": {
+      "edits": []
+    },
+    "0046": {
+      "edits": []
+    },
+    "0047": {
+      "edits": []
+    },
+    "0048": {
+      "edits": []
+    },
+    "004A": {
+      "edits": [
+        {
+          "find": "Touchez\n{24:16} sur l'écran tactile pour en jouer!",
+          "replace": "Pour\nen jouer, appuyez à droite\nsur la croix directionnelle."
+        }
+      ]
+    },
+    "004C": {
+      "edits": [
+        {
+          "find": "Touchez-le sur l'{1d:42}écran de quête{1d:00} ou\nsélectionnez-le avec {24:00} et appuyez\nsur {24:06} pour vous en équiper.",
+          "replace": "Appuyez sur SELECT, puis sur {24:0a}\npour ouvrir le menu {1d:42}Quête{1d:00}.\nÉquipez le bouclier avec {24:06}."
+        }
+      ]
+    },
+    "004D": {
+      "edits": [
+        {
+          "find": "Sur l'{1d:42}écran de quête{1d:00}, touchez ce\nbouclier pour vous en équiper.",
+          "replace": "Appuyez sur SELECT, puis sur {24:0a}\npour ouvrir le menu {1d:42}Quête{1d:00}.\nÉquipez le bouclier avec {24:06}."
+        }
+      ]
+    },
+    "0058": {
+      "edits": []
+    },
+    "005D": {
+      "edits": []
+    },
+    "0066": {
+      "edits": [
+        {
+          "find": "Touchez {24:1b} sur l'écran tactile pour\nregarder la carte en détail.",
+          "replace": "Appuyez sur SELECT, puis sur {24:0b}\npour ouvrir la {1d:41}carte{1d:00}."
+        },
+        {
+          "find": "Touchez le numéro de l'étage que\nvous voulez voir.",
+          "replace": "Choisissez l'étage avec {24:00}."
+        }
+      ]
+    },
+    "0069": {
+      "edits": []
+    },
+    "007A": {
+      "edits": []
+    },
+    "0098": {
+      "edits": []
+    },
+    "0099": {
+      "edits": []
+    },
+    "009A": {
+      "edits": []
+    },
+    "00A3": {
+      "edits": [
+        {
+          "find": "pour allumer et poser\nune bombe. Un sac de bombes est requis pour\nen acheter.",
+          "replace": "pour allumer\net poser une bombe. Il vous faut un sac\nde bombes pour en acheter."
+        }
+      ]
+    },
+    "00A4": {
+      "edits": [
+        {
+          "find": "Touchez {24:19} sur l'écran tactile pour\nafficher l'{1d:42}écran de quête{1d:00} et touchez\ncette épée pour vous en équiper.",
+          "replace": "Appuyez sur SELECT, puis sur {24:0a}\npour ouvrir le menu {1d:42}Quête{1d:00}.\nÉquipez votre épée avec {24:06}."
+        }
+      ]
+    },
+    "00AD": {
+      "edits": []
+    },
+    "00AE": {
+      "edits": []
+    },
+    "00AF": {
+      "edits": []
+    },
+    "00B1": {
+      "edits": []
+    },
+    "00CB": {
+      "edits": [
+        {
+          "find": "pour allumer et poser\nune bombe. Un sac de bombes est requis pour\nen acheter.",
+          "replace": "pour allumer\net poser une bombe. Il vous faut un sac\nde bombes pour en acheter."
+        }
+      ]
+    },
     "0101": {
       "edits": [
         {
           "find": "{19}{1d:44}Hé! Regarde, {0b}!\nTu peux voir à travers cette {1d:00}toile\nd'araignée {1d:44}en utilisant {1d:00}{1d:44}{24:18}!{1d:00}{00}",
           "replace": "{19}{1d:44}Hé! Regarde, {0b}!\nAppuie sur le stick droit pour voir\nà travers cette {1d:00}toile d'araignée{1d:44}!{1d:00}{00}"
+        }
+      ]
+    },
+    "0103": {
+      "edits": [
+        {
+          "find": " {1d:00}{1d:44}située sur l'écran supérieur!",
+          "replace": "!"
         }
       ]
     },
@@ -21,6 +314,102 @@
         }
       ],
       "requires": "NaviUp"
+    },
+    "1025": {
+      "edits": [
+        {
+          "find": "Tu sais, tu peux viser en maintenant",
+          "replace": "Vise en maintenant"
+        }
+      ]
+    },
+    "1035": {
+      "edits": [
+        {
+          "find": "Les icônes à droite de l'écran tactile\nL'icône sur l'écran supérieur",
+          "replace": "Les boutons d'objets\nLe bouton d'action"
+        }
+      ]
+    },
+    "1036": {
+      "edits": [
+        {
+          "find": "Tu peux {1d:43}assigner des objets {1d:00}à {24:1c}, {24:1e}, {24:1f} et\n{24:1d}, situés à droite de l'écran tactile.",
+          "replace": "Tu peux {1d:43}assigner des objets{1d:00} à {24:1e}, {24:1f},\nZL et ZR. ZL correspond à I et ZR à II."
+        },
+        {
+          "find": "Pour utiliser un nouvel objet, touche {24:1a} pour\nafficher l'{1d:43}écran des objets{1d:00}. Touche l'objet,\npuis touche {24:1c}, {24:1e}, {24:1f} ou {24:1d} pour l'assigner.",
+          "replace": "Appuie sur SELECT pour ouvrir les {1d:43}objets{1d:00}.\nChoisis un objet avec {24:00}, puis appuie\nsur {24:1e}, {24:1f}, ZL ou ZR pour l'assigner."
+        },
+        {
+          "find": "Pour utiliser un objet, touche {24:1c}, {24:1e}, {24:1f} ou\n{24:1d}.",
+          "replace": "Appuie sur le bouton choisi\npour utiliser ton objet."
+        },
+        {
+          "find": "Assigne les objets les plus utiles à {24:1e} ou {24:1f}\npour pouvoir les utiliser en appuyant sur les\nboutons correspondants.",
+          "replace": "Garde tes objets préférés à portée de main\ngrâce à ces quatre boutons!"
+        }
+      ]
+    },
+    "1037": {
+      "edits": [
+        {
+          "find": "L'icône avec un A située en bas à droite de\nl'écran supérieur",
+          "replace": "L'icône du bouton A"
+        }
+      ]
+    },
+    "1039": {
+      "edits": [
+        {
+          "find": "Une {1d:41}carte{1d:00} est affichée en bas à gauche de\nl'écran supérieur.",
+          "replace": "La {1d:41}mini-carte{1d:00} montre les environs."
+        },
+        {
+          "find": "Maintiens {24:04} enfoncé pour masquer la carte.\nAppuie sur {24:01} dans n'importe quelle direction\npour l'afficher à nouveau.",
+          "replace": "Appuie sur le stick gauche (L3) pour\nmasquer ou afficher la mini-carte."
+        },
+        {
+          "find": "Au centre de l'écran tactile se situe la carte\ngénérale de la région.",
+          "replace": "Tu peux changer ce raccourci dans\nles paramètres des commandes."
+        },
+        {
+          "find": "Touche {24:1b} sur l'écran tactile pour afficher\nles noms de lieux.",
+          "replace": "Appuie sur SELECT, puis sur {24:0b} pour voir\nles noms des lieux sur la {1d:41}carte{1d:00}.\nAppuie sur {24:0a} pour revenir aux objets."
+        }
+      ]
+    },
+    "103A": {
+      "edits": [
+        {
+          "find": "Les objets assignables peuvent être\nassignés à {24:1c}, {24:1e}, {24:1f} et {24:1d}. Pour t'en servir,\nutilise l'icône ou le bouton correspondant!",
+          "replace": "Tu peux assigner tes objets à {24:1e}, {24:1f},\nZL ou ZR. Appuie sur le bouton choisi\npour utiliser ton objet."
+        },
+        {
+          "find": "Si tu veux changer d'équipement, touche {24:19}\nsur l'écran tactile pour afficher l'{1d:42}écran de\nquête{1d:00}.",
+          "replace": "Appuie sur SELECT, puis sur {24:0a} pour\nouvrir le menu {1d:42}Quête{1d:00}. Appuie sur {24:0b}\npour revenir aux objets."
+        },
+        {
+          "find": "Pour utiliser un équipement, touche-le tout\nsimplement.",
+          "replace": "Choisis ton équipement avec {24:00}, puis\nappuie sur {24:06} pour t'en équiper."
+        },
+        {
+          "find": "Pour assigner un objet de l'inventaire,\ntouche {24:1a} pour afficher l'{1d:43}écran des objets{1d:00}.\nTouche l'objet en question, puis touche {24:1c},\n{24:1e}, {24:1f} ou {24:1d} pour l'assigner.",
+          "replace": "Dans le menu des {1d:43}objets{1d:00}, choisis un objet\net assigne-le à {24:1e}, {24:1f}, ZL ou ZR.\nZL correspond à I et ZR à II."
+        }
+      ]
+    },
+    "103D": {
+      "edits": [
+        {
+          "find": "Une fois acheté, touche {24:19} pour afficher\nl'{1d:42}écran de quête{1d:00}. À cet écran, choisis ton\nbouclier en le touchant.",
+          "replace": "Une fois le bouclier acheté, appuie sur\nSELECT, puis sur {24:0a} pour ouvrir le\nmenu {1d:42}Quête{1d:00}."
+        },
+        {
+          "find": "Tu peux aussi le sélectionner avec {24:00}, puis\nappuyer sur {24:06}.",
+          "replace": "Choisis ton bouclier avec {24:00}, puis\nappuie sur {24:06} pour t'en équiper."
+        }
+      ]
     },
     "103E": {
       "edits": [
@@ -43,11 +432,67 @@
       ],
       "requires": "NaviUp"
     },
+    "10C5": {
+      "edits": [
+        {
+          "find": "Si tu sors ton ocarina avec {24:16} au bon\nendroit, une {1d:41}portée {1d:00}apparaîtra.",
+          "replace": "Appuie à droite sur la croix directionnelle\npour sortir ton ocarina. Au bon endroit,\nune {1d:41}portée{1d:00} apparaîtra."
+        }
+      ]
+    },
+    "10C7": {
+      "edits": [
+        {
+          "find": "Pour voir les mélodies que tu as apprises,\naccède à l'{1d:44}écran de l'ocarina {1d:00}et touche\nl'icône en bas à droite.",
+          "replace": "Pour voir les mélodies que tu as apprises,\nappuie à droite sur la croix directionnelle\npour sortir ton ocarina, puis sur START."
+        }
+      ],
+      "requires": "SongListStart"
+    },
     "10D8": {
       "edits": [
         {
           "find": "Regarde! Belle vue, non? Tu peux changer\nde vue avec {24:18} et ainsi admirer la forêt\navec {24:00}.{00}",
           "replace": "Regarde! Belle vue, non? Appuie sur\nle stick droit, puis admire la forêt\navec {24:00}.{00}"
+        }
+      ]
+    },
+    "2044": {
+      "edits": []
+    },
+    "2065": {
+      "edits": [
+        {
+          "find": "Touche {24:1b} pour afficher l'{1d:41}écran\nde carte{1d:00}.",
+          "replace": "Appuie sur SELECT,\npuis sur {24:0b} pour ouvrir la {1d:41}carte{1d:00}."
+        }
+      ]
+    },
+    "2071": {
+      "edits": [
+        {
+          "find": "Pour vérifier sa position sur la carte, touche\n{24:1b} pour afficher l'{1d:41}écran de carte{1d:00}.",
+          "replace": "Pour voir où il se trouve, appuie sur\nSELECT, puis sur {24:0b} pour ouvrir la {1d:41}carte{1d:00}."
+        },
+        {
+          "find": " Tous les\nsecteurs visités sont indiqués sur la carte.",
+          "replace": "\nTu y verras les secteurs déjà visités."
+        }
+      ]
+    },
+    "4003": {
+      "edits": [
+        {
+          "find": "Touche {24:1b} pour consulter l'{1d:41}écran de carte{1d:00}\nde temps en temps. C'est très pratique!",
+          "replace": "Consulte la {1d:41}carte{1d:00} de temps en temps.\nAppuie sur SELECT, puis sur {24:0b}.\nC'est très pratique!"
+        }
+      ]
+    },
+    "406A": {
+      "edits": [
+        {
+          "find": " et\nplante-le",
+          "replace": "\net plante-le"
         }
       ]
     },
@@ -58,6 +503,35 @@
           "replace": "Pour admirer les environs, appuie sur\nle stick droit, puis regarde autour\nde toi avec {24:00}.{00}"
         }
       ]
+    },
+    "700C": {
+      "edits": [
+        {
+          "find": "... avec ",
+          "replace": "...\navec "
+        }
+      ]
+    },
+    "70A3": {
+      "edits": []
+    },
+    "70ED": {
+      "edits": [
+        {
+          "find": "... Avec ",
+          "replace": "...\nAvec "
+        }
+      ]
     }
-  }
+  },
+  "common": [
+    {
+      "find": "{24:1c}",
+      "replace": "ZL"
+    },
+    {
+      "find": "{24:1d}",
+      "replace": "ZR"
+    }
+  ]
 }

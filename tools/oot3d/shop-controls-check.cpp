@@ -38,6 +38,7 @@ struct Env : Dynarmic::A32::UserCallbacks {
         if(a==0x37547c)return 0xef000001;
         if(a==0x36be34)return 0xef000002;
         if(a==0x34e32c)return 0xef000003;
+        if(a==0x3695f8)return 0xef000004; // Allow the area-title draw.
         if(a==0x3769d8)return 0xef000004;
         if(a==0x2d04c0)return 0xef000005;
         if(a==0x34e27c && !cursor_test && !real_position)return 0xef000006;
@@ -148,6 +149,7 @@ struct Env : Dynarmic::A32::UserCallbacks {
         for(unsigned i=0;i<13;++i)r[i]=0x100+i;
         for(unsigned i=0;i<fp.size();++i)fp[i]=std::bit_cast<U32>(float(i)+.125f);
         r[0]=draw?Play:ActorAddress;r[1]=draw?ActorAddress:Play;
+        if(pc==0x4792a4)r[0]=0; // Area title index.
         if(!draw) {r[4]=ActorAddress;r[6]=Play;}
         r[3]=Get<U32>(0x52d9e0+Get<std::uint16_t>(ActorAddress+0x2a0)*4);
         r[13]=SP;r[14]=Stop;r[15]=pc;
@@ -166,6 +168,32 @@ int main(int argc,char** argv) {
     const auto size=f.tellg();f.seekg(0);assert(size>0 && size<0x700000);
     f.read(reinterpret_cast<char*>(e.bytes.data()+0x100000),size);assert(f && CodeMatches(e));
     Dynarmic::A32::UserConfig cfg;cfg.callbacks=&e;Dynarmic::A32::Jit cpu(cfg);e.cpu=&cpu;
+    // Run the game's title-card draw for the lower overworld and centered dungeon
+    // variants. Compare its submitted geometry and material with the unpatched draw.
+    for(unsigned y:{120u,192u})for(unsigned phase:{48u,255u}) {
+        e.ResetActor();e.Write(e.ActorAddress,e.Item);
+        e.Write(e.ActorAddress+4,(y<<16)|200);e.Write(e.ActorAddress+8,(36u<<16)|168);
+        e.Put(e.ActorAddress+12,1.f);e.Write(e.ActorAddress+16,phase<<16);
+        e.Put<std::uint16_t>(e.ActorAddress+20,phase);
+        e.Write(0x50c8e8+0x54,4);e.Put(0x50c8e8+0x60,.2f);
+        e.patched=false;cpu.ClearCache();e.Run(0x4792a4,true);
+        assert(e.draws.size()==1);const auto native=e.draws.back();
+        e.patched=true;cpu.ClearCache();
+        for(float scale:{.25f,1.f,3.f})for(bool reposition:{false,true}) {
+            OOT3D::HUD::Layout layout;layout.area_title_scale=scale;
+            layout.reposition_area_titles=reposition;layout.area_title_y=-240;
+            OOT3D::HUD::SetLayout(layout,false);e.draws.clear();e.Run(0x4792a4,true);
+            assert(e.draws.size()==1);const auto& draw=e.draws.back();
+            for(unsigned edge=0;edge<4;++edge) {
+                const float center=(native.rect[edge]+native.rect[edge^1])*.5f;
+                const float dy=(edge<2 && reposition && y==192)?-240.f:0.f;
+                assert(draw.rect[edge]==center+dy+(native.rect[edge]-center)*scale);
+            }
+            assert(draw.rgba==native.rgba && draw.matrix==native.matrix &&
+                   draw.depth==native.depth && draw.model==native.model);
+        }
+    }
+    OOT3D::HUD::SetLayout({},false);
     // Shop entry/idle, greeting, purchases and all other actions must dispatch
     // exactly like the native BLX, including its return address and flags.
     // Step the real JIT substitution through the production price-before-shop
@@ -220,6 +248,24 @@ int main(int argc,char** argv) {
         e.Write(OOT3D::DPad::UI+0x14,1);e.Write(OOT3D::DPad::UI+0x24,1);e.Write(e.Play+0x100,0x203);
         e.PollShop(0x10);assert(navigation_input.held==0);
         e.Write(OOT3D::DPad::UI+0x14,0);e.Write(OOT3D::DPad::UI+0x24,0);
+    }
+    // Press and release between two 30 Hz updates. The original shelf handler
+    // sees one press and repeat does not convert the tap into a second move.
+    for(bool pad:{false,true})for(bool mirrored:{false,true}) {
+        e.ResetActor();
+        e.Put<std::uint16_t>(e.ActorAddress+0x2a0,7);
+        e.Put<std::uint8_t>(0x587958+0xe,mirrored);
+        navigation_input.Observe(e,e.ActorAddress,e.Play);
+        const U32 right=mirrored?0x20:0x10;
+        navigation_input.Poll(e,pad?right:0,true,pad?0:right,1008333);
+        navigation_input.Poll(e,0,true,0,1012666);
+        e.UpdateInput();e.Run(Sites[0].pc);
+        assert(navigation_input.tick_press_us==1008333);
+        assert(e.Get<std::uint8_t>(e.ActorAddress+0x2fa)==2);
+        const auto sounds=e.sounds;
+        e.UpdateInput();e.Run(Sites[0].pc);
+        assert(!navigation_input.tick_press_us && e.sounds==sounds &&
+               e.Get<std::uint8_t>(e.ActorAddress+0x2fa)==2);
     }
     // Compare real ARM repeat accumulators/press flags for a D-pad sequence
     // versus the equivalent stick sequence, including release and reversal.

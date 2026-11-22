@@ -399,6 +399,8 @@ void PresentWindow::Present(Frame* frame) {
         present_queue.push(frame);
         frame_cv.notify_one();
     });
+    // Deliver the replacement before the renderer can block acquiring its next frame.
+    scheduler.DispatchWork();
 }
 
 void PresentWindow::WaitPresent() {

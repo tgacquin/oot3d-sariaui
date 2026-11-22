@@ -1,9 +1,7 @@
 Controller message translations
 
-Catalogs are keyed by the game's stable message IDs. english.json contains
-78 controller rewrites. french.json (QM slot 5) and spanish.json (slot 7)
-each update the six tutorials for D-pad Up Navi and right-stick-click View.
-Other French/Spanish dialogue is unchanged; no English is copied into them.
+Catalogs are keyed by the game's stable message IDs. English (QM slot 1), French
+(slot 5) and Spanish (slot 7) cover the same 78 controller messages.
 
 Find/replace strings use UTF-8 and hexadecimal QM controls, for example
 {24:06} for the A icon and {1d:43} for a color. Newlines become native line breaks.
@@ -24,7 +22,7 @@ control flow, font widths and the absence of old Navi/eye touch instructions.
 Tutorials 1017 and 103F use the implemented NaviUp binding in all three languages.
 10C7 uses the implemented SongListStart binding. Start enters the native song
 list from playable ocarina mode; B returns to playing before cancelling. All
-78 English rewrites are active. Input regression: tools/oot3d/ocarina-check.cpp.
+three languages use these bindings. Input regression: tools/oot3d/ocarina-check.cpp.
 
 Explicit user RomFS replacements/patches take precedence. Unsupported message
 archives are left untouched and logged. Baked menu-atlas captions are separate

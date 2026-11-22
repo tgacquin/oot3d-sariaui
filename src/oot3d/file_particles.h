@@ -68,7 +68,7 @@ inline float Smooth(float v) {v=std::clamp(v,0.f,1.f);return v*v*(3-2*v);}
 // A clipped square has at most eight vertices (three paired-triangle quads).
 struct Vertex {float x,y,u,v;};
 template<unsigned Capacity>
-inline void AddSprite(PausePrompts::QuadGeometry<Capacity>& out,float cx,float cy,float diameter,float aspect,float angle,
+inline void AddSprite(PausePrompts::QuadGeometry<Capacity>& out,unsigned first_quad,float cx,float cy,float diameter,float aspect,float angle,
                       float alpha,const std::array<float,3>& color,unsigned tile,float width) {
     if(alpha<=0)return;
     const float cs=std::cos(angle),sn=std::sin(angle),half=diameter/2;
@@ -82,6 +82,10 @@ inline void AddSprite(PausePrompts::QuadGeometry<Capacity>& out,float cx,float c
         polygon[i]={cx+x*cs-y*sn,cy+x*sn+y*cs,corner[0]<0?u0:u1,corner[1]<0?v0:v1};
     }
     const float left=(400-width)/2;
+    // Axis-aligned light pools and halos always fit one clipped quad. Skip
+    // edge-only contact so a zero-area polygon cannot spill into another slot.
+    if(angle==0 && (cx+half<=left || cx-half>=left+width ||
+                    cy+half*aspect<=0 || cy-half*aspect>=240))return;
     for(unsigned edge=0;edge<4 && count;++edge) {
         const auto distance=[&](const Vertex& v) {
             switch(edge) {case 0:return v.x-left;case 1:return left+width-v.x;
@@ -102,16 +106,17 @@ inline void AddSprite(PausePrompts::QuadGeometry<Capacity>& out,float cx,float c
         count=next;polygon=scratch;
     }
     for(unsigned i=1;i+1<count;i+=2) {
-        if(out.count==Capacity)return;
+        const unsigned q=first_quad+(i-1)/2;
+        if(q>=Capacity)return;
         const std::array<Vertex,4> quad{polygon[i],polygon[i+1],polygon[0],polygon[std::min(i+2,count-1)]};
         for(unsigned v=0;v<4;++v) {
-            const unsigned p=out.count*12+v*3,uv=out.count*8+v*2,c=out.count*16+v*4;
+            const unsigned p=q*12+v*3,uv=q*8+v*2,c=q*16+v*4;
             out.positions[p]=quad[v].x;out.positions[p+1]=quad[v].y;
             out.uvs[uv]=quad[v].u;out.uvs[uv+1]=quad[v].v;
             std::copy(color.begin(),color.end(),out.colors.begin()+c);
             out.colors[c+3]=std::clamp(alpha,0.f,1.f);
         }
-        ++out.count;
+        out.count=std::max(out.count,q+1);
     }
 }
 inline float Visibility(double seconds,unsigned i) {
@@ -136,9 +141,10 @@ inline GeometryFor<Limit> Draw(const Settings& s,double seconds,float entrance,f
     const float light=std::clamp(s.light_strength,0.f,1.f),radius=std::clamp(s.light_radius,.25f,3.f);
     if(rotation_seconds<0)rotation_seconds=seconds*std::clamp(s.spin,0.f,3.f);
     const float left=(400-screen_width)/2;
-    // Broad pools of light first, then every halo/core, so a later light never
-    // washes over another particle. File-select foreground controls draw later.
-    for(unsigned pass=0;pass<2;++pass)for(unsigned i=0;i<count;++i) {
+    // The mesh draws its full capacity. Reserve stable slots, even for motes
+    // that fade away or cross an edge, so intermediate frames pair the same
+    // mote. Draw all light pools behind the halos and spinning cores.
+    for(unsigned i=0;i<count;++i) {
         const double life=20+Random(i*7+2)*20;
         const float phase=float(std::fmod(seconds/life+Random(i*7+1),1.));
         const float x=left+Random(i*7+3)*screen_width+
@@ -150,19 +156,13 @@ inline GeometryFor<Limit> Draw(const Settings& s,double seconds,float entrance,f
         const unsigned variant=s.variations?i%3:0;
         constexpr std::array<std::array<float,3>,3> colors{{{.9f,1,.65f},{.68f,1,.8f},{1,.92f,.65f}}};
         const auto color=colors[variant];
-        if(pass==0) {
-            // A broad, low-opacity light pool brightens the dark parchment;
-            // the independent smooth texture avoids a magnified star outline.
-            AddSprite(out,x,y,diameter*15*radius,1,0,opacity*light,color,1,screen_width);
-        } else {
-            AddSprite(out,x,y,diameter*3.4f,1,0,opacity*.25f*glow,color,1,screen_width);
-            const double angle=Random(i*11+51)*6.28318530718+
-                rotation_seconds*(.8+Random(i*11+52)*1.4)*(i%2?-1:1);
-            // Round soft motes alternate with glints and elongated spinning
-            // glints. These are presentation variations, not native actor types.
-            AddSprite(out,x,y,diameter,variant==2?.65f:1.f,float(std::remainder(angle,6.28318530718)),
-                opacity,color,variant==1?1:0,screen_width);
-        }
+        const unsigned halo=Limit+4*i; // One halo and up to three clipped core quads.
+        AddSprite(out,i,x,y,diameter*15*radius,1,0,opacity*light,color,1,screen_width);
+        AddSprite(out,halo,x,y,diameter*3.4f,1,0,opacity*.25f*glow,color,1,screen_width);
+        const double angle=Random(i*11+51)*6.28318530718+
+            rotation_seconds*(.8+Random(i*11+52)*1.4)*(i%2?-1:1);
+        AddSprite(out,halo+1,x,y,diameter,variant==2?.65f:1.f,float(std::remainder(angle,6.28318530718)),
+            opacity,color,variant==1?1:0,screen_width);
     }
     return out;
 }

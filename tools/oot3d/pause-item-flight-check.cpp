@@ -142,6 +142,33 @@ int main(int argc,char** argv) {
             assert(!LandingGlow(m,side?mesh2:glow_mesh,0,poses));
         }
     }
+    m.words[root+0x34]=12;
+    m.words[root+0x78]=5;
+    m.words[root+0x7c]=3;
+    for(bool horizontal:{false,true})for(unsigned index:{5u,11u,17u,23u,8u}) {
+        Layout poses;poses.horizontal=horizontal;poses[Items]={-34,13,1.1f};poses[Slots]={-170,-80,.7f};
+        poses.slot_spacing=.8f;poses.slot_content_x=9;poses.slot_content_scale=1.25f;
+        SetLayout(poses,false);
+        const bool equipped=index%6==5;
+        const auto dest=equipped?SlotCenter(index/6,poses):point(index);
+        const auto end=Move(dest[0],dest[1],equipped?Slots:Items,poses[equipped?Slots:Items]);
+        m.words[root+0x50]=index;
+        for(unsigned choice=0;choice<4;++choice) {
+            m.words[root+0x90]=choice?0x37+choice:3;
+            const auto start=Move(151+21+(choice%2?52:7),137+21+(choice>=2?53:7),Items,poses[Items]);
+            for(unsigned tick=0;tick<=6;++tick) {
+                m.words[root+0x38]=tick==6?4:3;m.words[root+0x80]=tick%6;
+                const float t=tick==6?1:1-std::ldexp(1.f,-int(tick));
+                quad(src,253,175,tick==6?60:42,tick==6?60:42);quad(dst,0,0,0,0);
+                std::vector<AnimatedQuad> pending;
+                assert(CopyPositions(m,glow_mesh,dst,src,48,&pending));
+                assert(pending.size()==1);
+                assert(Near((m.F(dst)+m.F(dst+12))/2,std::lerp(start[0],end[0],t)));
+                assert(Near((m.F(dst+4)+m.F(dst+28))/2,std::lerp(start[1],end[1],t)));
+                assert(!ArrowFlight(m,mesh2,0,poses));
+            }
+        }
+    }
     m.words[root+0x34]=2;assert(!Flight(m,mesh,12,GetLayout()));
     m.words[root+0x34]=9;m.words[root+0x50]=100;
     assert(!Flight(m,mesh,12,GetLayout()));

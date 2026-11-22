@@ -99,7 +99,16 @@ layout (binding = 2, std140) uniform fs_data {
     vec4 tex_border_color[3];
     vec4 blend_color;
     vec4 sprite_atlas_blend;
-};
+)"
+#ifdef ENABLE_OOT3D_PRESENTATION
+R"(    vec4 heart_contour_shape[4];
+    vec4 heart_contour_color[4];
+    vec4 heart_contour_softness;
+    vec4 heart_pigment;
+    vec4 rupee_digit_outline;
+)"
+#endif
+R"(};
 )";
 
 FragmentModule::FragmentModule(const FSConfig& config_, const UserConfig& user_,
@@ -118,6 +127,87 @@ FragmentModule::FragmentModule(const FSConfig& config_, const UserConfig& user_,
     DefineShadowHelpers();
     DefineLightingHelpers();
     DefineProcTexSampler();
+    if (user.hud_colors) {
+        out += R"(
+vec3 tintHeart(vec3 heart, vec3 pigment, float brightness) {
+    float red = max(heart.r - max(heart.g, heart.b), 0.0);
+    vec3 bright = (heart + red * (pigment - vec3(1.0, 0.0, 0.0))) * brightness;
+    float highlight = 0.5 * max(max(bright.r, max(bright.g, bright.b)) - 1.0, 0.0);
+    return clamp(bright + highlight, 0.0, 1.0);
+}
+)";
+#ifdef ENABLE_OOT3D_PRESENTATION
+        if (config.texture.texture0_type == TexturingRegs::TextureConfig::Texture2D) {
+            out += R"(
+vec4 hudTexel(vec2 uv, float lod) {
+    // A displaced silhouette ends at the original quad's UV bounds. Keep
+    // neighboring hearts in the atlas out of its expanded screen rectangle.
+    if (any(lessThan(uv, texcoord1)) || any(greaterThan(uv, texcoord2))) return vec4(0.0);
+    return textureLod(tex0, uv, lod);
+}
+float heartContourAlpha(int layer, float lod) {
+    float opacity = heart_contour_color[layer].a;
+    if (opacity <= 0.0) return 0.0;
+    const float d = 0.70710678;
+    const vec2 directions[8] = vec2[8](vec2(1,0),vec2(d,d),vec2(0,1),vec2(-d,d),
+                                      vec2(-1,0),vec2(-d,-d),vec2(0,-1),vec2(d,-d));
+    vec4 shape = heart_contour_shape[layer];
+    float softness = heart_contour_softness[layer];
+    float uncovered = 1.0;
+    for (int ring = 0; ring < (softness > 0.0 ? 3 : 1); ++ring) {
+        float radius = 1.0 - softness * float(ring) / 3.0;
+        float weight = ring == 0 ? 1.0 - 0.85 * softness : (ring == 1 ? 0.30 : 0.55) * softness;
+        for (int i = 0; i < 8; ++i) {
+            vec2 offset = shape.xy + directions[i] * radius * shape.zw;
+            vec2 deltaUV = view.xy * (view.z > 0.5 ? offset.yx : offset);
+            uncovered *= 1.0 - opacity * weight * hudTexel(texcoord0 - deltaUV, lod).a;
+        }
+    }
+    return 1.0 - uncovered;
+}
+// Return one straight-alpha texel. The native texture combiner then applies
+// the same material and vertex fade to the complete decorated heart.
+vec4 sampleRupee(float lod) {
+    vec4 face = hudTexel(texcoord0, lod);
+    if (face.a == 1.0) return face;
+    float coverage;
+    vec3 pigment;
+    if (texcoord0_w < -0.4) {
+        // Outline the colored ink. Its black drop shadow shares the atlas cell.
+        float uncovered = 1.0;
+        for (int ring = 1; ring <= int(ceil(rupee_digit_outline.w)); ++ring) {
+            vec2 radius = min(float(ring), rupee_digit_outline.w) / vec2(256.0, 128.0);
+            for (int y = -1; y <= 1; ++y) for (int x = -1; x <= 1; ++x) {
+                if (x == 0 && y == 0) continue;
+                vec4 ink = hudTexel(texcoord0 + vec2(x,y) * radius, lod);
+                uncovered *= 1.0 - ink.a * max(ink.r, max(ink.g, ink.b));
+            }
+        }
+        coverage = 1.0 - uncovered;
+        pigment = rupee_digit_outline.rgb;
+    } else {
+        coverage = heartContourAlpha(3, lod);
+        pigment = heart_contour_color[3].rgb;
+    }
+    float rim = (1.0 - face.a) * coverage;
+    float alpha = face.a + rim;
+    return alpha > 0.0 ? vec4((face.rgb * face.a + pigment * rim) / alpha, alpha) : vec4(0.0);
+}
+vec4 sampleHeart(float lod) {
+    vec4 face = hudTexel(texcoord0, lod);
+    face.rgb = tintHeart(face.rgb, heart_pigment.rgb, heart_pigment.a);
+    if (face.a == 1.0) return face;
+    int outline = texcoord0_w < -0.2 ? 2 : 1;
+    float rim = (1.0 - face.a) * heartContourAlpha(outline, lod);
+    float shadow = (1.0 - face.a - rim) * heartContourAlpha(0, lod);
+    float alpha = face.a + rim + shadow;
+    vec3 premul = face.rgb * face.a + heart_contour_color[outline].rgb * rim + heart_contour_color[0].rgb * shadow;
+    return alpha > 0.0 ? vec4(premul / alpha, alpha) : vec4(0.0);
+}
+)";
+        }
+#endif
+    }
     for (u32 i = 0; i < 4; i++) {
         DefineTexUnitSampler(i);
     }
@@ -126,6 +216,17 @@ FragmentModule::FragmentModule(const FSConfig& config_, const UserConfig& user_,
 FragmentModule::~FragmentModule() = default;
 
 std::string FragmentModule::Generate() {
+    if (user.hud_colors) {
+        out += R"(
+float roundedBoxDistance(vec2 p, vec2 halfSize, float radius) {
+    vec2 q = abs(p) - halfSize + radius;
+    return length(max(q, vec2(0.0))) + min(max(q.x, q.y), 0.0) - radius;
+}
+float edgeCoverage(float distanceToEdge) {
+    return clamp(0.5 - distanceToEdge / max(fwidth(distanceToEdge), 0.0001), 0.0, 1.0);
+}
+)";
+    }
     // We round the interpolated primary color to the nearest 1/255th
     // This maintains the PICA's 8 bits of precision
     out += R"(
@@ -163,6 +264,50 @@ vec4 secondary_fragment_color = vec4(0.0);
     // Write shader source to emulate PICA TEV stages
     for (u32 index = 0; index < config.texture.tev_stages.size(); index++) {
         WriteTevStage(index);
+    }
+
+    if (user.hud_colors) {
+        // The magic fill's main RGBA4 texel is (2,15,2). Retain its brightness
+        // and any added white in the highlight, including between filtered texels.
+        // Heart silhouettes use the atlas only for alpha.
+        out += R"(
+bool clippedFill = texcoord0_w <= -6.0;
+if (texcoord0_w > 0.05 && texcoord0_w < 0.20 && view.x > 0.0) {
+    combiner_output.a *= edgeCoverage(roundedBoxDistance(texcoord1, texcoord2, view.x));
+} else if (clippedFill || texcoord0_w >= 1.0) {
+    float radius = clippedFill ? -texcoord0_w - 6.0 : texcoord0_w - 1.0;
+    combiner_output.a *= edgeCoverage(roundedBoxDistance(texcoord1, texcoord2, radius));
+}
+if (texcoord0_w > 0.25 && texcoord0_w < 0.75) {
+    // Replace the heart's red pigment while retaining neutral highlights and shading.
+    combiner_output.rgb = tintHeart(combiner_output.rgb, view, texcoord2.x);
+} else if (texcoord0_w < -4.5 && !clippedFill) {
+    float distanceToEdge = roundedBoxDistance(texcoord1, texcoord2, view.x);
+    float feather = max(view.y, 0.5 * max(fwidth(distanceToEdge), 0.0001));
+    combiner_output.a *= 1.0 - smoothstep(-feather, feather, distanceToEdge);
+    combiner_output.rgb = vec3(0.0);
+} else if (texcoord0_w < -3.5 && !clippedFill) {
+    float outer = roundedBoxDistance(texcoord1, texcoord2 + vec2(1.0), view.x);
+    float inner = roundedBoxDistance(texcoord1, texcoord2, max(view.x - 1.0, 0.0));
+    combiner_output.a *= edgeCoverage(outer) * (1.0 - edgeCoverage(inner))
+                      * mix(1.0, clamp(-outer, 0.0, 1.0), view.y);
+    combiner_output.rgb = rounded_primary_color.rgb;
+} else if (texcoord0_w < -2.5 && !clippedFill) {
+    // The bright digit and its black drop shadow share the same atlas cell.
+    // Use only the ink coverage, retaining the native vertex fade.
+    vec3 ink = sampleTexUnit0().rgb;
+    combiner_output.a *= max(ink.r, max(ink.g, ink.b));
+    combiner_output.rgb = rounded_primary_color.rgb;
+} else if (texcoord0_w < -1.5) {
+    vec3 source = combiner_output.rgb;
+    float peak = max(source.r, max(source.g, source.b));
+    float low = min(source.r, min(source.g, source.b));
+    float white = clamp((15.0 * low - 2.0 * peak) / 13.0, 0.0, peak);
+    combiner_output.rgb = view * (peak - white) + vec3(white);
+} else if (texcoord0_w < -0.5) {
+    combiner_output.rgb = rounded_primary_color.rgb;
+}
+)";
     }
 
     // Append the alpha test condition
@@ -829,8 +974,12 @@ void FragmentModule::WriteFog() {
            "float fog_factor = fog_lut_entry.r + fog_lut_entry.g * fog_f;\n"
            "fog_factor = clamp(fog_factor, 0.0, 1.0);\n";
 
-    // Blend the fog
-    out += "combiner_output.rgb = mix(fog_color.rgb, combiner_output.rgb, fog_factor);\n";
+    // The torch blends its light using source alpha. Attenuate its contribution
+    // with distance so fully fogged pixels reveal the terrain behind the flame.
+    if (user.torch_fog)
+        out += "combiner_output.a *= fog_factor;\n";
+    else
+        out += "combiner_output.rgb = mix(fog_color.rgb, combiner_output.rgb, fog_factor);\n";
 }
 
 void FragmentModule::WriteGas() {
@@ -1684,6 +1833,20 @@ void FragmentModule::DefineTexUnitSampler(u32 texture_unit) {
         out += "return vec4(0.0);\n}";
         return;
     }
+
+#ifdef ENABLE_OOT3D_PRESENTATION
+    if (texture_unit == 0 && user.hud_colors &&
+        config.texture.texture0_type == TexturingRegs::TextureConfig::Texture2D) {
+        out += R"(
+            // Solid magic-meter background, independent of the HUD atlas.
+            if (texcoord0_w > 0.05 && texcoord0_w < 0.20) return vec4(0.0, 0.0, 0.0, view.y);
+            if (texcoord0_w < -0.05 && texcoord0_w > -0.49) {
+                float lod = getLod(texcoord0 * vec2(textureSize(tex0, 0))) + tex_lod_bias[0];
+                return texcoord0_w < -0.35 ? sampleRupee(lod) : sampleHeart(lod);
+            }
+        )";
+    }
+#endif
 
     if (texture_unit < 3) {
         const u32 texcoord_num =

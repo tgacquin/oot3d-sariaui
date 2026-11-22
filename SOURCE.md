@@ -33,7 +33,7 @@ bash tools/oot3d/release/build.sh <target>
 
 The script builds in `build-release-<target>`, runs checks that do not require a game, and writes packages to `artifacts/`. Python is used by the build and packaging tools; players do not need it installed. No game dump is needed to build the application. Some additional developer checks require a separately acquired supported game dump and are not run by this workflow.
 
-Player builds enable `ENABLE_OOT3D_PRESENTATION` and `ENABLE_OOT3D_PLAYER_MODE`, and disable the MM3D presentation and game-folder options. They expose player settings through F1. The developer editor and F2 are unavailable in player builds. For developer builds, set `ENABLE_OOT3D_PLAYER_MODE=OFF`; existing internal target names and developer output paths retain the upstream names.
+Player builds enable `ENABLE_OOT3D_PRESENTATION` and `ENABLE_OOT3D_PLAYER_MODE`, and disable the MM3D presentation and game-folder options. They expose player settings through F1. In developer builds (`ENABLE_OOT3D_PLAYER_MODE=OFF`), F1 edits the presentation and F2 edits the running profile. Press F3 to choose defaults for new player profiles. F3 saves your choices to `src/oot3d/defaults/player.ini`. Build again to embed them, and include that file when committing a release.
 
 The shared version is stored in [resources/oot3d/release-version.txt](resources/oot3d/release-version.txt), initially `1.0.0`. Update and commit that file for each release. The workflow, artifact and package names, application version, and release metadata all use it. Versions such as `1.0.0-beta.1` are also supported. macOS and Windows numeric version fields use the three-part numeric portion; the full version is retained in the application and descriptive metadata.
 

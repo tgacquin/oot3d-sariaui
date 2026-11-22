@@ -38,7 +38,10 @@ u8 isItemOverrideActive                 = FALSE;
 u8 rActiveItemChestType                 = 0;
 static u16 rActiveItemObjectId          = 0;
 
+static Bool checkSariasGift;
+
 void ItemOverride_Init(void) {
+    checkSariasGift = FALSE;
     while (rItemOverrides[rItemOverrides_Count].key.all != 0) {
         rItemOverrides_Count++;
     }
@@ -663,13 +666,8 @@ Bool ItemOverride_DrawGetItem_ShouldSkipRotation() {
 }
 
 s32 ItemOverride_GiveSariasGift(void) {
-    u32 receivedGift = EventCheck(0xC1);
-    if (receivedGift == 0 &&
-        Entrance_SceneAndSpawnAre(0x5B, 0x09)) { // Kokiri Forest -> LW Bridge, index 05E0 in the entrance table
-        ItemOverride_PushDelayedOverride(DLYOVR_SARIA_GIFT);
-        EventSet(0xC1);
-    }
-
+    // Entrance setup can run before multiplayer has applied the host's flags.
+    checkSariasGift = Entrance_SceneAndSpawnAre(0x5B, 0x09);
     // return 1 to skip the cutscene
     return 1;
 }
@@ -692,6 +690,13 @@ void ItemOverride_PushDungeonReward(u8 dungeon) {
 }
 
 void ItemOverride_CheckStartingItem() {
+    if (checkSariasGift) {
+        checkSariasGift = FALSE;
+        if (!EventCheck(0xC1)) {
+            ItemOverride_PushDelayedOverride(DLYOVR_SARIA_GIFT);
+            EventSet(0xC1);
+        }
+    }
     // use eventChkInf[0] |= 0x0001 as the check for this
     if (EventCheck(0x00) == 0) {
         if (gSettingsContext.linksPocketItem != LINKSPOCKETITEM_DUNGEON_REWARD) {

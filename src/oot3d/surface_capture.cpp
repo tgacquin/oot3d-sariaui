@@ -36,7 +36,7 @@ QJsonObject DrawJSON(const Draw& d) {
     for (unsigned i = 0; i < d.input_count && i < d.inputs.size(); ++i)
         inputs.append(RowsJSON(d.inputs[i]));
     for(const auto& input:d.effect_inputs)effect_inputs.append(RowsJSON(input));
-    return {{"frame",double(d.frame)},{"time_us",double(d.time_us)},{"elapsed_ms",double(d.elapsed_ms)},
+    QJsonObject draw{{"frame",double(d.frame)},{"time_us",double(d.time_us)},{"elapsed_ms",double(d.elapsed_ms)},
         {"ordinal",double(d.ordinal)},{"generation",double(d.generation)},{"scene",double(d.scene)},
         {"shader",QString::number(d.shader,16)},{"swizzle",QString::number(d.swizzle,16)},
         {"target",double(d.target)},{"vertices",double(d.vertices)},{"vertex_base",double(d.vertex_base)},
@@ -52,6 +52,12 @@ QJsonObject DrawJSON(const Draw& d) {
         {"alpha_test",ValuesJSON(d.alpha_test)},{"depth",ValuesJSON(d.depth)},
         {"output_vertices",outputs},{"input_attributes",inputs},{"attribute_count",int(d.attribute_count)},
         {"effect_inputs",effect_inputs},{"effect_order",ValuesJSON(d.effect_order)}};
+    if (d.magic_fill) {
+        const auto& m=*d.magic_fill;
+        draw["magic_fill"]=QJsonObject{{"left",ValuesJSON(m.left)},{"right",ValuesJSON(m.right)},
+            {"replay_start",ValuesJSON(m.replay_start)},{"alpha",m.alpha},{"moving",m.moving}};
+    }
+    return draw;
 }
 }
 bool Export(const Packet& data, const std::string& path) {

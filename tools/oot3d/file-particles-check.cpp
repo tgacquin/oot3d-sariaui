@@ -12,6 +12,12 @@ template<unsigned Capacity>
 void CheckGeometry(const OOT3D::PausePrompts::QuadGeometry<Capacity>& g,float width) {
     assert(g.count<=Capacity);
     for(unsigned q=0;q<g.count;++q)for(unsigned v=0;v<4;++v) {
+        if(g.colors[q*16+3]==0) {
+            // An unused slot has zero-area geometry and cannot become visible.
+            assert(g.colors[q*16+v*4+3]==0 && g.positions[q*12+v*3]==0 &&
+                   g.positions[q*12+v*3+1]==0);
+            continue;
+        }
         const auto p=q*12+v*3;
         assert(std::isfinite(g.positions[p]) && g.positions[p]>=(400-width)/2-.001f);
         assert(g.positions[p]<=(400+width)/2+.001f);
@@ -60,6 +66,25 @@ int main(int argc,char** argv) {
         for(double time:{0.,.016,10.,35.,100.,3599.999,3600.001,1e6})
             CheckGeometry(Draw(s,time,1,width),width);
     }
+    // Removing a mote must leave every earlier mote in the same mesh slots,
+    // including across fades and clipped sprites at the edge of the screen.
+    s={};s.density=44;
+    unsigned visible_removals=0;
+    for(unsigned tick=0;tick<180;++tick) {
+        const double seconds=tick/60.;
+        const auto all=Draw(s,seconds,1,400);
+        const auto fewer=Draw(s,seconds,1,400,-1,43);
+        const unsigned removed=MaxParticles+4*43;
+        visible_removals+=all.colors[(removed+1)*16+3]>0;
+        for(unsigned q=0;q<removed;++q) {
+            if(q==43)continue; // The removed mote's light pool.
+            assert(std::equal(all.positions.begin()+q*12,all.positions.begin()+(q+1)*12,
+                              fewer.positions.begin()+q*12));
+            assert(std::equal(all.colors.begin()+q*16,all.colors.begin()+(q+1)*16,
+                              fewer.colors.begin()+q*16));
+        }
+    }
+    assert(visible_removals);
     // Dungeon maps have three times the capacity; other menus retain 64.
     s={};s.density=DungeonMaxParticles;
     const auto dense=Draw<DungeonMaxParticles>(s,10,1,400);
@@ -78,7 +103,11 @@ int main(int argc,char** argv) {
     s={};assert(Draw(s,10,1,400).count>0);
     s.enabled=false;assert(!Draw(s,10,1,400).count);
     s={};s.glow=0;s.light_strength=0;
-    const auto core=Draw(s,10,1,400);assert(core.count>0 && core.count<=unsigned(s.density)*3);
+    const auto core=Draw(s,10,1,400);assert(core.count>0);
+    for(unsigned i=0;i<MaxParticles;++i) {
+        assert(core.colors[i*16+3]==0);
+        assert(core.colors[(MaxParticles+4*i)*16+3]==0);
+    }
     s.size=std::numeric_limits<float>::quiet_NaN();assert(!Draw(s,10,1,400).count);
     s={};assert(!Draw(s,std::numeric_limits<double>::infinity(),1,400).count);
 
@@ -108,7 +137,7 @@ int main(int argc,char** argv) {
     // adjacent atlas cell, and stay inside the viewport after polygon clipping.
     for(float x:{-20.f,0.f,200.f,400.f,420.f})for(float y:{0.f,120.f,240.f})
         for(float angle:{0.f,.3f,.8f,1.5f}) {
-            Geometry g;AddSprite(g,x,y,80,.65f,angle,1,{1,1,1},0,400);
+            Geometry g;AddSprite(g,0,x,y,80,.65f,angle,1,{1,1,1},0,400);
             CheckGeometry(g,400);assert(g.count<=3);
             for(unsigned j=0;j<g.count*8;j+=2)assert(g.uvs[j]<=63.5f/Width+.00001f);
         }

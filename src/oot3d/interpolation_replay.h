@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "oot3d/interpolation_state.h"
+#include "oot3d/gyro_aim.h"
 namespace OOT3D::Interpolation {
 constexpr std::uint64_t ModelShader=0x6352a3be33cb99c6ULL, ModelSwizzle=0xba817d0ef27276d0ULL;
 // CmbVShader.shbin's DVLE uniform table (register numbers minus the 16 inputs):
@@ -145,7 +146,15 @@ public:
             ready=std::isfinite(d) && std::isfinite(a) && distance<=double(d)*d &&
                 (trace-1)/2>=std::cos(a*3.141592653589793/180.);
             if(ready) {
-                delta=Math::Multiply(Math::InverseRigid(Math::Blend(previous_camera,camera,sample_fraction)),camera);
+                auto view=Math::Blend(previous_camera,camera,sample_fraction);
+                if(GyroAim::enabled.load() && sample.aim_mode && sample.aim_mode==previous_sample.aim_mode) {
+                    const float rotation=GyroAim::history.RotationPhase(sample.epoch,previous_sample.time,sample.time,sample_fraction);
+                    if(rotation!=sample_fraction) {
+                        const auto aim=Math::Blend(previous_camera,camera,rotation);
+                        for(unsigned r=0;r<3;++r)for(unsigned c=0;c<3;++c)view[r][c]=aim[r][c];
+                    }
+                }
+                delta=Math::Multiply(Math::InverseRigid(view),camera);
                 for(unsigned r=0;r<4;++r)for(unsigned c=0;c<4;++c)
                     midpoint_lens[r][c]=SampleMix(lens[r][c],projection[r][c]);
                 failure=ReplayFailure::None;
@@ -206,7 +215,8 @@ struct ReplayFrame {
     std::optional<std::uint64_t> frame;
     std::uint32_t target{};
     unsigned epoch{};
-    bool failed{},world{};
+    bool failed{},world{},menu{};
+    MenuPage page=MenuPage::None;
     void Reset() {*this={};}
     void Fail(ReplayFailure reason) {
         if(!failed) {++replay_failures[unsigned(reason)];last_failure=reason;}
@@ -214,14 +224,14 @@ struct ReplayFrame {
     }
     bool Begin(std::uint64_t next,std::uint32_t address) {
         if(frame!=next || epoch!=generation.load()) {
-            *this={next,address,generation.load(),false,false};return true;
+            *this={next,address,generation.load(),false,false,false,menu_page.load()};return true;
         }
         if(target!=address)Fail(ReplayFailure::Target);
         return false;
     }
     bool Complete(std::uint64_t completed) const {
         return Replaying() && frame && completed && *frame==completed-1 &&
-            epoch==generation.load() && world && !failed;
+            epoch==generation.load() && page==menu_page.load() && (world || menu) && !failed;
     }
 };
 }

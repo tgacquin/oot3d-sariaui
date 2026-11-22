@@ -216,15 +216,16 @@ std::optional<Package> DecodePackage(const QJsonObject& input) {
     const bool before_expansion = runtime == QLatin1String("420dc8bca60d1b0ee9ae30f1f76e4b67da092faa655d9085372b03640bcc8440");
     const bool before_player_color = runtime == QLatin1String("2eaf0c69859e7ad7298187b37dcc2f578f1f9c33427eaf92aee0f9b2f20c4101");
     const bool before_new_file_sword_fix = runtime == QLatin1String("35a86e8871a00fc7e29cb480923e99855fa182a4c2b58dcf0a81452445e7b520");
+    const bool before_join_snapshot = runtime == QLatin1String("ba30b13024a141fcb27903e5ed908bb5f42ecfa45eb03665e6fbb367f9ca84c6");
     if ((object.value("format").toInt() == 1 &&
         (first_runtime || before_time_travel_fix || before_hook_abi_fix || before_native_alignment_fix || before_expansion)) ||
-        ((before_player_color || before_new_file_sword_fix) &&
+        ((before_join_snapshot || before_player_color || before_new_file_sword_fix) &&
          (object.value("format").toInt()==1 || object.value("format").toInt()==2))) {
         const auto decoded = QByteArray::fromBase64Encoding(object.value("message_entries").toString().toLatin1(),
                                                             QByteArray::AbortOnBase64DecodingErrors);
         if (!decoded || decoded.decoded.size() % 0x60) return {};
         auto entries = decoded.decoded;
-        const std::uint32_t old_message_at = before_new_file_sword_fix?6668481:before_player_color?6665565:GuestBase +
+        const std::uint32_t old_message_at = before_join_snapshot?6668593:before_new_file_sword_fix?6668481:before_player_color?6665565:GuestBase +
             (first_runtime ? 600985 : before_time_travel_fix ? 601257 :
              before_hook_abi_fix ? 601273 : 605433);
         const auto new_message_at = data.Find("rCustomMessages").address;
@@ -395,9 +396,21 @@ int PrepareNew(unsigned slot, bool mq) {
         // Decode/validate the payload and probe save-folder permissions on the
         // worker too. Neither JSON expansion nor filesystem sync belongs in a
         // file-menu update on the emulation thread.
-        auto result = DecodePackage(ReadJson(temp.filePath("seed.json")));
+        const auto output = ReadJson(temp.filePath("seed.json"));
+        auto result = DecodePackage(output);
         if (cancelled->load()) return {};
-        if (!result) { SetError(FileStatus::Error::Incompatible,"Generated seed did not match the bundled runtime."); return {}; }
+        if (!result) {
+            const auto runtime = output.value("runtime").toString().toLatin1();
+            if (!runtime.isEmpty() && runtime != Data().digest) {
+                SetError(FileStatus::Error::GeneratorMismatch,
+                         "Seed generator runtime " + runtime.toStdString() +
+                         " differs from running game runtime " + Data().digest.toStdString() + ".");
+            } else {
+                SetError(FileStatus::Error::Generation,
+                         "The seed generator returned a package that failed validation.");
+            }
+            return {};
+        }
         if (!CanStore(slot) || cancelled->load()) return {};
         return result;
     });

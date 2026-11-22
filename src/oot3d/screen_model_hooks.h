@@ -90,31 +90,7 @@ template<class M> std::optional<unsigned> MessageElement(M& m,U32 model,bool vis
     }
     return {};
 }
-// Native top-screen timer and minigame controllers own separate models.
-// Scope their draw transform by ownership; do not affect shared digit atlases
-// used by item ammunition, pause menus or other counters.
-template<class M> std::optional<HUD::Element> ExtraHUDModel(M& m,U32 model) {
-    if(!Pointer(model,0x1e4) || m.Read(model)!=std::optional<U32>{0x4ebd60})return {};
-    const auto number=[&](U32 owner) {
-        return Pointer(owner,0x14) && m.Read(owner+0x10)==std::optional<U32>{model};
-    };
-    if(const auto auxiliary=HUD::AuxiliaryModel(m,model))return auxiliary;
-    if(number(m.Read(HUD::Action+0x2c).value_or(0)))return HUD::Timer;
-    if(number(m.Read(HUD::Action+0x30).value_or(0)))return HUD::Minigame;
-    const U32 owner=m.Read(HUD::Action+0x40).value_or(0);
-    if(!Pointer(owner,0x534))return {};
-    if(m.Read(owner+8)==std::optional<U32>{model})return HUD::Minigame;
-    const U32 kind=m.Read(owner+0x428).value_or(0xffffffff);
-    if(kind<2) {
-        const unsigned count=m.Read(owner+0x224).value_or(0);
-        if(count>64)return {};
-        for(unsigned i=0;i<count;++i)
-            if(number(m.Read(owner+0xc+i*4).value_or(0)))return HUD::Minigame;
-    } else if(kind==2 || kind==3 || kind==5 || kind==6) {
-        if(number(m.Read(owner+0xc).value_or(0)))return HUD::Minigame;
-    }
-    return {};
-}
+using HUD::ExtraHUDModel;
 template<class M> bool HideSpecialBWhenPaused(M& m,U32 model) {
     return HUD::UsesBLayout(m) && ExtraHUDModel(m,model)==HUD::Minigame;
 }

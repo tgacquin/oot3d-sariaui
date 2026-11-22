@@ -1,0 +1,21 @@
+name: SariaUI instruction hook checks
+
+on: [push, pull_request, workflow_call, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Check dev instruction addresses
+        run: python3 tools/oot3d/check_hook_sites.py --mode dev
+      - name: Check player instruction addresses
+        run: python3 tools/oot3d/check_hook_sites.py --mode player
+      - name: Exercise collision detection
+        run: python3 -m unittest discover -s tools/oot3d -p test_hook_sites.py

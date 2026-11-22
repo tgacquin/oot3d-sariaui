@@ -6,9 +6,9 @@
 
 namespace OOT3D::PauseShadow {
 using TitleScreen::U32;
-// Background edge/dimmer plus two eight-piece gear shadows. Clipping each
-// piece against the other panel can split it into at most four rectangles.
-constexpr U32 Quads=66, Descriptor=0x1c0, Positions=0x2e0, UVs=Positions+Quads*48,
+// Four background quads, up to sixteen clipped gradient pieces, and two eight-piece
+// gear shadows that can each split into four rectangles per piece.
+constexpr U32 Quads=84, Descriptor=0x1c0, Positions=0x2e0, UVs=Positions+Quads*48,
     Colors=UVs+Quads*32, Indices=Colors+Quads*64, Cookie=(Indices+Quads*12+15)&~15u,
     AllocationSize=(Cookie+16+63)&~31u;
 constexpr U32 Magic=0x4f534831;
@@ -60,6 +60,33 @@ template<class M> std::optional<Rect> Bounds(M& m,U32 vertices,unsigned count,U3
         b.top=std::min(b.top,y);b.bottom=std::max(b.bottom,y);
     }
     return b;
+}
+// Record the plate only when it is actually drawn. The view already contains
+// the editor pose and any opening or retained closing animation.
+template<class M> void ObserveTextbox(M& m,U32 model,U32 view,std::optional<Rect>& bounds) {
+    const U32 pane=m.Read(ScreenModels::Message+0x56c).value_or(0);
+    if(!TitleScreen::Pointer(pane,0xb4) || m.Read(pane+0x64)!=model || m.Read(pane)!=0x4ed234 ||
+       m.Read(pane+4)!=ScreenModels::Message+0x168 || m.Read(model)!=0x4ebd60)return;
+    const U32 mesh=m.Read(model+4).value_or(0),desc=m.Read(mesh).value_or(0);
+    const auto count=m.Read(desc+12),slot=m.Read(mesh+0x124);
+    if(!count || (*count!=0 && *count!=4) || !slot || *slot>=2)return;
+    const U32 live=m.Read(mesh+0x1a0+4*(*slot)).value_or(0);
+    std::array<float,12> vertices,pose,camera;
+    if(!TitleScreen::Pointer(live,48) || !TitleScreen::ReadFloats(m,live,vertices) ||
+       !TitleScreen::ReadFloats(m,model+12,pose) || !TitleScreen::ReadFloats(m,view,camera))return;
+    Rect box{1e9f,1e9f,-1e9f,-1e9f};
+    for(unsigned i=0;i<12;i+=3) {
+        std::array<float,3> world{};
+        for(unsigned row=0;row<3;++row) {
+            const auto* r=pose.data()+row*4;
+            world[row]=r[0]*vertices[i]+r[1]*vertices[i+1]+r[2]*vertices[i+2]+r[3];
+        }
+        const float x=camera[0]*world[0]+camera[1]*world[1]+camera[2]*world[2]+camera[3];
+        const float y=camera[4]*world[0]+camera[5]*world[1]+camera[6]*world[2]+camera[7];
+        box.left=std::min(box.left,x);box.right=std::max(box.right,x);
+        box.top=std::min(box.top,y);box.bottom=std::max(box.bottom,y);
+    }
+    if(box.right>box.left && box.bottom>box.top)bounds=box;
 }
 inline Rect ToTop(Rect b,const PauseMenu::Pose& p) {
     const auto point=[&](float x,float y) {
@@ -178,13 +205,13 @@ template<unsigned N> void Perimeter(MeshGeometry<N>& g,Rect box,float depth,floa
 }
 // Remove the neighboring green rectangle from a shadow. Interpolate its UVs
 // and alpha when clipping, preserving the existing falloff instead of squeezing it.
-template<unsigned N> void ClipShadow(Geometry& out,const MeshGeometry<N>& source,unsigned q,Rect obstacle) {
+template<unsigned N,unsigned Capacity> void ClipShadow(MeshGeometry<Capacity>& out,const MeshGeometry<N>& source,unsigned q,Rect obstacle) {
     const auto* v=source.positions.data()+q*12;
     const Rect b{v[0],v[4],v[6],v[1]};
     const float left=std::max(b.left,obstacle.left),right=std::min(b.right,obstacle.right);
     const float top=std::max(b.top,obstacle.top),bottom=std::min(b.bottom,obstacle.bottom);
     const auto add=[&](Rect r) {
-        if(r.right<=r.left || r.bottom<=r.top || out.count>=Quads)return;
+        if(r.right<=r.left || r.bottom<=r.top || out.count>=Capacity)return;
         const unsigned dst=out.count;out.Add(r,1);
         for(unsigned i=0;i<4;++i) {
             const float x=(out.positions[dst*12+i*3]-b.left)/(b.right-b.left);
@@ -245,7 +272,25 @@ template<class M> void ItemPanel(M& m,Geometry& g,const PauseMenu::Layout& layou
     Perimeter(g,box,depth,opacity);
 }
 
-template<class M> Geometry Panels(M& m,const PauseMenu::Layout& layout) {
+inline void BottomCorners(Geometry& g,Rect panel,const PauseMenu::BackgroundVignette& settings,float visibility) {
+    if(!settings.enabled)return;
+    const float screen_width=Widescreen::Active()?240*Widescreen::Aspect:400;
+    const float left=std::max(panel.left,(400-screen_width)/2);
+    const float right=std::min(panel.right,(400+screen_width)/2);
+    const float top=std::max(panel.top,0.f),bottom=std::min(panel.bottom,240.f);
+    const float width=(right-left)*std::clamp(settings.width_percent,0.f,50.f)/100;
+    const float height=(bottom-top)*std::clamp(settings.height_percent,0.f,100.f)/100;
+    const float opacity=settings.opacity*std::clamp(visibility,0.f,1.f);
+    for(bool left_corner:{true,false}) {
+        const unsigned q=g.count;
+        const float x=left_corner?left:right-width;
+        g.Add({x,bottom-height,x+width,bottom},opacity,left_corner,false,!left_corner);
+        if(g.count>q)g.colors[q*16+7]=g.colors[q*16+15]=0;
+    }
+}
+
+template<class M> Geometry Panels(M& m,const PauseMenu::Layout& layout,float visibility=1,
+                                std::optional<Rect> textbox={}) {
     Geometry g;
     // The independent top-screen pass now owns this shade after teardown.
     if(SaveMenu::QuitTransition(m))return g;
@@ -261,6 +306,7 @@ template<class M> Geometry Panels(M& m,const PauseMenu::Layout& layout) {
     // storage. Read the currently published GPU vertex buffer instead.
     const U32 current=m.Read(mesh+0x124).value_or(2);
     const U32 live=current<2?m.Read(mesh+0x1a0+4*current).value_or(0):0;
+    Rect brown_panel{};
     if(auto b=Bounds(m,live,m.Read(desc+0xc).value_or(4),bg)) {
         if(PauseMenu::MapPage(m)) {
             for(unsigned side=0;side<2;++side) {
@@ -272,12 +318,31 @@ template<class M> Geometry Panels(M& m,const PauseMenu::Layout& layout) {
             return g;
         }
         auto pose=layout[PauseMenu::Background];pose.x+=PauseMenu::motion_x.load();
-        auto box=ToTop(*b,pose);
-        if(layout.stack_background)box.top-=240*PauseMenu::Scale*layout[PauseMenu::Background].scale;
+        brown_panel=ToTop(*b,pose);
+        if(layout.stack_background)brown_panel.top-=240*PauseMenu::Scale*pose.scale;
+    }
+    if(layout.bottom_gradient && PausePrompts::CurrentPage(m)!=PausePrompts::Page::Map) {
+        const float screen_width=Widescreen::Active()?240*Widescreen::Aspect:400;
+        const float width=screen_width*(std::clamp(layout.bottom_gradient_width_percent,0.f,100.f)/100.f);
+        const float height=std::clamp(layout.bottom_gradient_height,1.f,240.f);
+        MeshGeometry<1> gradient;
+        gradient.Add({(400-width)/2,240-height,(400+width)/2,240},
+                     layout.bottom_gradient_opacity*visibility,false,true);
+        if(gradient.count) {
+            gradient.colors[7]=gradient.colors[15]=0; // Transparent top vertices.
+            if(textbox) {
+                MeshGeometry<4> pieces;
+                ClipShadow(pieces,gradient,0,brown_panel);
+                for(unsigned q=0;q<pieces.count;++q)ClipShadow(g,pieces,q,*textbox);
+            } else ClipShadow(g,gradient,0,brown_panel);
+        }
+    }
+    if(brown_panel.right>brown_panel.left && brown_panel.bottom>brown_panel.top) {
         // Both stacked backgrounds share one exterior edge, with no dark seam.
         const float depth=Depth*Width(layout.background_shadow)*layout[PauseMenu::Background].scale;
-        g.Add({box.right,box.top,box.right+depth,box.bottom},Opacity(layout.background_shadow),true);
-        g.Add(box,layout.background_darkness,false,true);
+        g.Add({brown_panel.right,brown_panel.top,brown_panel.right+depth,brown_panel.bottom},Opacity(layout.background_shadow),true);
+        g.Add(brown_panel,layout.background_darkness,false,true);
+        BottomCorners(g,brown_panel,layout.background_vignette,visibility);
     }
     if(PauseMenu::Active(m) && m.Read(0x50446c+0x18).value_or(0)!=0) {
         const U32 helper=m.Read(0x50446c+0xc).value_or(0);

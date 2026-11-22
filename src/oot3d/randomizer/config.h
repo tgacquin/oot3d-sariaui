@@ -93,6 +93,7 @@ struct Config {
 inline Config NewFileConfig() {
     Config value;
     value.advanced["MP_Enabled"] = 1;
+    value.advanced["MP_SharedProgress"] = 1;
     return value;
 }
 inline Config Sanitize(Config value) {

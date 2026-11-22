@@ -87,8 +87,14 @@ template<class M> float EffectiveFov(M& memory, U32 view, float native, float co
     // Use the loaded scene, including when an entrance has been randomized.
     const auto scene = memory.Read(view - 0x188 + 0x104);
     const U32 id = scene ? (*scene & 0xffff) : ~U32{0};
-    // Link's house; Temple of Time exterior (adult ruins); Kokiri Shop.
-    float ceiling = id == 0x34 ? 55.f : id == 0x25 ? 56.f : id == 0x2d ? 58.f : 0.f;
+    float ceiling = 0.f;
+    switch (id) {
+    case 0x23: // Temple of Time courtyard, child day and night.
+    case 0x24: ceiling = 62.f; break;
+    case 0x25: ceiling = 56.f; break; // Adult ruins.
+    case 0x2d: ceiling = 58.f; break; // Kokiri Shop.
+    case 0x34: ceiling = 55.f; break; // Link's house.
+    }
     if (FirstPersonView(memory, view))
         ceiling = ceiling ? std::min(ceiling, FirstPersonMaximumFov) : FirstPersonMaximumFov;
     if (ceiling) configured = std::min(Sanitize(configured), ceiling);

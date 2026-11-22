@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "oot3d/pause_input.h"
+#include "oot3d/game_control_options.h"
 #include "oot3d/pause_framerate.h"
 #include "oot3d/pause_shadow.h"
 #include "oot3d/screen_model_hooks.h"
@@ -15,6 +16,10 @@ struct Memory {
     std::map<U32,U32> words;
     std::optional<U32> Read(U32 a) {auto i=words.find(a);return i==words.end()?std::nullopt:std::optional<U32>{i->second};}
     void Write(U32 a,U32 v) {assert(words.contains(a));words[a]=v;}
+    void Write8(U32 a,std::uint8_t v) {
+        auto& word=words.at(a&~3u);const auto shift=8*(a&3);
+        word=(word&~(255u<<shift))|(U32(v)<<shift);
+    }
     float F(U32 a) {return std::bit_cast<float>(words.at(a));}
 };
 int main(int argc,char** argv) {
@@ -104,9 +109,43 @@ int main(int argc,char** argv) {
             m.words[src+q*48+4*i]=std::bit_cast<U32>(v[i]);m.words[dst+q*48+4*i]=0;
         }
     }
+    {
+        namespace C=GameControlOptions;
+        const auto original=m.words;
+        assert(PauseFramerate::CodeMatches(m));
+        // Edits made at the title/file menu take effect on every loaded file.
+        m.words[PauseMenu::UI+0xc]=0;
+        C::hold_targeting=true;C::invert_camera_y=true;C::motion_controls=false;
+        const auto title=m.words;
+        C::Update(m);assert(m.words==title);
+        m.words[PauseMenu::UI+0xc]=play;
+        for(U32 slot:{0u,1u,2u})for(U32 quest:{0u,1u}) {
+            m.words[C::Save+0x14dc]=slot;
+            m.words[C::Save+0x2c]=0xabcd00ef;
+            m.words[C::Save+0x13d8]=0x87654300;
+            m.words[C::Save+0x0c]=(quest<<16)|0x2345;
+            C::Update(m);
+            assert(m.Read(C::Save+0x2c)==0xabcd01ef && m.Read(C::Save+0x13d8)==0x87654301 &&
+                   m.Read(C::Save+0x0c)==((quest<<16)|0x01002345));
+        }
+        // Editing during gameplay takes effect without another file load or save.
+        C::hold_targeting=false;C::invert_camera_y=false;C::motion_controls=true;
+        C::Update(m);
+        assert(m.Read(C::Save+0x2c)==0xabcd00ef && m.Read(C::Save+0x13d8)==0x87654300 &&
+               m.Read(C::Save+0x0c)==0x00012345);
+        PauseFramerate::Hook clock;
+        std::array<U32,16> regs{};std::array<U32,64> fp{};U32 flags=0;
+        regs[4]=SaveMenu::Owner;m.words[regs[4]+0x38]=1;
+        m.words[regs[4]+0x34]=0;
+        clock.Handle(m,regs,fp,flags,38);
+        assert(regs[15]==0x4395e8 && m.Read(regs[4]+0x38)==0 && m.Read(regs[4]+0x34)==0);
+        clock.Handle(m,regs,fp,flags,39);assert(regs[15]==0x439720);
+        m.words=original;
+    }
     SaveMenu::SetLayout({},false);
     assert(PauseMenu::CopyPositions(m,mesh,dst,src,78*48));
-    for(unsigned i=0;i<43*12;++i)assert(m.words[dst+4*i]==m.words[src+4*i]);
+    for(unsigned i=0;i<43*12;++i)if(SaveMenu::AtlasPart(i/12,false)!=SaveMenu::Options)
+        assert(m.words[dst+4*i]==m.words[src+4*i]);
     const auto collapsed=[&](unsigned q) {
         for(unsigned i=3;i<12;i+=3)for(unsigned axis=0;axis<3;++axis)
             if(m.words[dst+48*q+4*(i+axis)]!=m.words[dst+48*q+4*axis])return false;
@@ -128,6 +167,7 @@ int main(int argc,char** argv) {
     assert(PauseMenu::CopyPositions(m,mesh,dst,src,78*48));
     for(unsigned q:{15u,16u,17u,37u,38u,39u,18u,19u,20u,21u,40u,41u,42u}) {
         const auto part=SaveMenu::AtlasPart(q,false);assert(part);
+        if(*part==SaveMenu::Options){assert(collapsed(q));continue;}
         const auto p=SaveMenu::Move(m.F(src+48*q),m.F(src+48*q+4),*part,layout[*part]);
         assert(m.F(dst+48*q)==p[0] && m.F(dst+48*q+4)==p[1]);
     }
@@ -136,6 +176,7 @@ int main(int argc,char** argv) {
         const auto a=SaveMenu::Anchors[part],p=SaveMenu::Move(a[0],a[1],part,layout[part]);
         const auto hit=SaveMenu::MapPointer(.5f+(p[0]-160)*.8f/width,
             .5f+((p[1]-120)*.8f+18)/240,width,layout);
+        if(part==SaveMenu::Options){assert(!hit);continue;}
         assert(hit && std::abs((*hit)[0]-a[0]/320)<.0001f && std::abs((*hit)[1]-a[1]/240)<.0001f);
     }
     assert(!SaveMenu::MapPointer(.5f,.1f,400,layout));
@@ -211,7 +252,7 @@ int main(int argc,char** argv) {
     quad(43,-310,25,16,48);quad(64,2,266,8,36);
     assert(PauseMenu::CopyPositions(m,mesh,dst,src,78*48) && collapsed(43) && collapsed(64));
     assert(SaveMenu::CurrentInputPage(m)==SaveMenu::InputPage::Hidden);
-    // Cursor is suppressed for every transition, follows Options on the save
+    // Cursor is suppressed for every transition, stays hidden on the removed Options row of the save
     // page, and never inherits a Save pose on the actual Options page.
     constexpr U32 cursor=0x8600000,cursor_mesh=0x8700000;
     m.words[SaveMenu::Owner+0x18]=cursor;m.words[cursor]=cursor_mesh;
@@ -224,8 +265,7 @@ int main(int argc,char** argv) {
     }
     m.words[SaveMenu::Owner+0x24]=1;
     assert(SaveMenu::CopyPositions(m,cursor_mesh,dst,src,8*48));
-    const auto option_corner=SaveMenu::Move(108,200,SaveMenu::Options,layout[SaveMenu::Options]);
-    assert(m.F(dst)==option_corner[0] && m.F(dst+4)==option_corner[1]);
+    assert(collapsed(0));
     m.words[SaveMenu::Owner+0x28]=3;m.words[SaveMenu::Owner+0x3c]=2;
     assert(SaveMenu::CopyPositions(m,cursor_mesh,dst,src,8*48));
     const auto cursor_corner=SaveMenu::Move(108,200,SaveMenu::OptionsItems,layout[SaveMenu::OptionsItems]);
@@ -426,11 +466,10 @@ int main(int argc,char** argv) {
     const auto prompt=SaveMenu::MoveControl(12,4,SaveMenu::Prompt,layout);
     assert(m.F(dst+6*48)==stone[0] && m.F(dst+6*48+4)==stone[1]+motion.rise);
     assert(m.F(dst)==prompt[0] && m.F(dst+4)==prompt[1]);
-    // Options loses its larger native footer slide and shares the stones' rise.
+    // Options stays hidden during the opening animation.
     quad(18,112,236,24,32);m.words[offsets+18*8+4]=std::bit_cast<U32>(32.f);
     assert(SaveMenu::CopyPositions(m,mesh,dst,src,78*48));
-    const auto options=SaveMenu::MoveControl(112,204,SaveMenu::Options,layout);
-    assert(m.F(dst+18*48)==options[0] && m.F(dst+18*48+4)==options[1]+motion.rise);
+    assert(collapsed(18));
     // Options rows and footer stones replace different native slide axes.
     m.words[SaveMenu::Owner+0x28]=3;m.words[SaveMenu::Owner+0x3c]=1;
     quad(43,170,25,40,32);m.words[offsets+43*8]=std::bit_cast<U32>(160.f);

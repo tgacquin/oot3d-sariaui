@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
     Check(temporary.isValid());
     const auto root = temporary.path();
     using namespace OOT3D::ReleaseDefaults;
-    Check(Prepare(root + "/fresh"));
+    Check(Prepare(root + "/fresh", false));
     QSettings qt(root + "/fresh/qt-config.ini", QSettings::IniFormat);
     QSettings editor(root + "/fresh/oot3d-editor.ini", QSettings::IniFormat);
     Check(qt.value("Renderer/resolution_factor").toInt() == 3);
@@ -34,6 +34,9 @@ int main(int argc, char** argv) {
     Check(qt.value("Renderer/use_shader_jit").toBool());
     Check(!editor.value("Interpolation/match_refresh_rate").toBool());
     Check(editor.value("Graphics/widescreen").toBool());
+    Check(editor.value("Graphics/actor_draw_distance").toFloat() == 3.75f);
+    Check(editor.value("PauseScreen/dungeon_floor_line/width").toInt() == 42);
+    Check(editor.value("PauseScreen/dungeon_floors/grow_selected").toBool());
     Check(editor.value("Graphics/font_mode").toInt() == 1);
     Check(editor.value("TitleScreen/press_start/x").toFloat() == 400);
     Check(editor.value("FileSelect/name_entry/custom/enabled").toBool());
@@ -48,6 +51,30 @@ int main(int argc, char** argv) {
         Check(!key.startsWith("WebService/") && !key.startsWith("Controls/") &&
               !key.startsWith("Data Storage/") && !key.startsWith("UI/"));
     }
+
+    // F3 writes are embedded only for fresh player profiles. Compare the
+    // actual selected values so authoring a new release never breaks this test.
+    Check(Prepare(root + "/player",true));
+    QSettings player_editor(root + "/player/oot3d-editor.ini",QSettings::IniFormat);
+    QSettings player_qt(root + "/player/qt-config.ini",QSettings::IniFormat);
+    QSettings choices(":/oot3d/defaults/player.ini",QSettings::IniFormat);
+    for (const auto& group : {QStringLiteral("presentation"),QStringLiteral("runtime")}) {
+        choices.beginGroup(group);
+        auto& destination=group=="presentation" ? player_editor : player_qt;
+        for(const auto& key:choices.allKeys()) {
+            if(key.startsWith("UI/Shortcuts/") && key.endsWith("/KeySeq"))
+                Check(QKeySequence::fromString(destination.value(key).toString(),QKeySequence::NativeText)==
+                      QKeySequence::fromString(choices.value(key).toString(),QKeySequence::PortableText));
+            else Check(destination.value(key)==choices.value(key));
+        }
+        choices.endGroup();
+    }
+    player_editor.setValue("Graphics/bloom",!player_editor.value("Graphics/bloom").toBool());
+    const bool selected_bloom=player_editor.value("Graphics/bloom").toBool();
+    player_editor.sync();
+    Check(Prepare(root + "/player",true));
+    player_editor.sync();
+    Check(player_editor.value("Graphics/bloom").toBool()==selected_bloom);
 
     // Actual asset loaders must restore authored geometry without local files.
     FileUtil::UpdateUserPath(FileUtil::UserPath::ConfigDir, (root + "/fresh/").toStdString());
@@ -97,7 +124,7 @@ int main(int argc, char** argv) {
     qt.setValue(VersionKey, 1); qt.setValue("Renderer/resolution_factor", 1);
     qt.setValue("Renderer/resolution_factor/default", true); qt.sync();
     editor.setValue(VersionKey, 1); editor.setValue("PausePrompts/map_return/x", 69.5); editor.sync();
-    Check(Prepare(root + "/fresh")); qt.sync(); editor.sync();
+    Check(Prepare(root + "/fresh", false)); qt.sync(); editor.sync();
     Check(qt.value("Renderer/resolution_factor").toInt() == 1);
     Check(editor.value("PausePrompts/map_return/x").toInt() == 69);
 
@@ -115,7 +142,7 @@ int main(int argc, char** argv) {
     old_editor.setValue("PauseScreen/map/y", 0);
     old_editor.setValue("PauseScreen/map/scale", 1);
     old_editor.sync();
-    Check(Prepare(root + "/old-beta"));
+    Check(Prepare(root + "/old-beta", false));
     old_qt.sync(); old_editor.sync();
     Check(old_qt.value("Renderer/resolution_factor").toInt() == 3);
     Check(!old_qt.value("Audio/enable_audio_stretching").toBool());
@@ -134,7 +161,7 @@ int main(int argc, char** argv) {
     edited.setValue("UserHUD/hearts/x", 13);
     edited.setValue("Randomizer/seed", "keep existing");
     edited.sync();
-    Check(Prepare(root + "/edited"));
+    Check(Prepare(root + "/edited", false));
     edited_qt.sync(); edited.sync();
     Check(edited_qt.value("Renderer/resolution_factor").toInt() == 5);
     Check(edited.value("PauseScreen/map/x").toInt() == 0);
@@ -150,7 +177,7 @@ int main(int argc, char** argv) {
     qt.sync();
     editor.setValue("Interpolation/target_fps", 90);
     editor.sync();
-    Check(Prepare(root + "/fresh"));
+    Check(Prepare(root + "/fresh", false));
     qt.sync(); editor.sync();
     Check(qt.value("Renderer/resolution_factor").toInt() == 1);
     Check(qt.value("Audio/enable_audio_stretching").toBool());

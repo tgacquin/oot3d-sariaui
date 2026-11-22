@@ -105,8 +105,73 @@ int main(int argc,char** argv) {
         PauseMenu::Layout layout;layout[PauseMenu::Background]={10,20,.5f};
         layout[PauseMenu::Slots]={30,-40,1.5f};layout.stack_background=true;
         layout.horizontal=true;layout.background_darkness=.6f;
+        layout.bottom_gradient=false;
         const auto original=panels.words;const auto p=Panels(panels,layout);
         assert(p.count==3 && panels.words==original);
+        auto vignette=layout;
+        vignette.background_vignette={true,25,50,.8f};
+        const auto corners=Panels(panels,vignette,.5f);
+        assert(corners.count==p.count+2);
+        for(unsigned q=2;q<4;++q) {
+            const auto* v=corners.positions.data()+q*12;
+            assert(v[0]==(q==2?146:242) && v[6]==v[0]+32 && v[4]==110 && v[1]==206);
+            assert((corners.uvs[q*8]<corners.uvs[q*8+4])==(q==2));
+            const auto* c=corners.colors.data()+q*16;
+            assert(c[3]==.4f && c[11]==.4f && c[7]==0 && c[15]==0);
+        }
+        assert(Panels(panels,vignette,0).count==p.count);
+        for(bool items:{false,true})for(bool stacked:{false,true}) {
+            auto page=panels;
+            page.words[PauseHeader::Items+0x34]=items?2:0;
+            page.words[0x50446c+0x18]=items?0:2;
+            auto clipped=layout;
+            clipped.bottom_gradient=true;clipped.bottom_gradient_height=180;
+            clipped.bottom_gradient_width_percent=80;
+            clipped.stack_background=stacked;
+            const auto mesh=Panels(page,clipped);
+            // The transformed brown panel spans x=146..274 and y=110..206.
+            // Its stacked copy extends the top to 14. The gradient spans y=60..240.
+            const unsigned pieces=stacked?3:4;
+            assert(mesh.count>=pieces);
+            float area=0;
+            for(unsigned q=0;q<pieces;++q) {
+                const auto* v=mesh.positions.data()+q*12;
+                assert(v[6]<=146 || v[0]>=274 || v[1]<=(stacked?14:110) || v[4]>=206);
+                area+=(v[6]-v[0])*(v[1]-v[4]);
+                for(unsigned i=0;i<4;++i)
+                    assert(std::abs(mesh.colors[q*16+4*i+3]-.6f*(v[3*i+1]-60)/180)<.0001f);
+            }
+            assert(std::abs(area-(320*180-128*(stacked?146:96)))<.01f);
+            // The plate's live buffer, model and final view include its editor pose and animation.
+            constexpr U32 pane=0x8200000,plate=0x8210000,mesh_id=0x8220000,plate_desc=0x8230000,
+                buffer=0x14910000,view=0x8240000;
+            page.words[ScreenModels::Message+0x56c]=pane;page.words[pane]=0x4ed234;
+            page.words[pane+4]=ScreenModels::Message+0x168;page.words[pane+0x64]=plate;
+            page.words[plate]=0x4ebd60;page.words[plate+4]=mesh_id;page.words[mesh_id]=plate_desc;
+            page.words[plate_desc+12]=0;page.words[mesh_id+0x124]=1;page.words[mesh_id+0x1a4]=buffer;
+            const auto put=[&](U32 at,auto values) {
+                for(float v:values){page.words[at]=std::bit_cast<U32>(v);at+=4;}
+            };
+            put(buffer,std::array<float,12>{-50,-20,0,50,-20,0,-50,20,0,50,20,0});
+            auto pose=identity;pose[3]=200;pose[7]=190;put(plate+12,pose);
+            auto adjusted=identity;adjusted[0]=2;adjusted[3]=-200;put(view,adjusted);
+            std::optional<Rect> textbox;
+            ObserveTextbox(page,item,view,textbox);assert(!textbox);
+            ObserveTextbox(page,plate,view,textbox);
+            assert(textbox && textbox->left==100 && textbox->right==300 && textbox->top==170 && textbox->bottom==210);
+            const auto masked=Panels(page,clipped,1,textbox);
+            const auto others=mesh.count-pieces;
+            float visible=0;
+            for(unsigned q=0;q<masked.count-others;++q) {
+                const auto* v=masked.positions.data()+q*12;
+                assert(v[6]<=100 || v[0]>=300 || v[1]<=170 || v[4]>=210);
+                visible+=(v[6]-v[0])*(v[1]-v[4]);
+                for(unsigned j=0;j<4;++j)
+                    assert(std::abs(masked.colors[q*16+4*j+3]-.6f*(v[3*j+1]-60)/180)<.0001f);
+            }
+            assert(std::abs(visible-(area-200*40+128*36))<.01f);
+
+        }
         assert(p.positions[0]==274 && p.positions[6]==278 && p.positions[4]==14 && p.positions[1]==206);
         assert(p.colors[19]==.6f); // One dimmer across both stacked backgrounds.
         assert(std::abs(p.positions[30]-p.positions[24]-288)<.001f);
@@ -143,6 +208,35 @@ int main(int argc,char** argv) {
         layout.items_shadow.opacity=0;assert(Panels(panels,layout).count==0);
         layout.items_shadow.opacity=1;panels.words[PauseHeader::Items+0x34]=0;
         assert(Panels(panels,layout).count==0); // Other pages have no inventory shadow.
+    }
+    {
+        Memory page;
+        PauseMenu::Layout layout;
+        assert(layout.bottom_gradient && layout.bottom_gradient_height==44);
+        assert(!Panels(page,layout).count); // Map
+        for(bool items:{false,true})for(bool wide:{false,true}) {
+            page.words[PauseHeader::Items+0x34]=items?2:0;
+            page.words[0x50446c+0x18]=items?0:2;
+            Widescreen::supported_layout=true;Widescreen::enabled=wide;
+            layout.bottom_gradient_height=73;
+            const auto gradient=Panels(page,layout,.5f);
+            assert(gradient.count==1 && gradient.positions[1]==240 && gradient.positions[4]==167);
+            assert(std::abs(gradient.positions[6]-gradient.positions[0]-(wide?240*Widescreen::Aspect:400))<.001f);
+            assert(gradient.colors[3]==.3f && gradient.colors[11]==.3f);
+            assert(gradient.colors[7]==0 && gradient.colors[15]==0);
+            assert(!Panels(page,layout,0).count);
+            layout.bottom_gradient_width_percent=50;
+            const auto half=Panels(page,layout,.5f);
+            assert(half.count==1 && half.colors==gradient.colors);
+            assert(std::abs(half.positions[6]-half.positions[0]-(wide?240*Widescreen::Aspect:400)*.5f)<.001f);
+            assert(std::abs((half.positions[0]+half.positions[6])*.5f-200)<.001f);
+            layout.bottom_gradient_width_percent=0;
+            assert(!Panels(page,layout).count);
+            layout.bottom_gradient_width_percent=100;
+        }
+        page.words[SaveMenu::Owner+0x28]=1;
+        assert(!Panels(page,layout).count); // Save controls its own backdrop.
+        Widescreen::supported_layout=false;Widescreen::enabled=false;
     }
     // Shadows follow both independently edited green panels, and no emitted
     // rectangle covers either panel even when their positions overlap.

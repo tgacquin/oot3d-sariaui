@@ -61,6 +61,29 @@ int main(int argc,char** argv) {
     hook.Observe(m,model,decode);assert(hook.ready && hook.composed && decodes==208*176);
     assert(m.words==before && hook.prepared.colors==color);
     auto image=hook.composed;hook.Observe(m,model,decode);assert(hook.composed==image && decodes==208*176);
+    // A new hook can use the prepared image on its first map draw. A layout
+    // edit or a different atlas at the same address must use the live source.
+    const P::Recipe recipe(layout,{56,32,264,208});
+    const auto cached=std::make_shared<P::Warm>(P::Warm{recipe.key,
+        std::make_shared<const std::vector<U32>>(hook.compressed),recipe.Render(hook.paper)});
+    assert(*cached->pixels==*image);
+    P::warm.store(cached);
+    P::Hook first_open;
+    first_open.Observe(m,model,decode);
+    assert(first_open.ready && first_open.composed==cached->pixels && first_open.timings.rebuilds==0);
+    assert(decodes==208*176);
+    std::cout<<"Dungeon first observation with prepared parchment: "<<first_open.timings.observe_ms
+             <<" ms; cold composition alone: "<<hook.timings.compose_ms<<" ms\n";
+    auto edited=layout;edited.parchment_blend+=3;PauseMenu::SetLayout(edited,false);
+    first_open.Observe(m,model,decode);
+    assert(first_open.ready && first_open.composed!=cached->pixels && first_open.timings.rebuilds==1);
+    PauseMenu::SetLayout(layout,false);
+    m.words[texture+8]^=1;
+    first_open.Observe(m,model,decode);
+    assert(first_open.ready && first_open.composed!=cached->pixels && first_open.timings.rebuilds==2);
+    m.words[texture+8]^=1;
+    P::warm.store(std::shared_ptr<const P::Warm>{});
+    assert(decodes==3*208*176);decodes=208*176;
     // Motion/fades never trigger texture rebuild, and generated UV orientation
     // agrees with the other generated GuestUI textures (top UV=0).
     for(float motion:{-237.17f,-123.3f,-12.5f,0.f}) {

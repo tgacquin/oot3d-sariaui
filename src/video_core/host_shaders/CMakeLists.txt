@@ -20,6 +20,9 @@ set(SHADER_FILES
     opengl_present_interlaced.frag
     vulkan_depth_to_buffer.comp
     vulkan_present.frag
+    vulkan_fxaa.frag
+    vulkan_bloom.frag
+    vulkan_bloom_prefilter.frag
     vulkan_present.vert
     vulkan_present_anaglyph.frag
     vulkan_present_interlaced.frag

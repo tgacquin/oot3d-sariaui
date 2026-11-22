@@ -6,6 +6,10 @@ namespace OOT3D::PlayerGraphics {
 inline std::atomic<bool> vsync{true}, cache{true}, hardware{true}, async_shaders{false};
 inline std::atomic<int> set_vsync{-1}, set_cache{-1}, set_hardware{-1}, set_async{-1};
 inline std::atomic<bool> disable_fog{false}, fog_dirty{false};
+inline std::atomic<bool> fxaa{false}, fxaa_dirty{false};
+inline constexpr int DefaultBloomIntensity = 45;
+inline std::atomic<bool> bloom{false}, bloom_dirty{false};
+inline std::atomic<int> bloom_intensity{DefaultBloomIntensity};
 enum class Mode { Original, CPU, GPU };
 inline Mode CurrentMode() {
     if (!Interpolation::Replaying()) return Mode::Original;

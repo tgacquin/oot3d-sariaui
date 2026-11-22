@@ -73,7 +73,10 @@ int main(int argc,char**argv) {
     if(argc>1) {
         std::ifstream f(argv[1],std::ios::binary);assert(f);U32 w;
         for(U32 a=0x100000;f.read(reinterpret_cast<char*>(&w),4);a+=4)m.words[a]=w;
-        assert(CodeMatches(m));m.words[Collision]^=1;assert(!CodeMatches(m));m.words.clear();
+        assert(CodeMatches(m));
+        assert(Instruction(LockedBoomerangMode,*m.Read(LockedBoomerangMode))==0x13a08002);
+        assert(Instruction(0x252ef8,*m.Read(0x252ef8))==0xe3a08014); // Unlocked flight.
+        m.words[Collision]^=1;assert(!CodeMatches(m));m.words.clear();
     }
     constexpr U32 play=0x08000000, cam=play+0x364, player=0x09000000, sp=0x0ffff000;
     m.words[cam+0xd4]=play;m.words[cam+0xd8]=player;m.words[0x5043e0]=play;

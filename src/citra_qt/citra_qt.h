@@ -265,7 +265,7 @@ private slots:
     void OnMenuRecentFile();
     void OnConfigure();
     void OnConfigureControls();
-    void OnConfigurePresentationShortcut(bool texture_binding);
+    void OnConfigurePresentationShortcut(bool texture_binding, QString* portable_default = nullptr);
     void OnLoadAmiibo();
     void OnRemoveAmiibo();
     void OnOpenCitraFolder();

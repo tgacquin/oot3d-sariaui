@@ -119,12 +119,12 @@ struct Input {
     // HID owns the pending request; an accepted action belongs to the current
     // native update and must survive a HID poll while Main is in state 10/11.
     void Cancel() {pending_item=ElementCount;context=0;}
-    template<class M> void Filter(M& m,U32& buttons,bool live,std::int64_t now) {
+    template<class M> void Filter(M& m,U32& buttons,bool live,std::int64_t now,U32 stick=0) {
         const bool look=look_requested.exchange(false);
         const U32 raw=buttons,edge=raw&~previous;previous=raw;
         consumed&=raw;
         const bool valid=live && CodeMatches(m);
-        const bool shop=Shops::navigation_input.Poll(m,raw,valid && !PauseMenu::Active(m));
+        const bool shop=Shops::navigation_input.Poll(m,raw,valid && !PauseMenu::Active(m),stick,now);
         if(!valid) {Cancel();consumed=0;return;}
         if(shop) {
             Cancel();consumed|=raw&Directions;buttons&=~consumed;

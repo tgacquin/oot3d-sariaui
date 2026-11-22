@@ -47,6 +47,30 @@ int main(int argc,char** argv) {
         return texel(left,123,channel)*(1-t)+texel(left+1,123,channel)*t;
     };
     constexpr U32 model=0x8000000,helper=0x8100000,mesh=0x8200000,src=0x8300000,dst=0x8400000,banner=0x8500000;
+    {
+        const auto actions=read(std::string(argv[2])+"/menu/01_US_ENGLISH/hud_all00.ctxb");
+        assert(le16(actions,44)==256 && le16(actions,46)==256);
+        // Attack occupies [0,64) x [94,112). Check begins immediately below it.
+        const auto alpha=[&](unsigned x,unsigned y) {
+            unsigned morton=0;
+            for(unsigned i=0;i<3;++i)morton|=((x>>i)&1)<<(2*i)|((y>>i)&1)<<(2*i+1);
+            return le16(actions,72+((y/8*32+x/8)*64+morton)*2)&15;
+        };
+        assert(alpha(13,111)==0 && alpha(13,112)>0);
+        Memory m;m.words[HUD::Action+0x20]=model;m.words[HUD::Action+0x18]=helper;
+        m.words[model]=0x4ebd60;m.words[model+4]=mesh;m.words[helper]=8;m.words[helper+0x14]=src;
+        for(unsigned i=0;i<8*32;i+=4) {m.F(src+i,0);m.F(dst+i,0);}
+        for(unsigned v=0;v<4;++v) {
+            m.F(src+32+v*8,float((v/2)*64)/256);
+            m.F(src+36+v*8,1-(94.f+(v%2)*18)/256);
+        }
+        assert(AtlasSeams::Copy(m,mesh,dst,src,8*32));
+        for(unsigned v=0;v<4;++v) {
+            assert(m.F(dst+32+v*8)==(v/2?63.5f:.5f)/256);
+            assert(m.F(dst+36+v*8)==1-(v%2?111.5f:94.5f)/256);
+        }
+        for(unsigned i=0;i<8*32;i+=4)if(i<32 || i>=64)assert(m.F(dst+i)==m.F(src+i));
+    }
     // Every native floor slot, independent of dungeon and mirrored MQ geometry.
     for(unsigned floor=0;floor<8;++floor)for(float width:{128.f,256.f,512.f}) {
         Memory m;m.words[0x55b450+4*floor]=model;m.words[0x55b470+4*floor]=helper;

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "oot3d/items_interpolation.h"
 #include "oot3d/interpolation_replay.h"
 #include "oot3d/interpolation_pose.h"
 #include "oot3d/waterfall_interpolation.h"
@@ -36,6 +37,78 @@ int main() {
         const auto restarted=clock.Next(400,fps);RateClock fresh;
         assert(restarted.phases==fresh.Next(400,fps).phases);
         assert(clock.Next(401,120).count==4);
+    }
+    // The pause tabs and file select keep the guest at 60 Hz. Every interpolated sample must land on
+    // the requested display timeline, including non-divisors such as 75 Hz.
+    for(int requested=30;requested<=120;++requested) {
+        const int fps=std::max(60,requested);
+        RateClock clock;
+        unsigned output=0;
+        for(unsigned frame=0;frame<600;++frame) {
+            const auto plan=clock.Next(frame,requested,60);
+            assert(plan.source_fps==60 && plan.fps==fps && plan.sample_slots<=2);
+            for(unsigned i=0;i<plan.count;++i) {
+                ++output;
+                assert(Near((frame+double(plan.phases[i]))/60,double(output)/fps,1e-7));
+            }
+        }
+        assert(output==unsigned(10*fps));
+        assert(clock.Next(600,120,30).count==4);
+        assert(clock.Next(601,120,60).count==2);
+    }
+    {
+        PresentationClock clock;
+        assert(clock.Next(0,0,false,0,60)==Presentation::Native);
+        assert(clock.Next(1,0,true,17,60)==Presentation::Pair);
+        assert(clock.Next(1,0,true,17,60)==Presentation::Skip);
+        assert(clock.Next(2,0,true,50,30)==Presentation::Native);
+        struct Vertex {std::array<float,4> position{},color{};std::array<float,2> tex_coord0{};};
+        MenuGeometry::History<Vertex> history;
+        std::vector<Vertex> triangle(3),result;
+        for(auto& v:triangle)v.position[3]=1;
+        triangle[1].position[1]=.1f;
+        triangle[2].position[0]=.1f;
+        assert(!history.Apply(0,{},triangle,result));
+        for(auto& v:triangle){v.position[1]+=.25f;v.color[3]=1;}
+        sample_fraction=.5f;
+        assert(history.Apply(1,{},triangle,result));
+        assert(result.size()==3 && result.back().position[1]==.125f && result.back().color[3]==.5f);
+        result.clear();
+        triangle.front().tex_coord0[0]=.25f;
+        assert(!history.Apply(2,{},triangle,result) && result.empty());
+        assert(!history.Apply(4,{},triangle,result));
+        MenuGeometry::Material cursor_key{};
+        cursor_key[6]=1;
+        assert(!history.Apply(4,cursor_key,triangle,result));
+        cursor_key[7]=24;
+        for(auto& v:triangle)v.position[0]+=.1f;
+        assert(!history.Apply(5,cursor_key,triangle,result) && result.empty());
+        for(auto& v:triangle)v.position[0]+=.1f;
+        assert(history.Apply(6,cursor_key,triangle,result) && Near(result[0].position[0],.15f));
+        result.clear();
+        const auto visible=triangle;
+        for(auto& v:triangle)v.position={.611f,0,0,1};
+        assert(!history.Apply(7,cursor_key,triangle,result) && result.empty());
+        assert(!history.Apply(8,cursor_key,visible,result) && result.empty());
+        triangle=visible;
+        std::swap(triangle[1],triangle[2]);
+        assert(!history.Apply(9,cursor_key,triangle,result) && result.empty());
+
+    }
+    {
+        using enum MenuPage;
+        ReplayFrame replay;
+        unsigned frame=10;
+        for(auto page:{Items,Gear,Map,Items,FileSelect,NameEntry}) {
+            menu_page=page;
+            assert(!replay.Complete(frame));
+            assert(replay.Begin(frame,123));
+            replay.menu=true;
+            assert(replay.Complete(++frame));
+        }
+        menu_page=None;
+        assert(!replay.Complete(frame));
+
     }
     target_fps=200;assert(TargetFPS()==120);target_fps=1;assert(TargetFPS()==30);
     target_fps=75;display_refresh_rate=144;match_refresh_rate=true;assert(TargetFPS()==120);
@@ -77,6 +150,29 @@ int main() {
         assert((drain==4)==(dropped==0));
     }
 
+    // All four gold brackets use this pose path. An accepted shelf move
+    // changes endpoints on the first displayed sample at or after the edge.
+    for(int phase_index=1;phase_index<=4;++phase_index) {
+        Pose::Sample a,b;
+        a.key=b.key={1,2,3,4,1};
+        a.model=b.model="h_cursor";a.shop_slot=0;b.shop_slot=2;
+        a.camera=b.camera={Math::Identity(),1,2,0,100000,true};
+        a.time=100000;b.time=133333;b.camera.time=b.time;
+        a.frame=1;b.frame=2;
+        a.native[0]=a.world[0]=Math::Identity();
+        b.world[0]=a.world[0];b.world[0][0][3]=25;b.native=b.world;
+        b.shop_press_us=a.time+std::llround((b.time-a.time)*phase_index/4.);
+        Pose::History poses;poses.Observe(a);poses.Observe(b);
+        for(unsigned tick=1;tick<=4;++tick) {
+            sample_fraction=tick/4.f;
+            const auto sample=Pose::Resolve(poses.Pairs(),b.native,b.camera,b.frame,b.time);
+            assert(sample && sample->palette[0][0][3]==(int(tick)<phase_index?0:25));
+        }
+        b.shop_press_us=0;
+        assert(Pose::BlendPalette(a,b,0,.25)==b.world[0]);
+        b.shop_slot=a.shop_slot;
+        assert(Near((*Pose::BlendPalette(a,b,0,.5))[0][3],12.5));
+    }
     for(float phase:{.25f,.4f,.5f,.75f,1.f}) {
         sample_fraction=phase;
         auto a=Math::Identity(),b=a;b[0][3]=20;

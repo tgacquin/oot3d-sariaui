@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "oot3d/graphics_memory.h"
+#include "oot3d/frame_lights.h"
 #include "oot3d/graphics_memory_diagnostics.h"
 #include "oot3d/graphics_allocation_diagnostics.h"
 #include "dynarmic/interface/A32/a32.h"
@@ -18,6 +19,7 @@ struct Env : Dynarmic::A32::UserCallbacks {
     Dynarmic::A32::Jit* cpu=nullptr;
     std::uint64_t ticks=0;
     U32 app_budget=96*G::MiB,linear_requested=0,heap_requested=0;
+    bool frame_lights=false;
     bool patched=false,boot=false,diagnostics=false;
     OOT3D::GraphicsAllocations::Tracker tracker;
     std::int64_t now=0;
@@ -26,13 +28,17 @@ struct Env : Dynarmic::A32::UserCallbacks {
         if(at>=LinearBase && std::uint64_t(at)+size<=LinearBase+linear.size())return linear.data()+at-LinearBase;
         assert(std::uint64_t(at)+size<=code.size());return code.data()+at;
     }
+    void Write(U32 at,U32 value){Put(at,value);}
     template<class T> T Get(U32 at) {T v;std::memcpy(&v,Ptr(at,sizeof v),sizeof v);return v;}
     template<class T> void Put(U32 at,T v) {std::memcpy(Ptr(at,sizeof v),&v,sizeof v);}
     std::optional<U32> Read(U32 at) {return Get<U32>(at);}
     std::optional<U32> MemoryReadCode(U32 at) override {
         if(at==Stop || (boot && at==0x416128))return 0xef000000;
         if(boot && (at==0x416554 || at==0x416564 || at==0x302058 || at==0x301fc4))return 0xef000001;
+        if(frame_lights && at==OOT3D::FrameLights::ResetPC+4)return 0xef000000;
         const U32 word=Get<U32>(at);
+        if(frame_lights && OOT3D::FrameLights::Instruction(at,word)!=word)
+            return OOT3D::FrameLights::Instruction(at,word);
         if(diagnostics && OOT3D::GraphicsAllocations::CodeMatches(*this) &&
            OOT3D::GraphicsAllocations::Instruction(at,word)!=word)
             return OOT3D::GraphicsAllocations::Instruction(at,word);
@@ -54,6 +60,10 @@ struct Env : Dynarmic::A32::UserCallbacks {
         auto& r=cpu->Regs();
         if(svc>=OOT3D::GraphicsAllocations::FirstSVC && svc<OOT3D::GraphicsAllocations::FirstSVC+2) {
             tracker.Handle(*this,r,svc-OOT3D::GraphicsAllocations::FirstSVC,now);return;
+        }
+        if(svc==OOT3D::FrameLights::FirstSVC || svc==OOT3D::FrameLights::FirstSVC+1) {
+            OOT3D::FrameLights::Handle(*this,r,svc-OOT3D::FrameLights::FirstSVC);
+            return;
         }
         if(!svc){cpu->HaltExecution();return;}
         assert(svc==1 && boot);
@@ -220,6 +230,44 @@ void CheckAllocationLedger() {
     m.words[A::Heap+0x1c]=end;assert(m.words==original); // Ledger never writes guest memory.
     std::cout<<"Graphics ledger: retained/released bytes, reuse visibility, bounded records/reports, failure throttling, rollback and heap reset passed\n";
 }
+// Run the native record initializer and point-light writer against the queue
+// address from the Hyrule Field capture. Preserve actor and shadow lifetimes.
+void CheckFrameLights(Env& e) {
+    namespace L=OOT3D::FrameLights;
+    assert(L::CodeMatches(e));
+    constexpr U32 gfx=0xd00000, tint=gfx+0x100, light=gfx+0x200, position=gfx+0x300;
+    constexpr U32 scratch=0x5656a0, queue_capacity=0x565530, init=0x35bfb4;
+    const auto setup=[&](U32 tail) {
+        e.Put<U32>(gfx,0x4000);e.Put(gfx+4,scratch);e.Put(gfx+8,scratch);e.Put(gfx+12,tail);
+        e.Put<U32>(queue_capacity,16);
+    };
+    e.Put<U32>(tint+12,0x66554433);e.Put<U32>(tint+16,0x77);
+    e.Put<U32>(light+12,0xabcdef);e.Put<U32>(light+16,100);
+    setup(0x5655a0);
+    assert(e.Run(init,tint,gfx)==0x565520);
+    e.Run(0x213d80,0x565520,light,position);
+    assert(e.Get<U32>(queue_capacity)!=16); // Reproduce the original write.
+    setup(scratch+0x4000);
+    e.frame_lights=true;
+    e.Put<U32>(L::Base,99);e.Run(L::ResetPC);assert(e.Get<U32>(L::Base)==0);
+    for(U32 i=0;i<L::Records;++i) {
+        const auto at=e.Run(init,tint,gfx);
+        assert(at==L::Slots+i*L::RecordBytes && e.Get<U32>(gfx+12)==scratch+0x4000);
+        assert(e.Get<std::uint8_t>(at)==0 && e.Get<std::uint8_t>(at+8)==0x55 && e.Get<std::uint8_t>(at+9)==0x66 && e.Get<std::uint8_t>(at+10)==0x77);
+        e.Run(0x213d80,at,light,position);
+    }
+    assert(e.Get<std::uint8_t>(L::Slots)==1);
+    for(unsigned i=1;i<=128;++i)assert(e.Run(init,tint,gfx)==scratch+0x4000-i*128);
+    const auto emergency=e.Run(init,tint,gfx);
+    assert(emergency>=L::Base+128 && emergency+128<=L::Slots);
+    e.Run(0x213d80,emergency,light,position);
+    assert(e.Get<U32>(queue_capacity)==16 && e.Get<U32>(gfx+12)==scratch);
+    setup(scratch+0x4000);e.Put<U32>(gfx+8,scratch+0x4000-64);
+    assert(e.Run(init,tint,gfx)==emergency && e.Get<U32>(gfx+12)==scratch+0x4000);
+    e.Run(L::ResetPC);assert(e.Run(init,tint,gfx)==L::Slots);
+    e.frame_lights=false;
+    std::cout<<"Frame lights: reproduced the Hyrule Field queue overwrite; distinct records, native light colors, frame reset and exhaustion guards passed\n";
+}
 int main(int argc,char** argv) {
     assert(argc==2 || argc==3);
     Env e;const auto native=Load(argv[1]);assert(native.size()+0x100000<e.code.size());
@@ -227,6 +275,7 @@ int main(int argc,char** argv) {
     Dynarmic::A32::UserConfig config;config.callbacks=&e;
     Dynarmic::A32::Jit cpu(config);e.cpu=&cpu;
     assert(G::CodeMatches(e) && G::Supported(e));
+    CheckFrameLights(e);
     // Run the original boot partition arithmetic and allocation calls with and
     // without translation patches, including all surrounding ARM instructions.
     e.boot=true;e.Run(0x4160ec);

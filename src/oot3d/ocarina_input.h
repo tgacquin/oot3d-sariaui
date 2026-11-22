@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "oot3d/interpolation_state.h"
 #include "oot3d/title_hooks.h"
 #include "oot3d/input.h"
 #include "oot3d/ocarina_layout.h"
@@ -187,12 +188,41 @@ struct Input {
     U32 previous=0,consumed=0;
     Action pending=Action::None;
     bool navigation_sound=false;
+    struct Move {unsigned from{},to{};std::int64_t time{};};
+    struct Edge {U32 directions{};std::int64_t time{};};
+    static constexpr unsigned MaxEdges=8; // HID samples at 234 Hz, native navigation at 30.
+    std::array<Move,MaxEdges> moves{};
+    std::array<Edge,MaxEdges> edges{};
+    unsigned move_count{},edge_count{};
+    U32 held_directions{},stick_directions{};
+    std::int64_t stick_edge_time{};
+    bool sample_directions=false;
+    void PollDirections(U32 directions,U32 stick,std::int64_t now) {
+        const U32 pressed=directions & ~held_directions;
+        held_directions=directions;
+        const bool stick_pressed=(stick & ~stick_directions)!=0;
+        stick_directions=stick;
+        if(!sample_directions || !now) {
+            edge_count=move_count=0;stick_edge_time=0;return;
+        }
+        // HID and the native circle-pad menu use different thresholds. Use HID
+        // only to date the snap. The game chooses the direction (including MQ)
+        // and owns both the initial stick step and every held-stick repeat.
+        if(stick_pressed)stick_edge_time=now;
+        if(pressed && edge_count<edges.size()) {
+            edges[edge_count++]={pressed,now};
+        }
+    }
+
     template<class M> void Filter(M& m,U32& buttons,bool live,unsigned triggers=0) {
         constexpr U32 Start=8,B=2;
         const U32 raw=buttons,edges=raw&~previous;previous=raw;
         consumed&=raw;
+        sample_directions=false;
         if(!live || !CodeMatches(m)) {pending=Action::None;consumed=0;return;}
         const auto state=State(m);
+        sample_directions=state==4 && on_top.load() && Interpolation::Replaying() &&
+            Interpolation::TargetFPS()>30 && m.Read(Owner+0x44)==1;
         if(state) {
             // Extra HID reports ZL/ZR separately. Alias them to native L/R
             // while the instrument owns input; retain physical L/R as well.
@@ -264,21 +294,47 @@ struct Input {
         // Then refresh title/cursor/notation without polling input or playing.
         r[14]=0x425e40;r[15]=0x2f663c;
     }
-    template<class M,class R> void Navigate(M& m,R& r,bool enabled) {
+    template<class M,class R> void Navigate(M& m,R& r,bool enabled,std::int64_t now=0) {
         if(!enabled || r[5]!=Owner || State(m)!=4)return; // Displaced NOP.
         auto x=m.Read(Owner+0x18).value_or(4),y=m.Read(Owner+0x1c).value_or(3);
         if(x>=4 || y>=3)return;
         const U32 pad=m.Read(0x50af0c+0x24).value_or(0);
         const U32 keys=(pad?pad:m.Read(0x50af0c+0x20).value_or(0))&0xf0;
         const unsigned columns=GetLayout().Columns(),rows=12/columns;
-        const unsigned old=x+4*y;unsigned col=old%columns,row=old/columns;
-        if(keys&0x20)col=(col+columns-1)%columns;
-        else if(keys&0x10)col=(col+1)%columns;
-        else if(keys&0x40)row=(row+rows-1)%rows;
-        else if(keys&0x80)row=(row+1)%rows;
-        const unsigned next=row*columns+col;
+        const unsigned old=x+4*y;
+        unsigned next=old;
+        move_count=0;
+        const auto advance=[&](U32 direction,std::int64_t time) {
+            unsigned col=next%columns,row=next/columns;
+            if(direction&0x20)col=(col+columns-1)%columns;
+            else if(direction&0x10)col=(col+1)%columns;
+            else if(direction&0x40)row=(row+rows-1)%rows;
+            else if(direction&0x80)row=(row+1)%rows;
+            else return;
+            const unsigned stone=row*columns+col;
+            moves[move_count++]={next,stone,time};
+            next=stone;
+        };
+        if(sample_directions && now) {
+            for(unsigned i=0;i<edge_count;++i)
+                if(edges[i].time<=now && now-edges[i].time<=50000)
+                    advance(edges[i].directions,edges[i].time);
+            edge_count=0;
+            if(!move_count) {
+                if(pad) {
+                    // +0x0c holds new button presses. Those already came from
+                    // HID, while repeat pulses appear only in +0x24.
+                    advance(keys & ~m.Read(0x50af0c+0x0c).value_or(0),now);
+                } else if(keys) {
+                    const auto time=stick_edge_time>0 && stick_edge_time<=now &&
+                        now-stick_edge_time<=50000?stick_edge_time:now;
+                    advance(keys,time);
+                    stick_edge_time=0;
+                }
+            }
+        } else advance(keys,now);
         m.Write(Owner+0x18,next%4);m.Write(Owner+0x1c,next/4);
-        navigation_sound=old!=next;
+        navigation_sound=move_count!=0;
         r[15]=navigation_sound?0x425cb8:0x425dcc;
     }
     template<class M,class R> void AfterSound(M& m,R& r) {

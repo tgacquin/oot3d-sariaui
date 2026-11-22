@@ -43,6 +43,30 @@ int main(int argc,char** argv) {
     assert(slide.progress==1 && slide.Y()==0);
     slide.Advance(false,Duration/2);
     assert(std::abs(slide.Y()+Height/2)<.001);
+    // Sampling at 120 adds one position between each pair of native banner
+    // positions while both render rates reach the endpoint on the same tick.
+    for(auto page:{Interpolation::MenuPage::Items,Interpolation::MenuPage::Gear,Interpolation::MenuPage::Map}) {
+        for(int target:{30,60,120}) {
+            Interpolation::target_fps=target;
+            Slide banner;
+            Interpolation::RateClock clock;
+            unsigned samples=0;
+            for(unsigned tick=0;tick<15;++tick) {
+                const float before=banner.Y();
+                banner.Advance(true,1.f/60,.25f);
+                const auto plan=clock.Next(tick,Interpolation::PresentationFPS(page,false),Interpolation::SourceFPS(page));
+                for(unsigned i=0;i<plan.count;++i) {
+                    const float y=std::lerp(before,banner.Y(),plan.phases[i]);
+                    if(plan.phases[i]<1)assert(y>before && y<banner.Y());
+                    else assert(y==banner.Y());
+                    ++samples;
+                }
+                if(tick<14)assert(banner.progress<1);
+            }
+            assert(banner.progress==1 && samples==(target==120?30:15));
+        }
+    }
+    Interpolation::target_fps=60;
     const float midway=slide.Y();slide.Advance(true,1.f/30);assert(slide.Y()>midway);
     for(int i=0;i<10;++i)slide.Advance(false,1.f/30);
     assert(slide.progress==0 && slide.Y()==-Height);
@@ -326,6 +350,16 @@ int main(int argc,char** argv) {
     m.words[BannerOwner+0x28]=source;hook.Handle(m,regs,true);
     assert(hook.stage==Hook::Stage::Banner && regs[0]==source && regs[15]==0x3f9680);
     hook.NativeDraw(m,regs,true);assert(regs[15]==0x3f9680); // Our late banner draw is allowed.
+    // Returning from the banner completes the header without a status draw on any page.
+    for(unsigned tab=0;tab<4;++tab) {
+        auto page=m;
+        page.words[Items+0x34]=tab==0?2:0;
+        page.words[0x50446c+0x18]=tab==1?2:0;
+        page.words[0x4fda6c+0x50]=tab==3;
+        auto header=hook;auto r=regs;
+        header.Handle(page,r,true);
+        assert(header.stage==Hook::Stage::Idle && r==saved);
+    }
     hook.Handle(m,regs,true);assert(regs==saved && m.words.at(block+0x124)==0);
     regs[0]=source;regs[14]=0x123456;hook.NativeDraw(m,regs,true);assert(regs[15]==0x123456);
     regs=saved;
@@ -471,7 +505,8 @@ int main(int argc,char** argv) {
         m.words[0x54ac4c]=0x01000000;m.words[0x5066f8+0x34]=13;
         Hook tabs;tabs.last_time=2000000;tabs.Update(m,2016667,true);
         m.words[0x5066f8+0x34]=0;tabs.Update(m,2033334,true);
-        assert(tabs.slide.progress<1 && !tabs.map_open_entrance);
+        assert(tabs.slide.progress==1 && !tabs.map_open_entrance);
+        assert(PauseMenu::motion_x==0 && PauseMenu::motion_y==0 && PauseMenu::motion_bottom==0);
         assert(PauseMenu::world_location_alpha==1 && PauseMenu::world_location_y==0 && PauseMenu::world_panel_y==0);
         // A later pause session on the map animates again.
         m.words[PauseMenu::UI+0x14]=0;tabs.Update(m,2050001,true);

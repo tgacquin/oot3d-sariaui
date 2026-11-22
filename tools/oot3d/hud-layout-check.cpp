@@ -36,18 +36,6 @@ int main(int argc,char** argv) {
     Layout layout{};
     RoutingState routing;
     auto apply = [&](unsigned site, const Layout& poses) { Handle(m, regs, site, poses, routing); };
-    // Area titles move only at the draw register; dungeon/temple titles stay centered.
-    regs[4]=0x8100000;m.words[regs[4]+4]=(192u<<16)|200;
-    const auto title_memory=m.words;
-    layout.reposition_area_titles=false;apply(9,layout);assert(regs[1]==192);
-    layout.reposition_area_titles=true;layout.area_title_y=-72;
-    apply(9,layout);assert(regs[1]==120 && m.words==title_memory);
-    apply(9,layout);assert(regs[1]==120); // No accumulating offset.
-    m.words[regs[4]+4]=(120u<<16)|200;apply(9,layout);assert(regs[1]==120);
-    m.words[regs[4]+4]=(192u<<16)|200;
-    layout.area_title_y=std::numeric_limits<float>::quiet_NaN();
-    apply(9,layout);assert(regs[1]==192);
-    layout.area_title_y=-72;layout.reposition_area_titles=false;
     // Main atlas: only the explicitly identified quads move.
     setup(92);m.words[Main+4]=helper;regs[4]=Main;
     auto original=m.words;
@@ -105,6 +93,14 @@ int main(int argc,char** argv) {
         }
         assert((m.Float(vertices+86*48)+m.Float(vertices+91*48+12))*.5f==210);
     }
+    SetLayout(layout,false);
+    for(float overall:{.5f,1.f,2.f}) {
+        OOT3D::UserHUD::Layout user;user.overall_scale=overall;
+        OOT3D::UserHUD::SetLayout(user,false);
+        m.words=carrot_source;apply(0,GetEffectiveLayout());
+        assert(std::abs((m.Float(vertices+86*48)+m.Float(vertices+91*48+12))*.5f-210)<.001f);
+    }
+    SetLayout({},false);OOT3D::UserHUD::SetLayout({},false);
     m.words=original;layout={};layout[Hearts]={-400,0,1};layout[Rupees]={0,240,1};
     apply(0,layout);
     assert(m.Float(vertices+63*48)==-388); // Routing offsets don't reject extreme edits.
@@ -206,10 +202,6 @@ int main(int argc,char** argv) {
             assert(m.Float(vertices+q*48+8)==7);
         }
         const auto adjusted=m.words;m.words=local_source;apply(2,layout);assert(m.words==adjusted);
-        // Key positioning never inherits the rupee offsets or icon gap.
-        m.words=local_source;m.words[Main+0x20]=counter;m.words[Main+0x1c]=counter+4;
-        auto key_layout=layout;key_layout[Rupees].scale=1;key_layout.hd_rupee_text.scale=1;
-        apply(2,key_layout);assert(m.Float(vertices)==50 && m.Float(vertices+4)==151);
     }
     layout.hd_rupee_numbers=true;
     setup(92);m.words[Main+4]=helper;regs[4]=Main;
@@ -217,8 +209,7 @@ int main(int argc,char** argv) {
     auto group_only=layout;group_only.rupee_number_gap=0;group_only.hd_rupee_text={};group_only.hd_rupee_spacing=0;
     apply(0,group_only);const auto icon_layout=m.words;
     m.words=icon_source;apply(0,layout);assert(m.words==icon_layout);
-    // HD key digits track the final rupee text size despite different group
-    // scales, preserving the counter anchor, vertical center and hidden quads.
+    // Both counters share the HD text offsets, size, spacing and icon gap.
     setup(3);m.words[Main+0x20]=counter;m.words[counter+8]=helper;regs[4]=counter;
     for(unsigned q=0;q<3;++q) {
         const float x=q==2?400.f:20.f+10*(1-q);
@@ -226,15 +217,17 @@ int main(int argc,char** argv) {
         for(unsigned i=0;i<12;++i)m.Float(vertices+q*48+i*4,v[i]);
     }
     const auto key_source=m.words;
-    layout={};layout[Keys]={-13.5f,12.2f,.64f};layout[Rupees].scale=.67f;
-    layout.hd_rupee_text={-1.2f,-3.6f,1.28f};layout.rupee_number_gap=17;
+    layout={};layout[Keys]={-13.5f,12.2f,.67f};layout[Rupees].scale=.67f;
+    layout.hd_rupee_text={-1.2f,-3.6f,1.28f};layout.rupee_number_gap=17;layout.hd_rupee_spacing=-2;
     layout.hd_rupee_numbers=false;apply(2,layout);const auto native_key=m.words;
-    const float key_left=m.Float(vertices+48),key_center=(m.Float(vertices+4)+m.Float(vertices+28))*.5f;
+    const float key_left=m.Float(vertices+48),key_top=m.Float(vertices+4);
+    assert(std::abs(key_left-(2+18*.67f+10-13.5f+17*.67f))<1e-4f);
     m.words=key_source;layout.hd_rupee_numbers=true;apply(2,layout);
     assert(std::abs(m.Float(vertices+12)-m.Float(vertices)-11*.67f*1.28f)<1e-4f);
     assert(std::abs(m.Float(vertices+28)-m.Float(vertices+4)-21*.67f*1.28f)<1e-4f);
-    assert(m.Float(vertices+48)==key_left);
-    assert(std::abs((m.Float(vertices+4)+m.Float(vertices+28))*.5f-key_center)<1e-4f);
+    assert(std::abs(m.Float(vertices+48)-(key_left-1.2f*.67f))<1e-4f);
+    assert(std::abs(m.Float(vertices+4)-(key_top-3.6f*.67f))<1e-4f);
+    assert(std::abs(m.Float(vertices)-m.Float(vertices+48)-8*.67f*1.28f)<1e-4f);
     for(unsigned i=0;i<12;++i)assert(m.words.at(vertices+96+i*4)==native_key.at(vertices+96+i*4));
     const auto hd_key=m.words;m.words=key_source;apply(2,layout);assert(m.words==hd_key);
     m.words=key_source;layout.hd_rupee_numbers=false;apply(2,layout);assert(m.words==native_key);

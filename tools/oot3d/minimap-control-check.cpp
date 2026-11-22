@@ -106,6 +106,18 @@ int main() {
     m.Float(model+0xfc,.4f);arrows(.4f);m.Float(model+0xfc,1);
     map_fade(0);m.words[Owner+0x50]=0;
     assert(DungeonMarkerOpacity(m)==1 && !CopyArrows(m,mesh,dst,src,512,1)); // Overworld unchanged.
+    auto personal=UserHUD::GetLayout();personal.overall_opacity=.5f;personal.minimap_opacity=.25f;
+    UserHUD::SetLayout(personal,false);
+    m.words[renderer+0x354]=model;
+    for(unsigned dungeon:{0u,1u}) {
+        m.words[Owner+0x50]=dungeon;map_fade(1);
+        m.Float(stack+0x38,.8f);
+        HUD::Handle(m,regs,8,HUD::GetEffectiveLayout(),routing);
+        assert(Near(m.Float(stack+0x38),.1f));
+        assert(CopyArrows(m,mesh,dst,src,512,1));
+        assert(Near(m.Float(dst+35*4),.2f) && Near(m.Float(dst+3*4),m.Float(src+3*4)));
+    }
+    UserHUD::SetLayout({},false);
     m.Float(src+35*4,std::numeric_limits<float>::quiet_NaN());
     const auto invalid=m.words;assert(!CopyArrows(m,mesh,dst,src,512,.5f));assert(m.words==invalid);
     Reset();

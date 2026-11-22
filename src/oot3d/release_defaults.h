@@ -3,6 +3,7 @@
 
 #include <QDir>
 #include <QSettings>
+#include <QKeySequence>
 #include <QStringList>
 
 namespace OOT3D::ReleaseDefaults {
@@ -28,17 +29,31 @@ inline bool IsUnconfiguredEditor(const QSettings& settings) {
     return true;
 }
 
-inline bool Apply(QSettings& settings, const QString& resource, bool runtime) {
+inline bool Apply(QSettings& settings, const QString& resource, bool runtime, bool player = true) {
     const int previous_version = settings.value(VersionKey, 0).toInt();
     if (previous_version >= Version) return true;
     QSettings defaults(resource, QSettings::IniFormat);
     if (defaults.status() != QSettings::NoError || defaults.allKeys().isEmpty()) return false;
     const bool replace_placeholder = !runtime && IsUnconfiguredEditor(settings);
-    for (const auto& key : defaults.allKeys()) {
+    QVariantMap values;
+    for (const auto& key : defaults.allKeys()) values.insert(key, defaults.value(key));
+    if (player) {
+        QSettings choices(QStringLiteral(":/oot3d/defaults/player.ini"), QSettings::IniFormat);
+        choices.beginGroup(runtime ? QStringLiteral("runtime") : QStringLiteral("presentation"));
+        for (const auto& key : choices.allKeys()) {
+            auto value=choices.value(key);
+            if(runtime && key.startsWith(QStringLiteral("UI/Shortcuts/")) && key.endsWith(QStringLiteral("/KeySeq")))
+                value=QKeySequence::fromString(value.toString(),QKeySequence::PortableText).toString(QKeySequence::NativeText);
+            values.insert(key,value);
+        }
+        if (choices.status() != QSettings::NoError) return false;
+    }
+    for (auto it = values.cbegin(); it != values.cend(); ++it) {
+        const auto& key = it.key();
         if (replace_placeholder || !settings.contains(key) ||
             (runtime && previous_version == 0 &&
              settings.value(key + QStringLiteral("/default"), false).toBool())) {
-            settings.setValue(key, defaults.value(key));
+            settings.setValue(key, it.value());
             // Qt's /default=true means ignore the stored value and use its
             // upstream fallback. Our portable baseline must be read literally.
             if (runtime) settings.setValue(key + QStringLiteral("/default"), false);
@@ -57,11 +72,11 @@ inline bool Apply(QSettings& settings, const QString& resource, bool runtime) {
     return settings.status() == QSettings::NoError;
 }
 
-inline bool Prepare(const QString& config_dir) {
+inline bool Prepare(const QString& config_dir, bool player = true) {
     if (!QDir().mkpath(config_dir)) return false;
     QSettings runtime(config_dir + QStringLiteral("/qt-config.ini"), QSettings::IniFormat);
     QSettings presentation(config_dir + QStringLiteral("/oot3d-editor.ini"), QSettings::IniFormat);
-    return Apply(runtime, QStringLiteral(":/oot3d/defaults/runtime.ini"), true) &&
-           Apply(presentation, QStringLiteral(":/oot3d/defaults/presentation.ini"), false);
+    return Apply(runtime, QStringLiteral(":/oot3d/defaults/runtime.ini"), true, player) &&
+           Apply(presentation, QStringLiteral(":/oot3d/defaults/presentation.ini"), false, player);
 }
 } // namespace OOT3D::ReleaseDefaults

@@ -1,4 +1,5 @@
 #ifdef ENABLE_OOT3D_PRESENTATION
+#include "oot3d/menu_cursor_draw.h"
 #include "oot3d/pickup_fog.h"
 #include "oot3d/interpolation_timing.h"
 #endif
@@ -14,6 +15,7 @@
 #include "common/cityhash.h"
 #include "oot3d/texture_picker.h"
 #include "oot3d/hud_routing.h"
+#include "oot3d/player_graphics.h"
 #include "oot3d/magic_meter.h"
 #include "oot3d/widescreen.h"
 #include "oot3d/lens.h"
@@ -37,6 +39,9 @@
 #include "video_core/renderer_vulkan/renderer_vulkan.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
+#ifdef ENABLE_OOT3D_PRESENTATION
+#include "oot3d/heart_contour.h"
+#endif
 #include <cstdlib>
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/texture/texture_decode.h"
@@ -668,22 +673,21 @@ bool RasterizerVulkan::SetupGeometryShader() {
 
 bool RasterizerVulkan::AccelerateDrawBatch(bool is_indexed) {
 #ifdef ENABLE_OOT3D_PRESENTATION
-    if(is_indexed && OOT3D::AmmoBackdrop::Enabled(OOT3D::HUD::GetEffectiveLayout(),true)) {
+    const auto layout=OOT3D::HUD::GetEffectiveLayout();
+    const bool counter_backdrop=OOT3D::AmmoBackdrop::Enabled(layout,true);
+    if(is_indexed && (counter_backdrop || layout.OutlineHDRupees())) {
         bool counter=false;
         if(const auto mesh=OotHudMesh(&counter);mesh && mesh->second && counter)return false;
     }
-    if(is_indexed && OOT3D::AmmoBackdrop::Enabled(OOT3D::HUD::GetEffectiveLayout()))
+    if(is_indexed && OOT3D::AmmoBackdrop::Enabled(layout))
         if(const auto mesh=OotUIMeshHash(32);mesh &&
            OOT3D::HUD::FindNumberMesh(mesh->first,mesh->second/4)==OOT3D::HUD::NumberKind::Ammo)
             return false;
-    if(is_indexed && OOT3D::AmmoBackdrop::TimerEnabled(OOT3D::HUD::GetEffectiveLayout()))
+    if(is_indexed && OOT3D::AmmoBackdrop::TimerEnabled(layout))
         if(const auto mesh=OotUIMeshHash(32);mesh && OOT3D::HUD::IsTimerMesh(mesh->first,mesh->second/4))
             return false;
-    // Only the verified top HUD batch needs CPU vertex output for slicing the
-    // magic frame and interpolating the heart pulse. Native fragment shading stays
-    // on the existing path, including custom texture replacements and fades.
-    if(is_indexed && (OOT3D::MagicMeter::Changed(OOT3D::HUD::GetEffectiveLayout()) ||
-                      OOT3D::Interpolation::Replaying() || OOT3D::CarrotAnimation::Get().valid)) {
+    // Replace the native magic frame on the verified top HUD at every frame rate.
+    if(is_indexed && regs.pipeline.num_vertices==92*6) {
         const auto mesh=OotHudMesh();
         if(mesh && mesh->first==92 && mesh->second)return false;
     }
@@ -809,12 +813,9 @@ void RasterizerVulkan::SetupIndexArray() {
 std::optional<std::array<float,3>> RasterizerVulkan::OotSongSlide() {
     using namespace OOT3D;
     if(!OcarinaSlide::Active(Interpolation::guest_frames.load(),Interpolation::generation.load()))return {};
-    const unsigned count=regs.pipeline.num_vertices;
-    if(!OcarinaSlide::ValidDrawCount(count) ||
-       (regs.pipeline.triangle_topology!=Pica::PipelineRegs::TriangleTopology::List &&
-        regs.pipeline.triangle_topology!=Pica::PipelineRegs::TriangleTopology::Shader))return {};
-    const auto mesh=OotUIMeshHash(Ocarina::DrawQuadCount*4);
-    return mesh?OcarinaSlide::Find(mesh->first,mesh->second,Interpolation::guest_frames.load(),Interpolation::generation.load()):std::nullopt;
+    const auto mesh=OotUIMeshHash(Ocarina::DrawQuadCount*4,true);
+    return mesh?OcarinaSlide::Find(mesh->first,mesh->second,Interpolation::guest_frames.load(),Interpolation::generation.load(),
+        Interpolation::sample_fraction):std::nullopt;
 }
 
 std::optional<std::pair<std::uint64_t,unsigned>> RasterizerVulkan::OotUIMeshHash(unsigned max_vertices, bool allow_strip) {
@@ -942,59 +943,71 @@ std::optional<std::pair<unsigned, bool>> RasterizerVulkan::OotHudMesh(bool* hd_c
 }
 #endif
 
+#ifdef ENABLE_OOT3D_PRESENTATION
+template<class V> static V MixHudVertex(const V& a,const V& b,float t) {
+    V v;
+    v.position=a.position*(1-t)+b.position*t;
+    v.color=a.color*(1-t)+b.color*t;
+    v.tex_coord0=a.tex_coord0*(1-t)+b.tex_coord0*t;
+    v.tex_coord1=a.tex_coord1*(1-t)+b.tex_coord1*t;
+    v.tex_coord2=a.tex_coord2*(1-t)+b.tex_coord2*t;
+    v.tex_coord0_w=a.tex_coord0_w*(1-t)+b.tex_coord0_w*t;
+    v.normquat=a.normquat*(1-t)+b.normquat*t;
+    v.view=a.view*(1-t)+b.view*t;
+    return v;
+}
+#endif
+
 void RasterizerVulkan::DrawTriangles() {
     if (vertex_batch.empty()) {
         return;
     }
+    bool hud_colors=false,outline_rupees=false;
 #ifdef ENABLE_OOT3D_PRESENTATION
+    oot_magic_replay.reset();
     oot_hud_midpoint.clear();
-    if (const auto mesh = OotHudMesh(); mesh && vertex_batch.size() == regs.pipeline.num_vertices) {
+    bool rupee_counter=false;
+    if (const auto mesh = OotHudMesh(&rupee_counter); mesh && vertex_batch.size() == regs.pipeline.num_vertices) {
         const auto [quads, top] = *mesh;
         std::vector<HardwareVertex> filtered;
         filtered.reserve(vertex_batch.size()+132);
         const auto layout=OOT3D::HUD::GetEffectiveLayout();
-        bool magic_replaced=false,magic_blended=false;
-        std::size_t magic_begin=0,magic_end=0;
-        std::vector<HardwareVertex> midpoint_magic;
+        outline_rupees=top && rupee_counter && layout.OutlineHDRupees();
+        if(top && quads==92) {
+            OOT3D::MagicMeter::PrepareHudColors(std::span{vertex_batch},62,layout);
+            hud_colors=true;
+        }
+        bool gem_styled=false,magic_replaced=false;
         std::size_t hearts_begin=0,carrots_begin=0;
         bool carrots_replaced=false;
         const auto carrot_time=Core::System::GetInstance().CoreTiming().GetGlobalTimeUs().count();
         for (std::size_t i = 0; i < vertex_batch.size(); i += 6) {
             if (!OOT3D::HUD::KeepTriangle(quads, unsigned(i / 6 * 4), top)) continue;
+            if(top && quads==92 && i==26*6)
+                gem_styled=OOT3D::HUD::PrepareRupeeContour(vertex_batch.data()+i,layout.rupee_contour);
             if(top && quads==92 && i==59*6) {
-                const auto mix=[](const HardwareVertex& a,const HardwareVertex& b,float t) {
-                    HardwareVertex v;
-                    v.position=a.position*(1-t)+b.position*t;
-                    v.color=a.color*(1-t)+b.color*t;
-                    v.tex_coord0=a.tex_coord0*(1-t)+b.tex_coord0*t;
-                    v.tex_coord1=a.tex_coord1*(1-t)+b.tex_coord1*t;
-                    v.tex_coord2=a.tex_coord2*(1-t)+b.tex_coord2*t;
-                    v.tex_coord0_w=a.tex_coord0_w*(1-t)+b.tex_coord0_w*t;
-                    v.normquat=a.normquat*(1-t)+b.normquat*t;
-                    v.view=a.view*(1-t)+b.view*t;
-                    return v;
-                };
-                magic_begin=filtered.size();
+                const auto elapsed=OOT3D::MagicMeter::lens_elapsed_us.load();
+                const float brightness=OOT3D::MagicMeter::LensBrightness(elapsed);
                 if(OOT3D::Interpolation::Replaying()) {
-                    std::array<HardwareVertex,24> midpoint;
-                    std::copy_n(vertex_batch.begin()+i,24,midpoint.begin());
-                    magic_blended=oot_magic_history.Apply(std::span<HardwareVertex>{midpoint},
-                        OOT3D::Interpolation::guest_frames.load(),
-                        Core::System::GetInstance().CoreTiming().GetGlobalTimeUs().count(),
-                        OOT3D::Interpolation::generation.load(),
-                        [](const HardwareVertex& a,const HardwareVertex& b) {
-                            return a.color[3]==b.color[3] && a.tex_coord0==b.tex_coord0 &&
-                                a.tex_coord1==b.tex_coord1 && a.tex_coord2==b.tex_coord2;
-                        });
-                    if(magic_blended && !OOT3D::MagicMeter::Append(
-                            std::span<const HardwareVertex>{midpoint},layout,midpoint_magic,mix))
-                        midpoint_magic.assign(midpoint.begin(),midpoint.end());
+                    const auto native=std::span<const HardwareVertex,24>{vertex_batch.data()+i,24};
+                    const bool moving=oot_magic_history.Observe(native,OOT3D::Interpolation::guest_frames.load(),
+                        carrot_time,OOT3D::Interpolation::generation.load());
+                    if(moving || elapsed>=0) {
+                        auto& replay=oot_magic_replay.emplace();
+                        std::copy(native.begin(),native.end(),replay.native.begin());
+                        replay.begin=filtered.size();
+                        replay.layout=layout;
+                        replay.lens_elapsed=elapsed;
+                    }
                 } else oot_magic_history.seen=false;
                 magic_replaced=OOT3D::MagicMeter::Append(
-                    std::span<const HardwareVertex>{vertex_batch.data()+i,24},layout,filtered,mix);
+                    std::span<const HardwareVertex>{vertex_batch.data()+i,24},layout,filtered,MixHudVertex<HardwareVertex>,brightness);
             }
             if(magic_replaced && i>=59*6 && i<=62*6)continue;
-            if(top && quads==92 && i==63*6)magic_end=hearts_begin=filtered.size();
+            if(top && quads==92 && i==63*6) {
+                hearts_begin=filtered.size();
+                if(oot_magic_replay)oot_magic_replay->end=hearts_begin;
+            }
             if(top && quads==92 && i==86*6) {
                 carrots_begin=filtered.size();
                 carrots_replaced=oot_carrot_history.Update(
@@ -1013,19 +1026,27 @@ void RasterizerVulkan::DrawTriangles() {
                 OOT3D::Interpolation::guest_frames.load(),
                 Core::System::GetInstance().CoreTiming().GetGlobalTimeUs().count(),
                 OOT3D::Interpolation::generation.load());
-            if(magic_blended && magic_end>magic_begin) {
-                oot_hud_midpoint.erase(oot_hud_midpoint.begin()+magic_begin,oot_hud_midpoint.begin()+magic_end);
-                oot_hud_midpoint.insert(oot_hud_midpoint.begin()+magic_begin,midpoint_magic.begin(),midpoint_magic.end());
-            }
             if(carrots_replaced) {
-                // Carrots are the final six atlas quads. Build their halfway
-                // presentation, accounting for any magic replacement above.
-                const auto magic_delta=magic_blended && magic_end>magic_begin?
-                    std::ptrdiff_t(midpoint_magic.size())-std::ptrdiff_t(magic_end-magic_begin):0;
-                oot_hud_midpoint.resize(std::size_t(std::ptrdiff_t(carrots_begin)+magic_delta));
+                oot_hud_midpoint.resize(carrots_begin);
                 oot_carrot_history.Append(oot_hud_midpoint,carrot_time-16667,layout.carrot_shadow,layout.carrot_opacity);
             }
-            if(!hearts_blended && !magic_blended && !carrots_replaced)oot_hud_midpoint.clear();
+            if(!hearts_blended && !carrots_replaced)oot_hud_midpoint.clear();
+            else OOT3D::HUD::PrepareHeartContours(oot_hud_midpoint,hearts_begin,layout.heart_contours);
+        }
+        if(top && quads==92 && (OOT3D::HUD::PrepareHeartContours(filtered,hearts_begin,layout.heart_contours) || gem_styled)) {
+            hud_colors=true;
+            const auto set=[&](Common::Vec4f& field,Common::Vec4f value) {
+                if(field!=value){field=value;fs_data_dirty=true;}
+            };
+            const auto& layers=layout.heart_contours;
+            const std::array styles{&layers.shadow,&layers.outline,&layers.double_defense,&layout.rupee_contour};
+            for(unsigned j=0;j<styles.size();++j) {
+                const auto& s=*styles[j];
+                set(fs_data.heart_contour_shape[j],{s.x,s.y,s.width,s.height});
+                set(fs_data.heart_contour_color[j],{s.color[0],s.color[1],s.color[2],s.enabled?s.opacity:0.f});
+            }
+            set(fs_data.heart_contour_softness,{layers.shadow.softness,layers.outline.softness,layers.double_defense.softness,layout.rupee_contour.softness});
+            set(fs_data.heart_pigment,{layout.heart_color[0],layout.heart_color[1],layout.heart_color[2],layout.heart_brightness});
         }
         vertex_batch=std::move(filtered);
         if (vertex_batch.empty()) return;
@@ -1038,13 +1059,14 @@ void RasterizerVulkan::DrawTriangles() {
     pipeline_cache.UseTrivialVertexShader();
     pipeline_cache.UseTrivialGeometryShader();
 
-    Draw(false, false);
+    Draw(false, false, hud_colors, outline_rupees);
 #ifdef ENABLE_OOT3D_PRESENTATION
+    oot_magic_replay.reset();
     oot_hud_midpoint.clear();
 #endif
 }
 
-bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
+bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed, bool hud_colors, [[maybe_unused]] bool outline_rupees) {
     MICROPROFILE_SCOPE(Vulkan_Drawing);
     bool cpu_interpolation = false;
 #ifdef ENABLE_OOT3D_PRESENTATION
@@ -1190,9 +1212,8 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
                 positions[i] = {p.x, p.y, p.z, p.w};
             }
             if(clouds)return oot_storm_clouds=OOT3D::Widescreen::FadeClipGeometry(positions);
-            return clear ? OOT3D::Widescreen::ClearClipGeometry(positions) :
-                           (OOT3D::Widescreen::FadeClipGeometry(positions) ||
-                            OOT3D::Widescreen::LetterboxClipGeometry(positions));
+            return OOT3D::Widescreen::FadeClipGeometry(positions) ||
+                   (fade && OOT3D::Widescreen::LetterboxClipGeometry(positions));
         }
         if (vertex_info.vs_input_index_max - vertex_info.vs_input_index_min != 3) return false;
         std::array<OOT3D::Widescreen::Row, 4> projection{}, vertices{};
@@ -1212,9 +1233,9 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
                 vertices[i][c] = input[regs.vs.GetRegisterForAttribute(0)][c].ToFloat32();
         }
         if(clouds)return oot_storm_clouds=OOT3D::StormClouds::Geometry(projection,model,vertices);
-        return clear ? OOT3D::Widescreen::ClearGeometry(projection, model, vertices) :
-                       (OOT3D::Widescreen::FadeGeometry(projection, model, vertices) ||
-                        OOT3D::Widescreen::LetterboxGeometry(projection, model, vertices));
+        return (clear && OOT3D::Widescreen::ClearGeometry(projection, model, vertices)) ||
+               OOT3D::Widescreen::FadeGeometry(projection, model, vertices) ||
+               (fade && OOT3D::Widescreen::LetterboxGeometry(projection, model, vertices));
     }();
     const float oot_scale = !oot_full_width && OOT3D::Widescreen::Active() && !shadow_rendering && using_color_fb &&
         OOT3D::Widescreen::IsTopViewport(oot_viewport.GetWidth(), oot_viewport.GetHeight()) ?
@@ -1346,6 +1367,13 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
     // bound. Async font loading and texture-pack fallbacks keep native geometry.
     if(!accelerate && oot_number_backdrop)
         OOT3D::AmmoBackdrop::Prepend(vertex_batch,*oot_number_backdrop);
+    if(outline_rupees && oot_rupee_digit_outline &&
+       OOT3D::HUD::PrepareRupeeDigits(vertex_batch,regs.pipeline.num_vertices,*oot_rupee_digit_outline)) {
+        hud_colors=true;
+        const auto& s=*oot_rupee_digit_outline;
+        const Common::Vec4f style{s.color[0],s.color[1],s.color[2],s.thickness};
+        if(fs_data.rupee_digit_outline!=style){fs_data.rupee_digit_outline=style;fs_data_dirty=true;}
+    }
 #endif
 #ifdef ENABLE_MM3D_PRESENTATION
     const bool use_pause=pause_draw[0]||pause_draw[1]||pause_draw[2]||pause_draw[3];
@@ -1434,6 +1462,7 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
 #endif
 
     bool pickup_fog=false;
+    bool torch_fog=false;
 #ifdef ENABLE_OOT3D_PRESENTATION
     if(OOT3D::PickupFog::Candidate(regs) &&
        pica.vs_setup.GetProgramCodeHash()==OOT3D::Interpolation::ModelShader &&
@@ -1441,13 +1470,18 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
         std::array<OOT3D::PickupFog::Matrix,10> native{};
         for(unsigned b=0;b<10;++b)for(unsigned i=0;i<12;++i)
             native[b][i]=pica.vs_setup.uniforms.f[20+3*b+i/4][i%4].ToFloat32();
-        pickup_fog=OOT3D::PickupFog::Match(native,regs.pipeline.num_vertices,OOT3D::Interpolation::guest_frames.load(),
+        const auto fog=OOT3D::PickupFog::Match(native,regs.pipeline.num_vertices,OOT3D::Interpolation::guest_frames.load(),
             OOT3D::Interpolation::generation.load(),OOT3D::Interpolation::native_scene.load(),
             Core::System::GetInstance().CoreTiming().GetGlobalTimeUs().count());
+        pickup_fog=fog==OOT3D::PickupFog::Surface;
+        torch_fog=fog==OOT3D::PickupFog::Torch;
     }
 #endif
     // Sync and bind the shader
-    pipeline_cache.UseFragmentShader(regs, user_config
+    auto fragment_config=user_config;
+    fragment_config.hud_colors.Assign(hud_colors);
+    fragment_config.torch_fog.Assign(torch_fog);
+    pipeline_cache.UseFragmentShader(regs, fragment_config
 #ifdef ENABLE_MM3D_PRESENTATION
         , guest_regions.info[0]>0 || use_pause || padded_scene_copy
 #else
@@ -1685,6 +1719,47 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
     if (cpu_interpolation) native_cpu_draw = upload_cpu_draw(vertex_batch);
 
 #ifdef ENABLE_OOT3D_PRESENTATION
+    // Apply scene effects at the world-to-overlay boundary. Later HUD, lettering,
+    // remote names and fades blend over the finished scene in native order.
+    bool effects_boundary = false;
+    vk::Rect2D effects_region{};
+    const int bloom_intensity = OOT3D::PlayerGraphics::bloom.load() ?
+        OOT3D::PlayerGraphics::bloom_intensity.load() : 0;
+    const SceneEffects::Options effects{OOT3D::PlayerGraphics::fxaa.load(),bloom_intensity/100.f};
+    if ((effects.fxaa || effects.bloom > 0) && !shadow_rendering && using_color_fb &&
+        OOT3D::Interpolation::menu_page.load() == OOT3D::Interpolation::MenuPage::None &&
+        OOT3D::Widescreen::IsTopViewport(oot_viewport.GetWidth(), oot_viewport.GetHeight())) {
+        using namespace OOT3D::Interpolation;
+        const auto frame = guest_frames.load();
+        if (oot_scene_effects_frame != frame) {
+            oot_scene_effects_frame = frame;
+            oot_scene_effects_target = 0;
+            oot_scene_effects_applied = false;
+        }
+        if (!oot_scene_effects_applied && framebuffer->color_level == 0) {
+            const auto address = regs.framebuffer.framebuffer.GetColorBufferPhysicalAddress();
+            Matrix projection{};
+            for (unsigned row = 0; row < 4; ++row)
+                for (unsigned col = 0; col < 4; ++col)
+                    projection[row][col] = pica.vs_setup.uniforms.f[row][col].ToFloat32();
+            const bool world = pica.vs_setup.GetProgramCodeHash() == ModelShader &&
+                pica.vs_setup.GetSwizzleDataHash() == ModelSwizzle && WorldProjection(projection,CameraSnapshot());
+            if (world && using_depth_fb && write_depth_fb) oot_scene_effects_target = address;
+            if (!world && address == oot_scene_effects_target && address) {
+                oot_scene_effects_applied = true;
+                const auto rect = fb_helper.DrawRect();
+                effects_region = vk::Rect2D{{s32(rect.left),s32(rect.bottom)}, {rect.GetWidth(),rect.GetHeight()}};
+                if (!oot_scene_effects) oot_scene_effects = std::make_unique<SceneEffects>(instance,scheduler,renderpass_cache,update_queue);
+                const auto extent = res_cache.GetSurface(framebuffer->color_id).RealExtent();
+                effects_boundary = oot_scene_effects->Prepare(framebuffer->Images()[0], framebuffer->ImageView(SurfaceType::Color),
+                    {extent.width, extent.height}, effects_region,effects);
+                if (effects_boundary) {
+                    renderpass_cache.BeginRendering(framebuffer,rect);
+                    oot_scene_effects->Composite(framebuffer->RenderPass(),effects_region,effects);
+                }
+            }
+        }
+    }
     // Capture the camera/projection and depth convention from verified scene
     // draws. The name pass uses these exact transforms, not presentation math.
     const auto name_frame=OOT3D::Interpolation::guest_frames.load();
@@ -1934,6 +2009,20 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
                     }
                 }
             } else if(!accelerate) {
+                // Styled borders can push the green quad past the captured vertex prefix.
+                if (d.vertices==92*6 && oot_magic_history.seen && oot_magic_history.frame==d.frame) {
+                    if (const auto mesh=OotHudMesh(); mesh && mesh->first==92 && mesh->second) {
+                        auto& m=d.magic_fill.emplace();
+                        const auto& meter=oot_magic_history.previous;
+                        m.alpha=meter[18].color[3];
+                        m.moving=oot_magic_history.moving;
+                        for(unsigned c=0;c<4;++c) {
+                            m.left[c]=meter[18].position[c];
+                            m.right[c]=meter[20].position[c];
+                            m.replay_start[c]=m.moving?oot_magic_history.start_edge[0][c]:m.right[c];
+                        }
+                    }
+                }
                 if(OOT3D::Interpolation::SurfaceEffects::Candidate(regs,
                     pica.vs_setup.GetProgramCodeHash(),pica.vs_setup.GetSwizzleDataHash()) && pica.CanReplayCpuVertices()) {
                     const auto& replay=pica.GetCpuVertexReplay();
@@ -1960,17 +2049,30 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
         using namespace OOT3D::Interpolation;
         const auto frame=guest_frames.load();
         const auto address=regs.framebuffer.framebuffer.GetColorBufferPhysicalAddress();
+        const auto previous_page=oot_replay_frame.page;
         const bool first_draw=oot_replay_frame.Begin(frame,address);
+        const auto page=oot_replay_frame.page;
         if(first_draw) {
-            int rate=TargetFPS();
-            if(Settings::values.use_vsync.GetValue())rate=std::min(rate,
-                std::clamp(int(std::lround(display_refresh_rate.load())),30,120));
-            oot_rate_plan=oot_rate_clock.Next(frame,rate);
+            const int rate=PresentationFPS(page,Settings::values.use_vsync.GetValue());
+            if(page!=previous_page)
+                for(auto& slot:oot_replay_slots)slot.menu_geometry={};
+            oot_rate_plan=oot_rate_clock.Next(frame,rate,SourceFPS(page));
+        }
+        std::array<u32,3> cursor_selection{};
+        if(page!=MenuPage::None && oot_rate_plan.fps>60 && !accelerate) {
+            const auto& attributes=regs.pipeline.vertex_attributes;
+            for(const auto& loader:attributes.attribute_loaders) {
+                if(loader.component_count!=1 || loader.byte_count!=12)continue;
+                const auto at=u64(attributes.GetPhysicalBaseAddress())+loader.data_offset;
+                if(at<=UINT32_MAX)cursor_selection=MenuCursor::Selection(memory.GetPhysicalPointer(PAddr(at)),
+                    regs.pipeline.num_vertices,frame,generation.load());
+                if(cursor_selection[0])break;
+            }
         }
         for(unsigned slot_index=0;slot_index<oot_rate_plan.sample_slots;++slot_index) {
-        // At exact multiples of 30 the last slot is always the existing native
+        // At exact multiples of the source rate the last slot is the native
         // image. It needs neither a private attachment nor duplicate history.
-        if(oot_rate_plan.fps%30==0 && oot_rate_plan.phases[slot_index]>=1.f)continue;
+        if(oot_rate_plan.fps%oot_rate_plan.source_fps==0 && oot_rate_plan.phases[slot_index]>=1.f)continue;
         auto& slot=oot_replay_slots[slot_index];
         splash_old_cpu_draw={};
         vk::DescriptorSet old_effect_texture_set{};
@@ -1997,7 +2099,8 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
         const bool model_shader=pica.vs_setup.GetProgramCodeHash()==ModelShader &&
             pica.vs_setup.GetSwizzleDataHash()==ModelSwizzle;
         const auto sample=CameraSnapshot();
-        const bool perspective=model_shader && WorldProjection(projection,sample);
+        const bool menu_frame=oot_rate_plan.source_fps==60;
+        const bool perspective=!menu_frame && model_shader && WorldProjection(projection,sample);
         oot_fairy_glow.reset();
         oot_waterfall_uv.reset();
         oot_song_visual.reset();
@@ -2022,11 +2125,7 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
             Waterfall::UV uv;
             for(unsigned r=0;r<Waterfall::Rows.size();++r)for(unsigned c=0;c<4;++c)
                 uv[r][c]=pica.vs_setup.uniforms.f[Waterfall::Rows[r]][c].ToFloat32();
-            oot_waterfall_uv=oot_waterfall_history.Apply(frame,{
-                regs.pipeline.vertex_attributes.GetPhysicalBaseAddress(),u32(regs.pipeline.index_array.offset),
-                regs.texturing.texture0.GetPhysicalAddress(),regs.texturing.texture1.GetPhysicalAddress(),
-                regs.texturing.main_config.texture2_enable?regs.texturing.texture2.GetPhysicalAddress():0,
-                generation.load(),sample.scene},uv);
+            oot_waterfall_uv=oot_waterfall_history.ApplyDraw(frame,regs,is_indexed,generation.load(),sample.scene,uv);
         }
         if(perspective) {
             const auto now=Core::System::GetInstance().CoreTiming().GetGlobalTimeUs().count();
@@ -2039,7 +2138,7 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
                     for(unsigned r=0;r<3;++r)for(unsigned c=0;c<4;++c)
                         palette[i][r][c]=pica.vs_setup.uniforms.f[20+i*3+r][c].ToFloat32();
                 }
-                oot_pose_override=oot_pose_replay.Select(palette,sample,frame,now);
+                oot_pose_override=oot_pose_replay.Select(palette,sample,frame,now,regs.pipeline.num_vertices);
                 if(SurfaceEffects::enabled) {
                     if(const auto kind=ModelEffects::Candidate(regs);kind!=ModelEffects::None) {
                         ModelEffects::Sample visual;visual.model=palette[0];
@@ -2122,10 +2221,8 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
                 oot_replay_frame.Fail(oot_replay_camera.failure);
             }
         }
-        // Song-menu models retain their current selection/artwork, but replay
-        // the shared slide halfway between native frames in both CPU/GPU modes.
+        // Sample the song panel curve and discrete cursor position at this output phase.
         oot_song_slide=(!perspective && model_shader)?OotSongSlide():std::nullopt;
-        if(oot_song_slide)for(auto& value:*oot_song_slide)value*=2*(1-sample_fraction);
         if(OOT3D::OcarinaSlide::DiagnosticActive() && regs.pipeline.num_vertices==OOT3D::Ocarina::DrawQuadCount*6 && OOT3D::OcarinaSlide::renderer_logs.fetch_add(1)<400) {
             LOG_INFO(Render_Vulkan, "OoT song slide replay: frame={} cpu={} shader={:016x} swizzle={:016x} perspective={} route_active={} matched={} failed={} world={}",
                 frame,!accelerate,pica.vs_setup.GetProgramCodeHash(),pica.vs_setup.GetSwizzleDataHash(),
@@ -2186,6 +2283,13 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
                     std::vector<SurfaceEffects::Vertex> inputs(replay.Inputs().size());
                     for(unsigned i=0;i<inputs.size();++i)for(unsigned a=0;a<3;++a)for(unsigned c=0;c<4;++c)
                         inputs[i][a][c]=replay.Inputs()[i][a][c].ToFloat32();
+                    // Streak strips carry position and UV. Their color comes from
+                    // the vertex shader uniform shared by the whole impact.
+                    if(effect_kind==CombatSprites::Streaks) {
+                        CombatSprites::Color tint;
+                        for(unsigned c=0;c<4;++c)tint[c]=uniforms.f[8][c].ToFloat32();
+                        for(auto& v:inputs) { v[2]=v[1]; v[1]=tint; }
+                    }
                     oot_surface_effects.Context(generation.load(),sample.scene);
                     if(const auto half=ReplayEffectStrip<SurfaceEffects::Vertex>(inputs,replay.Order(),[&](const auto& vertices,const auto& order) {
                         ++SurfaceEffects::replay_counts[effect_kind].canonical;
@@ -2195,13 +2299,19 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
                     })) {
                         if(*half!=inputs)++SurfaceEffects::replay_counts[effect_kind].changed;
                         effect_inputs=replay.Inputs();
-                        for(unsigned i=0;i<inputs.size();++i)for(unsigned a=0;a<3;++a)for(unsigned c=0;c<4;++c)
+                        for(unsigned i=0;i<inputs.size();++i)for(unsigned a=0;a<(effect_kind==CombatSprites::Streaks?1u:3u);++a)for(unsigned c=0;c<4;++c)
                             effect_inputs[i][a][c]=Pica::f24::FromFloat32((*half)[i][a][c]);
+                        if(effect_kind==CombatSprites::Streaks) {
+                            const auto& tint=(*half)[replay.Order().front()][1];
+                            for(unsigned c=0;c<4;++c)uniforms.f[8][c]=Pica::f24::FromFloat32(tint[c]);
+                            oot_sparkle_color=oot_surface_effects.CombatColor();
+                            fs_data_dirty=true;
+                        }
                         if(effect_kind==6) {
                             oot_sparkle_color=oot_surface_effects.SparkleColor();
                             if(oot_sparkle_color)fs_data_dirty=true;
                         }
-                        if(effect_kind>=8 && !oot_surface_effects.OldSpriteInputs().empty()) {
+                        if(effect_kind>=8 && effect_kind<=15 && !oot_surface_effects.OldSpriteInputs().empty()) {
                             const auto prior=ReplayEffectStrip<SurfaceEffects::Vertex>(inputs,replay.Order(),[&](const auto&,const auto&) {
                                 return std::optional{oot_surface_effects.OldSpriteInputs()};
                             });
@@ -2252,16 +2362,39 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
                 }
             }
         }
-        if(!accelerate && !perspective && !oot_hud_midpoint.empty()) {
-            auto vertices=oot_hud_midpoint;
-            if(vertices.size()==vertex_batch.size())for(unsigned i=0;i<vertices.size();++i)
+        if(!accelerate && !perspective && (!oot_hud_midpoint.empty() || oot_magic_replay)) {
+            auto vertices=oot_hud_midpoint.empty()?vertex_batch:oot_hud_midpoint;
+            if(!oot_hud_midpoint.empty() && vertices.size()==vertex_batch.size())for(unsigned i=0;i<vertices.size();++i)
                 for(unsigned c=0;c<4;++c) {
                     vertices[i].position[c]=vertex_batch[i].position[c]+
                         (vertices[i].position[c]-vertex_batch[i].position[c])*2*(1-sample_fraction);
                     vertices[i].color[c]=std::clamp(vertex_batch[i].color[c]+
                         (vertices[i].color[c]-vertex_batch[i].color[c])*2*(1-sample_fraction),0.f,1.f);
                 }
+            if(oot_magic_replay) {
+                const auto& replay=*oot_magic_replay;
+                auto meter=replay.native;
+                oot_magic_history.Sample(std::span{meter},sample_fraction);
+                const float brightness=OOT3D::MagicMeter::LensBrightness(
+                    replay.lens_elapsed-std::lround((1.f-sample_fraction)*33333));
+                std::vector<HardwareVertex> styled;
+                if(!OOT3D::MagicMeter::Append(std::span<const HardwareVertex>{meter},replay.layout,
+                        styled,MixHudVertex<HardwareVertex>,brightness))
+                    styled.assign(meter.begin(),meter.end());
+                vertices.erase(vertices.begin()+replay.begin,vertices.begin()+replay.end);
+                vertices.insert(vertices.begin()+replay.begin,styled.begin(),styled.end());
+            }
             midpoint_cpu_draw=upload_cpu_draw(vertices);use_midpoint_cpu_draw=true;
+        }
+        if(!menu_frame && !accelerate && !perspective && SurfaceEffects::enabled) {
+            if(const auto flare=OOT3D::SunFlare::Identify(regs,pica.vs_setup.uniforms,
+                    pica.vs_setup.GetProgramCodeHash(),pica.vs_setup.GetSwizzleDataHash())) {
+                auto vertices=vertex_batch;
+                if(slot.sun_flare.Apply(*flare,vertices,frame,{sample.scene,sample.owner,sample.cut_group,
+                        address,regs.texturing.texture0.GetPhysicalAddress()})) {
+                    midpoint_cpu_draw=upload_cpu_draw(vertices);use_midpoint_cpu_draw=true;
+                }
+            }
         }
         if(!accelerate && !perspective && OOT3D::CircleWipe::Candidate(regs,
            pica.vs_setup.GetProgramCodeHash(),pica.vs_setup.GetSwizzleDataHash())) {
@@ -2311,6 +2444,21 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
                 }
             }
         }
+        if(menu_frame && !accelerate && model_shader) {
+            const auto& t=regs.texturing;
+            const MenuGeometry::Material material{
+                t.main_config.texture0_enable?t.texture0.GetPhysicalAddress():0u,
+                t.main_config.texture1_enable?t.texture1.GetPhysicalAddress():0u,
+                u32(regs.pipeline.num_vertices),unsigned(regs.pipeline.triangle_topology.Value()),
+                t.tev_stage0.ops_raw,t.tev_stage0.sources_raw,
+                cursor_selection[0],cursor_selection[1],cursor_selection[2]};
+            std::vector<HardwareVertex> vertices;
+            if(slot.menu_geometry.Apply(frame,material,vertex_batch,vertices))oot_replay_frame.menu=true;
+            if(!vertices.empty()) {
+                midpoint_cpu_draw=upload_cpu_draw(vertices);
+                use_midpoint_cpu_draw=true;
+            }
+        }
         // Names enter each interpolated scene immediately before its HUD, using
         // the same corrected world projection and the same depth attachment.
         if(slot.names.frame!=frame){slot.names={};slot.names.frame=frame;}
@@ -2334,12 +2482,19 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
             const bool reverse=compare==CF::GreaterThan || compare==CF::GreaterThanOrEqual;
             const unsigned width=std::max<unsigned>(draw_rect.right,viewport.width);
             const unsigned height=std::max<unsigned>(draw_rect.top,viewport.height);
+            bool effects_replay = false;
+            if (effects_boundary && layer.Visible() && layer.Width()==width && layer.Height()==height) {
+                layer.PrepareForSampling();
+                effects_replay = oot_scene_effects->Prepare(layer.Image(),layer.View(),{width,height},effects_region,effects);
+            }
             if(layer.Visible() && (layer.Width()!=width || layer.Height()!=height))oot_replay_frame.Fail(ReplayFailure::Layer);
             else if(layer.Begin(width,height,reverse?0.f:1.f)) {
                 pipeline_info.state.attachments.color=VideoCore::PixelFormat::RGBA8;
                 pipeline_info.state.attachments.depth=VideoCore::PixelFormat::D24S8;
                 pipeline_info.dynamic_info.viewport={viewport.x,viewport.y,viewport.x+viewport.width,viewport.y+viewport.height};
                 pipeline_info.dynamic_info.scissor=draw_rect;
+                if (effects_replay) oot_scene_effects->Composite(renderpass_cache.GetRenderpass(
+                    VideoCore::PixelFormat::RGBA8,VideoCore::PixelFormat::D24S8,false),effects_region,effects);
                 if(name_draw.count)oot_name_renderer->Render(name_draw,stream_buffer.Handle(),slot.names.viewport,slot.names.scissor);
                 if(!draw_batch())oot_replay_frame.Fail(ReplayFailure::Draw);
                 else {++replayed_draws;if(oot_pose_override)++Pose::blended_draws;}
@@ -3959,6 +4114,7 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
     using TextureType = Pica::TexturingRegs::TextureConfig::TextureType;
 #ifdef ENABLE_OOT3D_PRESENTATION
     oot_number_backdrop.reset();
+    oot_rupee_digit_outline.reset();
     // Exact native indicator ownership, also published with interpolation off.
     // Other sprites sharing its atlas retain their original sampling.
     bool smooth_indicator=false;
@@ -4068,6 +4224,7 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
                 font_descriptor.format==13 && number_layout.hd_numbers && number_layout.hd_timer_numbers;
             std::shared_ptr<const OOT3D::HDFont::RupeeAtlas> rupees;
             bool ammo_backdrop=false,rupee_backdrop=false,timer_backdrop=false;
+            bool styled_counter=false;
             if(number_layout.hd_numbers && font_descriptor.width==256 && font_descriptor.height==128 && font_descriptor.format==4) {
                 const auto& layout=number_layout;
                 if(layout.hd_rupee_numbers) {
@@ -4076,6 +4233,7 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
                     if(mesh && mesh->second && counter) {
                         rupee_backdrop=texture_index==0 && OOT3D::AmmoBackdrop::Enabled(layout,true);
                         rupees=OOT3D::HDFont::StyledRupeeAtlas(layout.hd_rupee_shadow,false,rupee_backdrop,layout.hd_numbers_bold);
+                        styled_counter=rupees && texture_index==0 && layout.OutlineHDRupees();
                     }
                 }
                 if(!rupees && (layout.hd_timer_numbers || layout.hd_ammo_numbers || layout.hd_score_numbers || layout.hd_skulltula_numbers)) {
@@ -4124,6 +4282,7 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
                             bytes, rupees ? std::span<const u8>(rupees->rgba) :
                                 generated ? std::span<const u8>(*generated) : std::span<const u8>{},rupees?rupees->variant:0)) {
                             texture_view = view;
+                            if(styled_counter && rupees)oot_rupee_digit_outline=number_layout.rupee_digit_outline;
                             if(rupees && (ammo_backdrop || rupee_backdrop || timer_backdrop))
                                 oot_number_backdrop=timer_backdrop?number_layout.hd_timer_backdrop:
                                     rupee_backdrop?number_layout.hd_rupee_backdrop:number_layout.hd_ammo_backdrop;

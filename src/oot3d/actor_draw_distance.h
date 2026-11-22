@@ -10,7 +10,7 @@
 
 namespace OOT3D::ActorDrawDistance {
 using U32=std::uint32_t;
-constexpr float Minimum=1.f,Maximum=5.f,Default=1.f;
+constexpr float Minimum=1.f,Maximum=3.75f,Default=Maximum;
 inline std::atomic<float> multiplier{Default};
 inline std::atomic<bool> dirty{false};
 constexpr U32 FirstSVC=0xfff600;
@@ -66,11 +66,11 @@ inline U32 Instruction(U32 pc,U32 word) {
     return word;
 }
 inline float Clamp(float value) {
-    return std::isfinite(value)?std::clamp(value,Minimum,Maximum):Default;
+    return std::isfinite(value)?std::clamp(value,Minimum,Maximum):Minimum;
 }
 inline U32 Scale(U32 word,float factor,bool squared=false) {
     factor=Clamp(factor);
-    if(factor==Default)return word; // Exact native bits, including signed zero.
+    if(factor==1.f)return word; // Exact native bits, including signed zero.
     const float value=std::bit_cast<float>(word);
     if(!std::isfinite(value) || value<=0)return word;
     if(squared)factor*=factor;

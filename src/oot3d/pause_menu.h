@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "oot3d/title_hooks.h"
+#include "oot3d/interpolation_rate.h"
 #include "oot3d/pause_ammo.h"
+#include "oot3d/hud_layout.h"
 #include "oot3d/save_menu.h"
 #include "oot3d/death_menu.h"
 #include "oot3d/map_time_tint.h"
@@ -109,6 +111,10 @@ struct PromptCorner {
     float strength=.55f,width=128,height=72,softness=.9f,x=0,y=0;
     std::array<float,3> color{0,0,0};
 };
+struct BackgroundVignette {
+    bool enabled=false;
+    float width_percent=40,height_percent=40,opacity=.6f;
+};
 struct FloorGrowth {
     bool enabled=false;
     float size=1.25f,speed=1.f;
@@ -142,6 +148,9 @@ struct Layout : std::array<Pose,PartCount> {
     ArrowShadow arrow_shadow{};
     ArrowShadow tab_shadow{true,3,0,1,.5f};
     bool horizontal=false, stack_background=false;
+    BackgroundVignette background_vignette{};
+    bool bottom_gradient=true;
+    float bottom_gradient_width_percent=100,bottom_gradient_height=44,bottom_gradient_opacity=.6f;
     float header_y=0, background_darkness=0;
     float transition_seconds=DefaultTransitionSeconds;
     float preview_rotation_speed=1.f;
@@ -378,6 +387,12 @@ template<class M> bool Active(M& m) {
            m.Read(UI+0x20)==std::optional<U32>{0} &&
            m.Read(UI+0x24)==std::optional<U32>{1} &&
            (m.Read(play+0x100).value_or(0)&255)==3;
+}
+template<class M> Interpolation::MenuPage PresentationPage(M& m) {
+    using Interpolation::MenuPage;
+    if(SaveMenu::Active(m))return MenuPage::Save;
+    if(m.Read(0x5066f8+0x34).value_or(0))return MenuPage::Items;
+    return m.Read(0x50446c+0x18).value_or(0)?MenuPage::Gear:MenuPage::Map;
 }
 template<class M> bool MapPage(M& m) {
     return !SaveMenu::BackdropActive(m) && m.Read(0x5066f8+0x34)==std::optional<U32>{0} &&
@@ -694,6 +709,44 @@ template<class M> std::optional<ItemFlight> Flight(M& m,U32 mesh,unsigned quad,
     for(unsigned i=0;i<2;++i)flight.center[i]=targets[0][i]+t*(targets[1][i]-targets[0][i]);
     return flight;
 }
+// The bow chooser uses its own flight and expanding copy (0044689c/0044697c).
+// Its icon moves halfway to the bow per update, then grows at the destination.
+template<class M> std::optional<ItemFlight> ArrowFlight(M& m,U32 mesh,unsigned quad,
+                                                       const Layout& poses) {
+    constexpr U32 root=0x5066f8;
+    if(quad!=0 || m.Read(root+0x34)!=12)return {};
+    const auto phase=m.Read(root+0x38);
+    if(phase!=3 && phase!=4)return {};
+    const U32 glow=m.Read(root+0x44).value_or(0);
+    if(!OwnershipCandidate(m,glow,12))return {};
+    const U32 model=m.Read(glow+8).value_or(0);
+    if(!OwnershipCandidate(m,model,0x1e4) || m.Read(model)!=0x4ebd60 || m.Read(model+4)!=mesh)return {};
+
+    const unsigned index=m.Read(root+0x50).value_or(24);
+    if(index>=24)return {};
+    ItemFlight f;
+    f.to=index%6==5?Slots:Items;
+    auto dest=f.to==Slots?SlotCenter(index/6,poses):
+        std::array{32.f+48*(index%6),28.f+48*(index/6)};
+    f.center=Move(dest[0],dest[1],f.to,poses[f.to]);
+    f.scale=poses[f.to].scale*(f.to==Slots?poses.slot_content_scale:1);
+    f.progress=1;
+    if(phase==3) {
+        // Popup origin tables at 004d4abc, followed by the local arrow offsets.
+        constexpr std::array<float,6> xs{55,103,151,55,103,151};
+        constexpr std::array<float,4> ys{0,48,96,137};
+        const auto col=m.Read(root+0x78).value_or(6),row=m.Read(root+0x7c).value_or(4);
+        const auto arrow=m.Read(root+0x90).value_or(0),tick=m.Read(root+0x80).value_or(6);
+        if(col>=xs.size() || row>=ys.size() || tick>5 ||
+           (arrow!=3 && (arrow<0x38 || arrow>0x3a)))return {};
+        const auto start=Move(xs[col]+21+(arrow==0x38 || arrow==0x3a?52:7),
+                              ys[row]+21+(arrow>=0x39?53:7),Items,poses[Items]);
+        f.progress=1-std::ldexp(1.f,-static_cast<int>(tick));
+        for(unsigned i=0;i<2;++i)f.center[i]=std::lerp(start[i],f.center[i],f.progress);
+        f.scale=std::lerp(poses[Items].scale,f.scale,f.progress);
+    }
+    return f;
+}
 // Native state 11 expands two landing glows around their destination slots.
 // Their left edges cross the old item/slot boundary as they grow, so classify
 // them by the owning controller and target index rather than their bounds.
@@ -839,7 +892,8 @@ template<class M> bool CopyPositions(M& m,U32 mesh,U32 dst,U32 src,U32 bytes,
            max_x>min_x && max_y>min_y) {
             auto flight=Flight(m,mesh,q,poses);
             if(!flight) {
-                flight=LandingGlow(m,mesh,q,poses);
+                flight=ArrowFlight(m,mesh,q,poses);
+                if(!flight)flight=LandingGlow(m,mesh,q,poses);
                 // The native rectangle helper truncates half-pixel offsets.
                 // Recenter the interpolated landing copy before applying the
                 // user's slot layout so odd widths don't wobble diagonally.
@@ -1348,6 +1402,7 @@ struct Hook {
             dungeon_page.store(routed && DungeonPage(m));
             dungeon_floor_rows.store(routed && DungeonPage(m)?DungeonFloorRows(m):0);
             on_top.store(routed);
+            if(routed)Interpolation::menu_page=PresentationPage(m);
             SaveMenu::on_top.store(routed && SaveMenu::Active(m));
             SaveMenu::input_page.store(routed?SaveMenu::CurrentInputPage(m):SaveMenu::InputPage::Hidden);
             if(drawing) {r[14]=Sites[1].pc;r[15]=0x41ec2c;}

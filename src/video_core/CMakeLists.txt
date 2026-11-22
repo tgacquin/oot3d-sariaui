@@ -204,7 +204,8 @@ if (ENABLE_VULKAN)
     )
     if (ENABLE_OOT3D_PRESENTATION)
         target_sources(video_core PRIVATE ../mm3d/prompt_layer.cpp
-            renderer_vulkan/vk_remote_names.cpp renderer_vulkan/vk_remote_names.h)
+            renderer_vulkan/vk_remote_names.cpp renderer_vulkan/vk_remote_names.h
+            renderer_vulkan/vk_scene_effects.cpp renderer_vulkan/vk_scene_effects.h)
     endif()
     if (ENABLE_MM3D_PRESENTATION OR ENABLE_OOT3D_PRESENTATION)
         target_sources(video_core PRIVATE renderer_vulkan/vk_visibility_depth.cpp renderer_vulkan/vk_visibility_depth.h)

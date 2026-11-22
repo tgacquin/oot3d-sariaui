@@ -103,8 +103,8 @@ int main(int argc,char** argv) {
     observe();
     assert(hook.bounds && hook.extension && decodes==320*240);
     assert(hook.cached_crop==E::Crop{});
-    const auto image=hook.extension;hook.dirty=false;hook.ResetFrame();observe();
-    assert(hook.extension==image && decodes==320*240); // No re-decode/rebuild for a stationary map.
+    const auto image=hook.extension;assert(hook.dirty);hook.ResetFrame();observe();
+    assert(hook.extension==image && decodes==320*240); // Pending guest upload cannot trigger another CPU composition.
     m.Floats(live,std::array<float,12>{50,20,0,210,20,0,50,140,0,210,140,0});
     hook.ResetFrame();observe();assert(hook.extension==image);
     assert(std::abs(hook.bounds->right-hook.bounds->left-128)<.001f);

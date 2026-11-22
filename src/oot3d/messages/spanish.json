@@ -2,14 +2,277 @@
   "language": "Spanish",
   "language_slot": 7,
   "notes": [
-    "Navi uses D-pad Up; the right-stick click controls first-person view. Only these related tutorials are translated here."
+    "Controller instructions for the USA message archive."
   ],
   "messages": {
+    "0002": {
+      "edits": [
+        {
+          "find": "la pantalla del mapa",
+          "replace": "el mapa"
+        }
+      ]
+    },
+    "0003": {
+      "edits": [
+        {
+          "find": "la\npantalla del mapa",
+          "replace": "el\nmapa"
+        }
+      ]
+    },
+    "0004": {
+      "edits": [
+        {
+          "find": "la pantalla del mapa",
+          "replace": "el mapa"
+        }
+      ]
+    },
+    "0005": {
+      "edits": [
+        {
+          "find": "la pantalla del mapa",
+          "replace": "el mapa"
+        }
+      ]
+    },
+    "0008": {
+      "edits": [
+        {
+          "find": "la pantalla\ndel mapa",
+          "replace": "el mapa"
+        }
+      ]
+    },
+    "0009": {
+      "edits": [
+        {
+          "find": "la pantalla\ndel mapa",
+          "replace": "el mapa"
+        }
+      ]
+    },
+    "000D": {
+      "edits": [
+        {
+          "find": "la pantalla del mapa",
+          "replace": "el mapa"
+        }
+      ]
+    },
+    "000E": {
+      "edits": [
+        {
+          "find": "la pantalla del mapa",
+          "replace": "el mapa"
+        }
+      ]
+    },
+    "0010": {
+      "edits": []
+    },
+    "0011": {
+      "edits": []
+    },
+    "0012": {
+      "edits": []
+    },
+    "0013": {
+      "edits": []
+    },
+    "0014": {
+      "edits": []
+    },
+    "0015": {
+      "edits": []
+    },
+    "0016": {
+      "edits": []
+    },
+    "0017": {
+      "edits": []
+    },
+    "001C": {
+      "edits": []
+    },
+    "001D": {
+      "edits": []
+    },
+    "0026": {
+      "edits": [
+        {
+          "find": "pantalla de equipo",
+          "replace": "página de equipo"
+        },
+        {
+          "find": "la {1d:41}pantalla del mapa",
+          "replace": "el {1d:41}mapa"
+        }
+      ]
+    },
+    "0030": {
+      "edits": [
+        {
+          "find": "Toca {24:1a} en la pantalla táctil\npara abrir la {1d:43}pantalla de objetos\n{1d:00}y asígnala a {24:1c}, {24:1e}, {24:1f} o {24:1d}.",
+          "replace": "Oprime SELECT para abrir {1d:43}Objetos{1d:00}.\nElige el objeto y asígnalo a\n{24:1e}, {24:1f}, ZL o ZR."
+        }
+      ]
+    },
+    "0031": {
+      "edits": []
+    },
+    "0032": {
+      "edits": []
+    },
+    "0033": {
+      "edits": []
+    },
+    "0034": {
+      "edits": [
+        {
+          "find": "En la {1d:43}pantalla de objetos{1d:00} puedes\nasignarlas a {24:1c}, {24:1e}, {24:1f} o {24:1d}.",
+          "replace": "Oprime SELECT para abrir {1d:43}Objetos{1d:00}.\nElige el objeto y asígnalo a\n{24:1e}, {24:1f}, ZL o ZR."
+        }
+      ]
+    },
+    "0035": {
+      "edits": []
+    },
+    "0036": {
+      "edits": []
+    },
+    "0037": {
+      "edits": [
+        {
+          "find": "Toca {24:1a} en la pantalla táctil\npara abrir la {1d:43}pantalla de objetos{1d:00}\ny asignarlo a {24:1c}, {24:1e}, {24:1f} o {24:1d}.",
+          "replace": "Oprime SELECT para abrir {1d:43}Objetos{1d:00}.\nElige el objeto y asígnalo a\n{24:1e}, {24:1f}, ZL o ZR."
+        }
+      ]
+    },
+    "0038": {
+      "edits": []
+    },
+    "0039": {
+      "edits": []
+    },
+    "0042": {
+      "edits": []
+    },
+    "0043": {
+      "edits": []
+    },
+    "0044": {
+      "edits": []
+    },
+    "0045": {
+      "edits": []
+    },
+    "0046": {
+      "edits": []
+    },
+    "0047": {
+      "edits": []
+    },
+    "0048": {
+      "edits": []
+    },
+    "004A": {
+      "edits": [
+        {
+          "find": "Toca {24:16}\nen la pantalla táctil para usarla.",
+          "replace": "Oprime\nderecha en la cruz de control\npara tocarla."
+        }
+      ]
+    },
+    "004C": {
+      "edits": [
+        {
+          "find": "Dirígete a la {1d:42}pantalla de equipo\n{1d:00}y tócalo para equiparlo o elígelo\ncon {24:00} y oprime {24:06}.",
+          "replace": "Oprime SELECT y luego {24:0a} para\nabrir {1d:42}Equipo{1d:00}. Elige el escudo\ncon {24:00} y oprime {24:06} para equiparte."
+        }
+      ]
+    },
+    "004D": {
+      "edits": [
+        {
+          "find": "Ve a la {1d:42}pantalla de equipo{1d:00} y toca\neste escudo para equiparlo.",
+          "replace": "Oprime SELECT y luego {24:0a} para\nabrir {1d:42}Equipo{1d:00}. Elige el escudo\ncon {24:00} y oprime {24:06} para equiparte."
+        }
+      ]
+    },
+    "0058": {
+      "edits": []
+    },
+    "005D": {
+      "edits": []
+    },
+    "0066": {
+      "edits": [
+        {
+          "find": "¡Toca {24:1b} en la pantalla táctil para\nver la pantalla del mapa!",
+          "replace": "Oprime SELECT y luego {24:0b} para\nabrir el {1d:41}mapa{1d:00}."
+        },
+        {
+          "find": "Para ver los planos de otras plantas\nde la mazmorra, toca su número\ncorrespondiente.",
+          "replace": "Elige la planta con {24:00}."
+        }
+      ]
+    },
+    "0069": {
+      "edits": []
+    },
+    "007A": {
+      "edits": []
+    },
+    "0098": {
+      "edits": []
+    },
+    "0099": {
+      "edits": []
+    },
+    "009A": {
+      "edits": []
+    },
+    "00A3": {
+      "edits": []
+    },
+    "00A4": {
+      "edits": [
+        {
+          "find": "Toca {24:19} en la pantalla táctil\npara abrir la {1d:43}{1d:42}pantalla de equipo{1d:43}\n{1d:00}y equiparla.",
+          "replace": "Oprime SELECT y luego {24:0a} para\nabrir {1d:42}Equipo{1d:00}. Elige la espada\ncon {24:00} y oprime {24:06} para equiparte."
+        }
+      ]
+    },
+    "00AD": {
+      "edits": []
+    },
+    "00AE": {
+      "edits": []
+    },
+    "00AF": {
+      "edits": []
+    },
+    "00B1": {
+      "edits": []
+    },
+    "00CB": {
+      "edits": []
+    },
     "0101": {
       "edits": [
         {
           "find": "{19}{1d:44}¡Mira, mira, {0b}!\n¡Puedes ver qué hay bajo esa {1d:00}telaraña\n{1d:44}con {1d:00}{1d:44}{1d:44}{24:18}{1d:44}!{1d:00}{00}",
           "replace": "{19}{1d:44}¡Mira, mira, {0b}!\nPulsa el stick derecho para ver\nqué hay bajo esa {1d:00}telaraña{1d:44}.{1d:00}{00}"
+        }
+      ]
+    },
+    "0103": {
+      "edits": [
+        {
+          "find": "\nque está en la pantalla superior!",
+          "replace": "!"
         }
       ]
     },
@@ -21,6 +284,106 @@
         }
       ],
       "requires": "NaviUp"
+    },
+    "1025": {
+      "edits": [
+        {
+          "find": "y para disparar solo hay que soltar.",
+          "replace": "y suelta el botón para disparar."
+        }
+      ]
+    },
+    "1035": {
+      "edits": [
+        {
+          "find": " de las pantallas?",
+          "replace": "?"
+        },
+        {
+          "find": "Los de la derecha de la pantalla táctil\nEl de la pantalla superior",
+          "replace": "Los botones de objetos\nEl botón de acción"
+        }
+      ]
+    },
+    "1036": {
+      "edits": [
+        {
+          "find": "Los iconos {24:1c}, {24:1e}, {24:1f} y {24:1d} se llaman {1d:43}iconos\nde objetos{1d:00}.",
+          "replace": "Los {1d:43}botones de objetos{1d:00} son\n{24:1e}, {24:1f}, ZL y ZR.\nZL corresponde a I y ZR a II."
+        },
+        {
+          "find": "Su funcionamiento es muy sencillo: toca {24:1a}\npara abrir la {1d:43}pantalla de objetos{1d:00}, y luego\ntoca el objeto y el icono al que lo quieres\nasignar.",
+          "replace": "Oprime SELECT para abrir {1d:43}Objetos{1d:00}.\nElige un objeto con {24:00} y asígnalo\na {24:1e}, {24:1f}, ZL o ZR."
+        },
+        {
+          "find": "Usa el objeto con {24:1c}, {24:1e}, {24:1f} o {24:1d}.",
+          "replace": "Oprime el botón que elegiste\npara usar el objeto."
+        },
+        {
+          "find": "Te recomiendo que asignes los objetos\nque usas más frecuentemente a {24:1e} o {24:1f}.\nDe este modo tan solo tendrás que oprimir\nun botón. ¡Ya verás qué práctico!",
+          "replace": "¡Así podrás tener tus objetos favoritos\na mano con esos cuatro botones!"
+        }
+      ]
+    },
+    "1037": {
+      "edits": [
+        {
+          "find": "El icono redondo de la pantalla superior",
+          "replace": "El icono del botón A"
+        }
+      ]
+    },
+    "1039": {
+      "edits": [
+        {
+          "find": "En la parte inferior izquierda de la pantalla\nsuperior verás un {1d:41}mapa{1d:00}.",
+          "replace": "El {1d:41}minimapa{1d:00} muestra tus alrededores."
+        },
+        {
+          "find": "Oprime {24:04} un instante para ocultar el mapa.\nPara que vuelva a mostrarse, oprime {24:01} en\ncualquier dirección.",
+          "replace": "Oprime el stick izquierdo (L3) para\nocultar o mostrar el minimapa."
+        },
+        {
+          "find": "En la parte central de la pantalla inferior\npuedes ver el mapa general de la zona\ndonde te encuentras.",
+          "replace": "Puedes cambiar este atajo en los\najustes de controles."
+        },
+        {
+          "find": "Toca {24:1b} en la pantalla inferior para ver el\nmapa con nombres de lugares.",
+          "replace": "Oprime SELECT y luego {24:0b} para ver los\nnombres de los lugares en el {1d:41}mapa{1d:00}.\nCon {24:0a} puedes volver a Objetos."
+        }
+      ]
+    },
+    "103A": {
+      "edits": [
+        {
+          "find": "Los objetos de inventario se asignan a\n{24:1c}, {24:1e}, {24:1f} o {24:1d}. Si quieres utilizarlos, debes\nusar el icono o botón correspondiente.",
+          "replace": "Puedes asignar los objetos a {24:1e}, {24:1f},\nZL o ZR. Usa el botón que elegiste\npara utilizar el objeto."
+        },
+        {
+          "find": "Si quieres cambiar tu equipo, toca {24:19} en la\npantalla inferior para abrir la {1d:42}pantalla de\nequipo{1d:00}.",
+          "replace": "Oprime SELECT y luego {24:0a} para abrir\n{1d:42}Equipo{1d:00}. Oprime {24:0b} para volver a Objetos."
+        },
+        {
+          "find": "A continuación, toca el objeto o prenda\ncon la que quieras equiparte.",
+          "replace": "Elige lo que quieras usar con {24:00}\ny oprime {24:06} para equiparte."
+        },
+        {
+          "find": "Para asignar objetos de tu inventario,\ntoca {24:1a} para abrir la {1d:43}pantalla de objetos,{1d:00}\nluego toca el objeto que quieras asignar\ny finalmente toca {24:1c}, {24:1e}, {24:1f} o {24:1d}.",
+          "replace": "En {1d:43}Objetos{1d:00}, elige un objeto y asígnalo\na {24:1e}, {24:1f}, ZL o ZR.\nZL corresponde a I y ZR a II."
+        }
+      ]
+    },
+    "103D": {
+      "edits": [
+        {
+          "find": "Cuando lo tengas, toca {24:19} para abrir la\n{1d:42}pantalla de equipo{1d:00}.",
+          "replace": "Cuando lo tengas, oprime SELECT y\nluego {24:0a} para abrir {1d:42}Equipo{1d:00}."
+        },
+        {
+          "find": "Una vez allí, toca el escudo para equiparte\ncon él. También puedes elegirlo usando {24:00}\ny oprimir {24:06} para equiparte con él.",
+          "replace": "Elige el escudo con {24:00} y oprime {24:06}\npara equiparte con él."
+        }
+      ]
     },
     "103E": {
       "edits": [
@@ -43,11 +406,67 @@
       ],
       "requires": "NaviUp"
     },
+    "10C5": {
+      "edits": [
+        {
+          "find": "Si sacas la ocarina con {24:16} en un lugar\ndonde es necesario tocar una melodía,\naparecerá un {1d:41}pentagrama{1d:00}.",
+          "replace": "Oprime derecha en la cruz de control\npara sacar la ocarina. Si hace falta\nuna melodía, verás un {1d:41}pentagrama{1d:00}."
+        }
+      ]
+    },
+    "10C7": {
+      "edits": [
+        {
+          "find": "Para ver las melodías que has aprendido,\nve a la {1d:44}pantalla de la ocarina{1d:00} y toca el\nicono de la esquina inferior derecha.",
+          "replace": "Oprime derecha en la cruz de control\npara sacar la ocarina. Luego oprime START\npara ver las melodías que has aprendido."
+        },
+        {
+          "find": "Toca los iconos para ver el nombre y la\npartitura de las melodías correspondientes.",
+          "replace": "Elige una melodía para ver su nombre\ny su partitura."
+        }
+      ],
+      "requires": "SongListStart"
+    },
     "10D8": {
       "edits": [
         {
           "find": "¡Mira! ¿No es un paisaje hermoso?\nPuedes cambiar el punto de vista con {24:18}\npara admirar el bosque con {24:00}.{00}",
           "replace": "¡Mira! ¿No es un paisaje hermoso?\nPulsa el stick derecho y admira\nel bosque con {24:00}.{00}"
+        }
+      ]
+    },
+    "2044": {
+      "edits": []
+    },
+    "2065": {
+      "edits": [
+        {
+          "find": "Toca {24:1b} en la pantalla inferior\npara abrir la {1d:41}pantalla del mapa{1d:00}.",
+          "replace": "Oprime SELECT y luego {24:0b}\npara abrir el {1d:41}mapa{1d:00}."
+        }
+      ]
+    },
+    "2071": {
+      "edits": [
+        {
+          "find": "Si quieres confirmar su ubicación en el\nmapa, toca {24:1b} para abrir la {1d:41}pantalla del\nmapa{1d:00}.",
+          "replace": "Para ver dónde está, oprime SELECT y\nluego {24:0b} para abrir el {1d:41}mapa{1d:00}."
+        }
+      ]
+    },
+    "4003": {
+      "edits": [
+        {
+          "find": "Deberías consultar la {1d:41}pantalla del mapa\n{1d:00}de vez en cuando.",
+          "replace": "Consulta el {1d:41}mapa{1d:00} de vez en cuando.\nOprime SELECT y luego {24:0b} para abrirlo."
+        }
+      ]
+    },
+    "406A": {
+      "edits": [
+        {
+          "find": "y plántala en\nla tierra",
+          "replace": "y plántala\nen la tierra"
         }
       ]
     },
@@ -58,6 +477,25 @@
           "replace": "Para echar un buen vistazo, pulsa\nel stick derecho y mira a tu\nalrededor con {24:00}.{00}"
         }
       ]
+    },
+    "700C": {
+      "edits": []
+    },
+    "70A3": {
+      "edits": []
+    },
+    "70ED": {
+      "edits": []
     }
-  }
+  },
+  "common": [
+    {
+      "find": "{24:1c}",
+      "replace": "ZL"
+    },
+    {
+      "find": "{24:1d}",
+      "replace": "ZR"
+    }
+  ]
 }

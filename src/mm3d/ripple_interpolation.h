@@ -10,7 +10,7 @@
 namespace MM3D::RippleInterpolation {
 using Point=std::array<float,3>;
 using Color=std::array<float,4>;
-struct Mesh {std::vector<Point> points;std::vector<Color> colors;};
+struct Mesh {std::vector<Point> points;std::vector<Color> colors;bool tinted=false;};
 inline bool Near(float a,float b){return std::isfinite(a)&&std::isfinite(b)&&std::abs(a-b)<.01f;}
 struct Ring {Point center;float radius;};
 inline std::optional<Ring> Describe(const Mesh& m,unsigned i) {
@@ -24,7 +24,10 @@ inline std::optional<Ring> Describe(const Mesh& m,unsigned i) {
             const float expected=center[axis]+(axis==0?x[k]*radius:axis==2?z[k]*radius:0);
             if(!Near(m.points[i+k][axis],expected))return {};
         }
-        for(unsigned axis=0;axis<3;++axis)if(!Near(m.colors[i+k][axis],0))return {};
+        for(unsigned axis=0;axis<3;++axis) {
+            const float tint=m.colors[i+k][axis];
+            if(!Near(tint,m.tinted?m.colors[i][axis]:0) || (m.tinted && (tint<0 || tint>1)))return {};
+        }
         if(!Near(m.colors[i+k][3],m.colors[i][3]) || m.colors[i+k][3]<0 || m.colors[i+k][3]>1)return {};
     }
     return Ring{center,radius};
@@ -39,7 +42,7 @@ public:
         std::vector<Ring> rings;
         for(unsigned i=0;i+1<mesh.points.size();i+=8){auto r=Describe(mesh,i);if(!r)return {};rings.push_back(*r);}
         auto out=mesh;bool changed=false;
-        if(next==frame+1 && tex==texture && gen==generation) {
+        if(next==frame+1 && tex==texture && gen==generation && previous.tinted==mesh.tinted) {
             std::vector<Ring> old_rings;
             for(unsigned j=0;j+1<previous.points.size();j+=8) {
                 const auto r=Describe(previous,j);
@@ -74,7 +77,8 @@ public:
                 if(!match || best(*match,true)!=i)continue;
                 for(unsigned k=0;k<8;++k) {
                     for(unsigned a=0;a<3;++a)out.points[i*8+k][a]=previous.points[*match*8+k][a]+(mesh.points[i*8+k][a]-previous.points[*match*8+k][a])*fraction;
-                    out.colors[i*8+k][3]=previous.colors[*match*8+k][3]+(mesh.colors[i*8+k][3]-previous.colors[*match*8+k][3])*fraction;
+                    for(unsigned c=mesh.tinted?0:3;c<4;++c)
+                        out.colors[i*8+k][c]=previous.colors[*match*8+k][c]+(mesh.colors[i*8+k][c]-previous.colors[*match*8+k][c])*fraction;
                 }
                 changed=true;
             }

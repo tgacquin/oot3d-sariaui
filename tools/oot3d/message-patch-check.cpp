@@ -34,21 +34,21 @@ int main(int argc,char** argv) {
     assert(!changed.contains(0x010f) && !changed.contains(0x103b)); // Correct START/save instructions.
     const auto once=patched;assert(Apply(patched)==0 && patched==once);
     for(auto language:{Language::French,Language::Spanish}) {
-        auto other=original;assert(Apply(other,language)==6);
+        auto other=original;assert(Apply(other,language)==78);
         for(unsigned i=0;i<count;++i)for(unsigned slot=0;slot<10;++slot) {
             const auto at=16+i*96+16+slot*8;
             if(slot!=unsigned(language))assert(Read32(other,at)==Read32(original,at));
         }
         const auto saved=other;assert(!Apply(other,language) && other==saved);
     }
-    auto localized=original;assert(ApplyAll(localized)==90);
+    auto localized=original;assert(ApplyAll(localized)==234);
     for(unsigned i=0;i<count;++i)for(unsigned slot=0;slot<10;++slot) {
         const auto at=16+i*96+16+slot*8;
         if(Read32(localized,at)!=Read32(original,at)) {
             const auto id=Read32(original,16+i*96);
             if(slot!=1) {
                 assert(slot==5 || slot==7);
-                assert(id==0x101 || id==0x1017 || id==0x103e || id==0x103f || id==0x10d8 || id==0x5056);
+                assert(changed.contains(id));
             }
         }
     }
@@ -80,5 +80,5 @@ int main(int argc,char** argv) {
         std::ofstream out(argv[2],std::ios::binary);assert(out);
         out.write(reinterpret_cast<const char*>(all_once.data()),all_once.size());assert(out);
     }
-    std::cout<<"78 English and 6 French/Spanish messages each patched; locale isolation and atomic installation verified; malformed and modified archives rejected\n";
+    std::cout<<"78 messages in each of English, French and Spanish patched; locale isolation and atomic installation verified; malformed and modified archives rejected\n";
 }

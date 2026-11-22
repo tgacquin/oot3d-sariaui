@@ -180,8 +180,9 @@ struct Hook : GuestUI::Hook<Geometry,Width,Height> {
         // Compare the current guest data, not just its address: save states and
         // language changes can reuse a texture allocation with different pixels.
         readback.resize(131072/4);
-        for(unsigned i=0;i<readback.size();++i) {auto word=m.Read(address+4*i);if(!word)return;readback[i]=*word;}
-        if(!extension || crop!=cached_crop || readback!=compressed) {
+        if(!GuestUI::ReadTextureWords(m,address,readback))return;
+        const bool changed=!extension || crop!=cached_crop || readback!=compressed;
+        if(changed) {
             decoded.resize((crop.right-crop.left)*(crop.bottom-crop.top));
             const auto word64=[&](unsigned offset) {return std::uint64_t(readback[offset/4])|(std::uint64_t(readback[offset/4+1])<<32);};
             for(int y=crop.top;y<crop.bottom;++y)for(int x=crop.left;x<crop.right;++x) {
@@ -191,9 +192,9 @@ struct Hook : GuestUI::Hook<Geometry,Width,Height> {
                 decoded[(y-crop.top)*(crop.right-crop.left)+x-crop.left]=
                     (U32(rgb[0])<<24)|(U32(rgb[1])<<16)|(U32(rgb[2])<<8)|a;
             }
-            compressed=readback;cached_crop=crop;dirty=true;
+            compressed.swap(readback);cached_crop=crop;
         }
-        if(dirty || settings.blur!=cached_blur || settings.darkness!=cached_darkness) {
+        if(changed || settings.blur!=cached_blur || settings.darkness!=cached_darkness) {
             extension=Extend(decoded,crop.right-crop.left,crop.bottom-crop.top,settings.blur,settings.darkness);
             cached_blur=settings.blur;cached_darkness=settings.darkness;dirty=true;
         }
@@ -202,8 +203,7 @@ struct Hook : GuestUI::Hook<Geometry,Width,Height> {
     template<class M,class R> void Begin(M& m,R& r,U32 return_pc) {
         if(!bounds || !extension || !PauseMenu::MapPage(m) || PauseMenu::DungeonPage(m))return;
         if(dirty && Owned(m)) {
-            for(unsigned i=0;i<extension->size();++i)if(!m.Read(texture+4*i))return;
-            for(unsigned i=0;i<extension->size();++i)m.Write(texture+4*i,(*extension)[i]);
+            if(!GuestUI::WriteTextureWords(m,texture,*extension))return;
         }
         dirty=false;
         const auto layout=PauseMenu::GetLayout();

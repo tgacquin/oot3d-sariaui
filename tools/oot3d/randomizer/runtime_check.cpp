@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Execute the actual ARM randomizer payload and native save routines, without a window.
 #include "oot3d/randomizer/hooks.h"
+#include "oot3d/area_load_trace.h"
 #include "oot3d/master_quest.h"
 #include "oot3d/death_menu.h"
 #include "oot3d/price_runtime.h"
@@ -17,6 +18,7 @@
 #include <functional>
 #include <iostream>
 #include <set>
+#include <string_view>
 #include <map>
 #include "../../../externals/oot3d-randomizer/shared/s_settings.h"
 #include "../../../externals/oot3d-randomizer/shared/s_seq_id.h"
@@ -30,6 +32,7 @@ struct Env : Dynarmic::A32::UserCallbacks {
     std::uint64_t remaining=0;
     bool stopped=false;
     unsigned host_writes=0;
+    bool check_price_hooks=false;
     U32 stop_at=Stop;
     std::function<void()> setup;
     std::function<void(unsigned)> menu_svc;
@@ -46,7 +49,9 @@ struct Env : Dynarmic::A32::UserCallbacks {
         if(mock_at && at==mock_at)return 0xef000002;
         if(at==0x35010c || at==0x306e40 || at==0x324f44)return 0xef000001;
         if(at==OOT3D::Prices::TextSite.pc)return 0xef000000|OOT3D::Prices::TextSVC;
-        const auto word=R::Instruction(at,Get<U32>(at));
+        const auto native=Get<U32>(at);
+        const auto word=R::Instruction(at,native);
+        if(check_price_hooks && word==native)return OOT3D::Prices::Instruction(at,native);
         return OOT3D::MasterQuest::Instruction(at,word);
     }
     std::uint8_t MemoryRead8(U32 at) override {return Get<std::uint8_t>(at);}
@@ -76,6 +81,9 @@ struct Env : Dynarmic::A32::UserCallbacks {
                 r[0]=i;
             }
             r[15]=r[14];return;
+        }
+        if(check_price_hooks && svc>=OOT3D::Prices::FirstSVC && svc<OOT3D::Prices::FirstSVC+OOT3D::Prices::Sites.size()) {
+            OOT3D::Prices::Handle(*this,r,svc-OOT3D::Prices::FirstSVC);return;
         }
         if(svc==OOT3D::Prices::TextSVC) {OOT3D::Prices::SelectText(*this,r);return;}
         if(svc>=R::FirstSVC && svc<R::FirstSVC+15) {
@@ -108,8 +116,65 @@ struct Env : Dynarmic::A32::UserCallbacks {
 #include "player_color_check.h"
 #include "rewards_check.h"
 
+// No ROM required. Enter at the shared merchant call and observe the native
+// wallet debit. The guest bridge and purchase logic run from the shipped payload.
+static void CheckHookRouting() {
+    constexpr U32 call=0x14eda8,play=0xd00000,collect=play+0x208c+0x19c+0x1c;
+    Env env;
+    Dynarmic::A32::UserConfig config;
+    config.callbacks=&env;
+    Dynarmic::A32::Jit jit(config);
+    env.cpu=&jit;
+    env.check_price_hooks=true;
+    R::WriteBytes(env,R::GuestBase,R::Data().bytes);
+
+    // File loading has already initialized the randomizer. PlayInit still has
+    // to publish the scene pointer before actors attach their materials.
+    constexpr U32 init=0x4352f4;
+    const U32 global=R::Data().Find("gGlobalContext").address;
+    env.Put<std::uint8_t>(R::Data().Find("rRandomizerInit").address,1);
+    env.Write(init,0xe1a05000);
+    env.stop_at=init+4;
+    for(bool randomized:{false,true}) {
+        R::active=randomized;
+        env.Write(global,0);
+        jit.ClearCache();
+        env.Run(init,play);
+        assert(jit.Regs()[5]==play && env.Read(global)==(randomized?play:0));
+    }
+    std::cout<<"PlayInit: randomized entry sets the scene pointer before actor setup\n";
+
+    env.stop_at=call+4;
+    env.Write(call,0xeb089f2c);
+    const U32 shuffled=R::Data().Find("gSettingsContext").address+offsetof(SettingsContext,shuffleMagicBeans);
+    OOT3D::Difficulty::price_text_ready=true;
+    for(bool randomized:{false,true}) {
+        R::active=randomized;
+        for(bool beans:{false,true}) {
+            for(unsigned factor:{1u,2u,3u}) {
+                env.Put<std::uint8_t>(shuffled,beans);
+                env.Write(collect,0x40);
+                OOT3D::Difficulty::active_price_multiplier=factor;
+                unsigned charges=0;
+                env.mocks[OOT3D::Prices::ChangeRupees]=[&] {
+                    assert(std::int32_t(jit.Regs()[0])==-int(factor)*(randomized && beans?60:10));
+                    ++charges;
+                };
+                jit.ClearCache();
+                env.Run(call,U32(-10));
+                assert(charges==1 && env.Read(collect)==(randomized && beans?0x42u:0x40u));
+            }
+        }
+    }
+    std::cout<<"Bean merchant routing: ordinary and randomized purchases, shuffle flag and 1x/2x/3x prices passed\n";
+}
+
 int main(int argc,char** argv) {
     QCoreApplication app(argc,argv);
+    if(argc==2 && std::string_view(argv[1])=="--check-hook-routing") {
+        CheckHookRouting();
+        return 0;
+    }
     assert(argc>=5);
     QTemporaryDir temp;assert(temp.isValid());
     QSettings settings(temp.filePath("settings.ini"),QSettings::IniFormat);
@@ -407,7 +472,19 @@ int main(int argc,char** argv) {
         const auto entrance_table=R::Data().Find("entranceOverrideTable").address;assert(entrance_table);
         const auto original_house=env.Get<std::uint16_t>(entrance_table+0xbb*2);
         env.Put<std::uint16_t>(entrance_table+0xbb*2,0x123);
-        env.Run("before_Play_Init",0xd00000);
+        // A dev trace once took precedence over PlayInit, leaving PLAYER null
+        // when the randomizer attached child Link's tunic material.
+        assert(OOT3D::AreaLoadTrace::CodeMatches(env));
+        for(const auto& site:OOT3D::AreaLoadTrace::Sites)
+            assert(R::Instruction(site.pc,site.instruction)==site.instruction);
+        const auto global=R::Data().Find("gGlobalContext").address;
+        env.Write(global,0);
+        env.stop_at=0x4352fc;
+        jit.ClearCache();
+        env.Run(0x4352f4,0xd00000);
+        assert(env.Read(global)==0xd00000 && jit.Regs()[5]==0xd00000 && jit.Regs()[0]==0x587958);
+        env.stop_at=Env::Stop;
+        jit.ClearCache();
         env.Run("Entrance_GetOverride",0xbb);assert(jit.Regs()[0]==0x123);
         env.Put<std::uint16_t>(entrance_table+0xbb*2,original_house);
         env.Run("Scene_Init");

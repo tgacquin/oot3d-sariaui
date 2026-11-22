@@ -8,7 +8,8 @@
 namespace OOT3D {
 inline std::atomic<bool> available{false};
 inline std::atomic<bool> visible{false};
-inline std::atomic<bool> player_view{false};
+enum class SettingsView { Editor, Player, Defaults };
+inline std::atomic<SettingsView> settings_view{SettingsView::Editor};
 struct PointerEvent { float x, y; int button; bool down; };
 inline std::mutex input_mutex;
 inline std::vector<PointerEvent> pointer_events;
@@ -26,10 +27,10 @@ inline bool Pointer(float x, float y, int button = -1, bool down = false) {
     pointer_events.push_back({x, y, button, down});
     return true;
 }
-inline void Toggle(bool player=false) {
+inline void Toggle(SettingsView view=SettingsView::Editor) {
     if (!available.load()) return;
-    const bool close=visible.load() && player_view.load()==player;
-    player_view.store(player);
+    const bool close=visible.load() && settings_view.load()==view;
+    settings_view.store(view);
     text_input.store(false);
     visible.store(!close);
 }

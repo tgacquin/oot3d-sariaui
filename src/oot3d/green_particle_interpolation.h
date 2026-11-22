@@ -76,15 +76,104 @@ inline std::optional<unsigned> Match(const F::Quad& q,const std::vector<F::Quad>
     }
     return second>best*1.5f+.01f?result:std::nullopt;
 }
+// A hit can submit several 27-droplet bursts using the same texture. Each
+// expands about its moving center over 24 ticks, fading by 1/24 each tick.
+// The native draw order changes with depth, so a slot isn't a droplet ID.
+struct RadialBurst {
+    static constexpr unsigned Count=27;
+    using Point=std::array<double,3>;
+    unsigned age{};
+    Point center{};
+    std::array<Point,Count> offsets{};
+    static std::optional<RadialBurst> Describe(const std::vector<F::Quad>& quads) {
+        if(quads.size()!=Count)return {};
+        RadialBurst burst;
+        const float alpha=quads.front().vertices[0][1][3];
+        const int age=std::lround((1.f-alpha)*24.f);
+        if(age<1 || age>24 || std::abs(alpha-(1.f-age/24.f))>.001f)return {};
+        burst.age=age;
+        for(unsigned i=0;i<Count;++i) {
+            if(!F::Near(quads[i].vertices[0][1][3],alpha))return {};
+            const auto pos=F::Center(quads[i]);
+            for(unsigned c=0;c<3;++c) {
+                burst.offsets[i][c]=pos[c];
+                burst.center[c]+=double(pos[c])/Count;
+            }
+        }
+        for(auto& offset:burst.offsets)for(unsigned c=0;c<3;++c)
+            offset[c]-=burst.center[c];
+        return burst;
+    }
+    using Matches=std::array<unsigned,Count>;
+    std::optional<Matches> MatchPrevious(const RadialBurst& old) const {
+        if(age!=old.age && age!=old.age+1)return {};
+        double motion=0;
+        for(unsigned c=0;c<3;++c)motion+=(center[c]-old.center[c])*(center[c]-old.center[c]);
+        // During hit-stop the game can draw the same simulation tick twice.
+        if(motion>(age==old.age?.02*.02:32.*32.))return {};
+        const double growth=double(age)/old.age;
+        Matches matches{};
+        std::array<bool,Count> used{};
+        for(unsigned i=0;i<Count;++i) {
+            unsigned match=Count;
+            for(unsigned j=0;j<Count;++j) {
+                double error=0;
+                for(unsigned c=0;c<3;++c) {
+                    const double delta=offsets[i][c]-old.offsets[j][c]*growth;
+                    error+=delta*delta;
+                }
+                if(error>.02*.02)continue;
+                if(match!=Count || used[j])return {};
+                match=j;
+            }
+            if(match==Count)return {};
+            used[match]=true;
+            matches[i]=match;
+        }
+        return matches;
+    }
+};
+inline void BlendQuad(std::vector<Vertex>& out,const F::Quad& current,const F::Quad& old) {
+    auto half=current;
+    for(unsigned k=0;k<4;++k)for(unsigned a=0;a<2;++a)for(unsigned c=0;c<4;++c)
+        half.vertices[k][a][c]=SampleMix(old.vertices[k][a][c],current.vertices[k][a][c]);
+    F::PreserveSpinSize(half,current,old,sample_fraction);
+    for(unsigned k=0;k<4;++k)out[current.indices[k]]=half.vertices[k];
+}
 class History {
     struct Entry {std::uint64_t frame{};std::vector<F::Quad> quads;};
+    struct BurstEntry {std::uint64_t frame;unsigned texture;RadialBurst burst;std::vector<F::Quad> quads;};
+    std::vector<BurstEntry> bursts;
     std::map<unsigned,Entry> entries;unsigned epoch{},scene{};
 public:
-    void Reset(){entries.clear();}
+    void Reset(){entries.clear();bursts.clear();}
     void Context(unsigned e,unsigned s){if(epoch!=e || scene!=s)Reset();epoch=e;scene=s;}
     std::optional<std::vector<Vertex>> Apply(std::uint64_t frame,unsigned texture,
         std::span<const Vertex> inputs,std::span<const std::uint32_t> order) {
-        const auto quads=Decode(inputs,order);if(!quads){entries.erase(texture);return {};}
+        auto quads=Decode(inputs,order);
+        std::erase_if(bursts,[&](const auto& b) {
+            return b.frame>frame || frame-b.frame>1 || (!quads && b.texture==texture);
+        });
+        if(!quads){entries.erase(texture);return {};}
+        if(const auto burst=RadialBurst::Describe(*quads)) {
+            const BurstEntry* previous=nullptr;
+            RadialBurst::Matches matches{};
+            for(const auto& b:bursts) {
+                if(b.frame==frame || b.texture!=texture)continue;
+                if(const auto pairing=burst->MatchPrevious(b.burst)) {
+                    if(previous){previous=nullptr;break;}
+                    previous=&b;matches=*pairing;
+                }
+            }
+            std::optional<std::vector<Vertex>> out;
+            if(previous) {
+                out.emplace(inputs.begin(),inputs.end());
+                for(unsigned i=0;i<matches.size();++i)BlendQuad(*out,(*quads)[i],previous->quads[matches[i]]);
+                ++pairs;
+            }
+            if(bursts.size()<32)bursts.push_back({frame,texture,*burst,std::move(*quads)});
+            return out;
+        }
         for(auto it=entries.begin();it!=entries.end();)
             if(it->second.frame>frame || frame-it->second.frame>1)it=entries.erase(it);else ++it;
         if(!entries.contains(texture) && entries.size()>=8)return {};
@@ -93,11 +182,7 @@ public:
         if(old.frame+1==frame)for(unsigned i=0;i<quads->size();++i) {
             const auto& q=(*quads)[i];const auto match=Match(q,old.quads,true);
             if(!match || Match(old.quads[*match],*quads,false)!=i)continue;
-            auto half=q;
-            for(unsigned k=0;k<4;++k)for(unsigned a=0;a<2;++a)for(unsigned c=0;c<4;++c)
-                half.vertices[k][a][c]=SampleMix(old.quads[*match].vertices[k][a][c],q.vertices[k][a][c]);
-            F::PreserveSpinSize(half,q,old.quads[*match],sample_fraction);
-            for(unsigned k=0;k<4;++k)out[q.indices[k]]=half.vertices[k];
+            BlendQuad(out,q,old.quads[*match]);
             changed=true;
         }
         old={frame,*quads};if(changed){++pairs;return out;}return {};

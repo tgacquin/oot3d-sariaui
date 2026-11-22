@@ -40,7 +40,8 @@ inline bool FadeState(std::uint64_t shader, std::uint64_t swizzle, unsigned coun
                       const std::array<unsigned, 4>& blend) {
     return shader == 0x6352a3be33cb99c6ULL && swizzle == 0xba817d0ef27276d0ULL &&
            count == 4 && topology == 1 && depth == 0xf10 && textures == 0 &&
-           !alpha_test && !stencil_test && blend == std::array<unsigned,4>{1,0,6,7};
+           !alpha_test && !stencil_test &&
+           (blend == std::array<unsigned,4>{1,0,6,7} || blend == std::array<unsigned,4>{1,0,1,0});
 }
 using Row = std::array<float, 4>;
 inline bool ClearGeometry(const std::array<Row, 4>& projection,
@@ -70,12 +71,15 @@ inline bool FadeGeometry(const std::array<Row, 4>& projection,
     // The fade scales a unit square to 400x240 and centers it on the display.
     // Do not depend on its color or alpha: black/white and partial fades all
     // need identical coverage throughout the transition.
-    return near(projection[0], {0, -2.f/240, 0, 1}) &&
+    const float z = model[2][3];
+    const float depth = projection[2][2] * z + projection[2][3];
+    return std::isfinite(depth) && depth >= -1 && depth <= 1 &&
+           projection[2][0] == 0 && projection[2][1] == 0 &&
+           near(projection[0], {0, -2.f/240, 0, 1}) &&
            near(projection[1], {-2.f/400, 0, 0, 1}) &&
-           near(projection[2], {0, 0, 1.f/3, -1.f/3}) &&
            near(projection[3], {0, 0, 0, 1}) &&
            near(model[0], {400, 0, 0, 200}) && near(model[1], {0, 240, 0, 120}) &&
-           near(model[2], {0, 0, 1, -1}) &&
+           near(model[2], {0, 0, 1, z}) &&
            vertices == std::array<Row,4>{{{-.5f,-.5f,0,1}, {.5f,-.5f,0,1},
                                         {-.5f,.5f,0,1}, {.5f,.5f,0,1}}};
 }
@@ -97,7 +101,8 @@ inline bool ClearClipGeometry(const std::array<Row, 6>& vertices) {
     return FullScreenClipGeometry(vertices, -1.f);
 }
 inline bool FadeClipGeometry(const std::array<Row, 6>& vertices) {
-    return FullScreenClipGeometry(vertices, -2.f/3);
+    const float depth = vertices.front()[2];
+    return depth >= -1 && depth <= 1 && FullScreenClipGeometry(vertices, depth);
 }
 
 // 2ea9e0 submits [0,400] x [0,height] and [0,400] x [240-height,240]

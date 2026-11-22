@@ -140,10 +140,14 @@ template<class M> Geometry Atlas(M& m,const Layout& l,bool normalize=false) {
 struct Slide {
     std::optional<std::int64_t> time;
     float progress=0;
+    OcarinaSlide::Interval interval;
+    std::int64_t previous_time{};
     float Advance(std::int64_t now,bool visible) {
-        if(!time || now<*time) {time=now;progress=0;return 0;}
+        if(!time || now<*time) {time=now;previous_time=now;interval={};progress=0;return 0;}
+        previous_time=*time;
         const float dt=std::clamp(float(now-*time)/180000.f,0.f,1.f);time=now;
-        progress=std::clamp(progress+(visible?dt:-dt),0.f,1.f);
+        interval={progress,progress+(visible?dt:-dt)};
+        progress=std::clamp(interval.end,0.f,1.f);
         return 1-std::pow(1-progress,3.f);
     }
 };
@@ -297,9 +301,25 @@ struct Hook {
     template<class M> void CaptureSlide(M& m,U32 model,U32 view) const {
         const auto cursor=m.Read(Owner+0xc).value_or(0);
         const bool title=NativeDrawing() && (!cursor || m.Read(cursor+4)!=std::optional<U32>{model});
+        OcarinaSlide::CursorPath path;
+        if(NativeDrawing() && !title && input.move_count && slide.time &&
+           *slide.time>slide.previous_time && *slide.time-slide.previous_time<=50000 &&
+           m.Read(Owner+0x28)==0) {
+            const unsigned selected=input.moves[input.move_count-1].to;
+            if(m.Read(Owner+0x18)==selected%4 && m.Read(Owner+0x1c)==selected/4) {
+                const auto next=Transform(frame_layout,Stones,selected);
+                for(unsigned i=0;i<input.move_count;++i) {
+                    const auto& move=input.moves[i];
+                    if(move.time<=slide.previous_time || move.time>*slide.time)continue;
+                    const auto old=Transform(frame_layout,Stones,move.from);
+                    path.steps[path.count++]={old.ax+old.x-next.ax-next.x,old.ay+old.y-next.ay-next.y,
+                        float(move.time-slide.previous_time)/float(*slide.time-slide.previous_time)};
+                }
+            }
+        }
         if(frame_layout.bottom_panels && (bottom_atlas.Drawing() || title))
-            OcarinaSlide::Capture(m,model,view,0,bottom_midpoint);
-        else if(atlas.Drawing() || NativeDrawing())OcarinaSlide::Capture(m,model,view,midpoint_shift);
+            OcarinaSlide::Capture(m,model,view,0,bottom_midpoint,slide.interval,{},title);
+        else if(atlas.Drawing() || NativeDrawing())OcarinaSlide::Capture(m,model,view,midpoint_shift,0,slide.interval,path,title);
     }
     template<class M> ScreenModels::Transform ModelTransform(M& m,U32 model) const {
         if(!NativeDrawing())return {};

@@ -3,6 +3,7 @@
 #pragma once
 #include "oot3d/interpolation_pose.h"
 #include "oot3d/fishing_foliage.h"
+#include "oot3d/shop_controls.h"
 #include "oot3d/pickup_fog_hooks.h"
 #include "oot3d/actor_capture.h"
 #include "oot3d/title_hooks.h"
@@ -37,10 +38,13 @@ template<class M> bool ReadMatrix(M& m,U32 address,Matrix& result) {
     return true;
 }
 template<class M> std::shared_ptr<const Skeleton> ReadSkeleton(M& m,const Sample& sample) {
-    // Verified child/adult Link CMBs have 25 40-byte bones. MM uses a
-    // different stride; do not apply its layout or guess other actors' flags.
+    // Link and the Bunny Hood use 40-byte CMB bone records. The hood's
+    // three bones form a chain, and its skin palette uses all three.
     const auto count=sample.bone_count,resource=sample.key.resource;
-    if(count!=25 || m.Read(resource+4)!=16+40*count)return {};
+    const bool hood=sample.model=="rb_cap";
+    if(count!=(hood?3u:25u) || m.Read(resource+4)!=16+40*count)return {};
+    if(hood && (sample.skinning!=2 || sample.key.count!=3 || sample.bone_ids[0]!=0 ||
+                sample.bone_ids[1]!=1 || sample.bone_ids[2]!=2))return {};
     const auto world=m.Read(sample.key.skeleton+0x14).value_or(0);
     const auto bind=m.Read(sample.key.skeleton+8).value_or(0);
     if(!TitleScreen::Pointer(world,count*48) || !TitleScreen::Pointer(bind,count*48) ||
@@ -50,7 +54,7 @@ template<class M> std::shared_ptr<const Skeleton> ReadSkeleton(M& m,const Sample
         const auto info=m.Read(resource+16+40*i);
         if(!info || (*info&65535)!=i)return {};
         auto& bone=result->bones[i];bone.parent=*info>>16;
-        if((i==0 && bone.parent!=65535) || (i>0 && bone.parent>=i) ||
+        if((i==0 && bone.parent!=65535) || (i>0 && bone.parent>=i) || (hood && i>0 && bone.parent!=i-1) ||
            !ReadMatrix(m,world+48*i,bone.world) || !ReadMatrix(m,bind+48*i,bone.bind))return {};
     }
     return result;
@@ -149,7 +153,15 @@ template<class M,class R> void Capture(M& m,R& r,std::int64_t now) {
         if(!ReadMatrix(m,renderer+0x90+48*i,sample.native[i])) {reject(CaptureStage::Matrix);return;}
         sample.world[i]=Math::Multiply(*inverse,sample.native[i]);
     }
-    if(LinkModel(sample.model)) {
+    if(sample.model=="h_cursor") {
+        const auto& input=Shops::navigation_input;
+        if(input.Active(m)) {
+            sample.shop_slot=(m.Read(input.actor+0x2f8).value_or(~0u)>>16)&255;
+            if(input.tick_press_us<=now && now-input.tick_press_us<=50000)
+                sample.shop_press_us=input.tick_press_us;
+        }
+    }
+    if(HierarchyModel(sample.model)) {
         std::array<float,3> offset;
         static SkeletonCache cache;
         bool valid=TitleScreen::ReadFloats(m,r[7]+0x18,offset);

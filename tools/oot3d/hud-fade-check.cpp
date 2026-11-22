@@ -50,6 +50,7 @@ struct Env : Dynarmic::A32::UserCallbacks {
     void ExceptionRaised(U32 pc,Dynarmic::A32::Exception) override {std::cerr<<"exception "<<std::hex<<pc<<'\n';std::abort();}
     void AddTicks(std::uint64_t n) override {ticks=n>ticks?0:ticks-n;}
     std::uint64_t GetTicksRemaining() override {return ticks;}
+    HUD::Layout layout{};
     void CallSVC(U32 svc) override {
         auto& r=cpu->Regs();
         if(svc==0) {cpu->HaltExecution();return;}
@@ -60,10 +61,10 @@ struct Env : Dynarmic::A32::UserCallbacks {
             // so queue iteration/return and register preservation are exercised.
             r[15]=0x3fbb9c;return;
         }
-        HUD::Handle(*this,r,svc-HUD::FirstSVC,{},routing,paused,now_us);
+        HUD::Handle(*this,r,svc-HUD::FirstSVC,layout,routing,paused,now_us);
     }
     void Setup() {
-        cpu->Reset();routing={};alphas.clear();
+        cpu->Reset();layout={};routing={};alphas.clear();
         paused=false;action_drawn=true;now_us=1000000;drawn_action_alpha=0;
         Write(Ocarina::Owner+0x14,0);Write(SaveMenu::Owner+0x28,0);
         routing.fade.progress=1; routing.fade.initialized=true;
@@ -124,7 +125,7 @@ struct Env : Dynarmic::A32::UserCallbacks {
             drawn_action_alpha=alphas[0];
             const float factor=routing.hud_return.hidden?0.f:
                 routing.hud_return.returning?routing.hud_return.opacity:1.f;
-            assert(std::abs(drawn_action_alpha-Get<float>(ActionModel+0xfc)*factor)<.00001f);
+            assert(std::abs(drawn_action_alpha-Get<float>(ActionModel+0xfc)*factor*layout.overall_opacity)<.00001f);
         }
         alphas.clear();Write(Q+0x14+pass*4,2);
         Write(Q+0x214+pass*0x60,Model);Write(Q+0x218+pass*0x60,CounterModel);
@@ -157,6 +158,10 @@ int main(int argc,char** argv) {
     e.now_us+=HUDFade::FadeUs/2;e.Expect(.5f);e.Expect(.5f);
     e.now_us+=HUDFade::FadeUs/2;e.Expect(0);e.Expect(0);
     e.action_drawn=true;e.Reveal();
+    e.Setup();e.layout.overall_opacity=.5f;e.Expect(.5f);e.Expect(.5f);
+    e.action_drawn=false;e.now_us+=HUDFade::FadeUs/2;e.Expect(.25f);
+    e.layout.overall_opacity=0;e.Expect(0);
+    e.Setup();
     // Reverse midway without jumping or restarting from an endpoint.
     e.action_drawn=false;e.now_us+=HUDFade::FadeUs/2;e.Expect(.5f);
     e.action_drawn=true;e.Expect(.5f);e.now_us+=HUDFade::FadeUs/4;e.Expect(.75f);

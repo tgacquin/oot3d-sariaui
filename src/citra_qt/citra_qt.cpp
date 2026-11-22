@@ -20,6 +20,7 @@
 #ifdef ENABLE_OOT3D_PRESENTATION
 #include "oot3d/game_folder.h"
 #include "oot3d/player_mode.h"
+#include "oot3d/player_defaults_draft.h"
 #include "input_common/controller_autoconfig.h"
 #include "oot3d/release_defaults.h"
 #include "oot3d/interpolation_state.h"
@@ -39,6 +40,7 @@
 #include "audio_core/hle/accuracy.h"
 #include "oot3d/minimap_control.h"
 #include "oot3d/control_swap.h"
+#include "oot3d/game_control_options.h"
 #include "oot3d/remote_names_layout.h"
 #include "oot3d/input.h"
 #include "oot3d/dpad_input.h"
@@ -56,7 +58,7 @@
 #include "oot3d/title_layout.h"
 #include "oot3d/hd_numbers_config.h"
 #include "oot3d/hud_layout.h"
-#include "oot3d/user_hud_config.h"
+#include "oot3d/user_hud_preset.h"
 #include "oot3d/user_camera_config.h"
 #include "oot3d/hud_defaults.h"
 #include "oot3d/textbox_layout.h"
@@ -1007,13 +1009,15 @@ void GMainWindow::InitializeSaveStateMenuActions() {
     UpdateSaveStates();
 }
 
-void GMainWindow::OnConfigurePresentationShortcut(bool texture_binding) {
+void GMainWindow::OnConfigurePresentationShortcut(bool texture_binding, QString* portable_default) {
     const QString group=QStringLiteral("Main Window"), action=texture_binding?QStringLiteral("Toggle Custom Textures"):QStringLiteral("Fullscreen");
     const QKeySequence default_sequence=texture_binding?QKeySequence{}:DefaultFullscreenShortcut();
     QDialog dialog(this);dialog.setWindowTitle(texture_binding?tr("Custom textures shortcut"):tr("Fullscreen shortcut"));
     auto* layout=new QVBoxLayout(&dialog);
     layout->addWidget(new QLabel(texture_binding?tr("Choose a shortcut to toggle custom textures. Leave empty for no shortcut."):tr("Press a key or key combination to toggle fullscreen."),&dialog));
-    auto* edit=new QKeySequenceEdit(hotkey_registry.GetKeySequence(group,action),&dialog);
+    const auto initial=portable_default ? (portable_default->isNull() ? default_sequence :
+        QKeySequence::fromString(*portable_default,QKeySequence::PortableText)) : hotkey_registry.GetKeySequence(group,action);
+    auto* edit=new QKeySequenceEdit(initial,&dialog);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     edit->setMaximumSequenceLength(1);
 #endif
@@ -1028,14 +1032,24 @@ void GMainWindow::OnConfigurePresentationShortcut(bool texture_binding) {
     connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
     connect(buttons,&QDialogButtonBox::accepted,&dialog,[&,edit,message] {
         const auto sequence=edit->keySequence();
-        if(texture_binding&&sequence.isEmpty()) {
-            hotkey_registry.SetKeySequence(group,action,{});
-            hotkey_registry.SaveHotkeys();config->Save();dialog.accept();return;
-        }
+        const auto save=[&] {
+            if(portable_default) *portable_default=sequence.toString(QKeySequence::PortableText);
+            else {
+                hotkey_registry.SetKeySequence(group,action,sequence);
+                hotkey_registry.SaveHotkeys();
+                config->Save();
+            }
+            dialog.accept();
+        };
+        if(texture_binding&&sequence.isEmpty()) {save();return;}
         if(sequence.count()!=1) {message->setText(tr("Choose one key or key combination."));return;}
         const auto key=sequence[0].key();
-        if(key==Qt::Key_F1||key==Qt::Key_F2||key==Qt::Key_Escape) {
-            message->setText(tr("F1, F2 and Escape are reserved. Choose another key."));return;
+        if(key==Qt::Key_F1||key==Qt::Key_F2||key==Qt::Key_Escape
+#ifdef ENABLE_OOT3D_PRESENTATION
+           ||(!OOT3D::IsPlayerBuild() && key==Qt::Key_F3)
+#endif
+        ) {
+            message->setText(tr("That key is reserved for the settings menu. Choose another key."));return;
         }
         for(const auto& other:UISettings::values.shortcuts) {
             if(other.group==group&&other.name==action)continue;
@@ -1057,8 +1071,7 @@ void GMainWindow::OnConfigurePresentationShortcut(bool texture_binding) {
                 gameplay_key|=bound(Common::ParamPackage(analog.Get(direction,"")));
         }
         if(gameplay_key && sequence[0].keyboardModifiers()==Qt::NoModifier) {message->setText(tr("That key is assigned to a game control. Choose another key."));return;}
-        hotkey_registry.SetKeySequence(group,action,sequence);
-        hotkey_registry.SaveHotkeys();config->Save();dialog.accept();
+        save();
     });
     edit->setFocus();dialog.exec();render_window->setFocus();
 }
@@ -1355,7 +1368,7 @@ bool GApplicationEventFilter::eventFilter(QObject* object, QEvent* event) {
         const auto key=key_event->key();
         // These player shortcuts also work with F1/F2 open, except while typing.
         // Let Qt dispatch the existing QAction/QShortcut exactly once.
-        if(OOT3D::visible.load() && !OOT3D::text_input.load() &&
+        if(OOT3D::visible.load() && OOT3D::settings_view.load()!=OOT3D::SettingsView::Defaults && !OOT3D::text_input.load() &&
            key!=Qt::Key_F1 && key!=Qt::Key_F2 && key!=Qt::Key_Escape) {
             for(const auto& shortcut:UISettings::values.shortcuts) {
                 if(shortcut.group!=QStringLiteral("Main Window") ||
@@ -1365,7 +1378,7 @@ bool GApplicationEventFilter::eventFilter(QObject* object, QEvent* event) {
                 if(sequence.count()==1 && sequence[0]==key_event->keyCombination())return false;
             }
         }
-        if (key==Qt::Key_F1 || key==Qt::Key_F2 || OOT3D::visible.load()) {
+        if (key==Qt::Key_F1 || key==Qt::Key_F2 || (!OOT3D::IsPlayerBuild() && key==Qt::Key_F3) || OOT3D::visible.load()) {
             event->accept();return true;
         }
     }
@@ -1533,8 +1546,12 @@ void GMainWindow::ConnectWidgetEvents() {
     OOT3D::HDFont::SetMode(oot_editor_config->value(QStringLiteral("Graphics/font_mode"),
         oot_editor_config->value(QStringLiteral("Graphics/hd_font"),false).toBool()?
             OOT3D::HDFont::Heavy:OOT3D::HDFont::Original).toInt());
-    OOT3D::ActorDrawDistance::multiplier.store(OOT3D::ActorDrawDistance::Clamp(
-        oot_editor_config->value(QStringLiteral("Graphics/actor_draw_distance"),1.f).toFloat()));
+    const float saved_draw_distance = oot_editor_config->value(
+        QStringLiteral("Graphics/actor_draw_distance"), OOT3D::ActorDrawDistance::Default).toFloat();
+    const float draw_distance = OOT3D::ActorDrawDistance::Clamp(saved_draw_distance);
+    OOT3D::ActorDrawDistance::multiplier.store(draw_distance);
+    if (draw_distance != saved_draw_distance)
+        OOT3D::ActorDrawDistance::dirty.store(true);
     OOT3D::AudioSettings::mute_music.store(
         oot_editor_config->value(QStringLiteral("Audio/mute_music"),false).toBool());
     AudioCore::HLE::accurate_audio.store(
@@ -1663,6 +1680,15 @@ void GMainWindow::ConnectWidgetEvents() {
     pause_layout.dungeon_spacing={read_pause_float(QStringLiteral("PauseScreen/dungeon_items/spacing"),1,.2f,3),
         read_pause_float(QStringLiteral("PauseScreen/dungeon_floors/spacing"),1,.2f,3)};
     pause_layout.background_darkness=read_pause_float(QStringLiteral("PauseScreen/background_darkness"),0,0,1);
+    auto& vignette=pause_layout.background_vignette;
+    vignette.enabled=oot_editor_config->value(QStringLiteral("PauseScreen/background_vignette/enabled"),vignette.enabled).toBool();
+    vignette.width_percent=read_pause_float(QStringLiteral("PauseScreen/background_vignette/width_percent"),vignette.width_percent,0,50);
+    vignette.height_percent=read_pause_float(QStringLiteral("PauseScreen/background_vignette/height_percent"),vignette.height_percent,0,100);
+    vignette.opacity=read_pause_float(QStringLiteral("PauseScreen/background_vignette/opacity"),vignette.opacity,0,1);
+    pause_layout.bottom_gradient=oot_editor_config->value(QStringLiteral("PauseScreen/bottom_gradient/enabled"),pause_layout.bottom_gradient).toBool();
+    pause_layout.bottom_gradient_width_percent=read_pause_float(QStringLiteral("PauseScreen/bottom_gradient/width_percent"),pause_layout.bottom_gradient_width_percent,0,100);
+    pause_layout.bottom_gradient_height=read_pause_float(QStringLiteral("PauseScreen/bottom_gradient/height"),pause_layout.bottom_gradient_height,1,240);
+    pause_layout.bottom_gradient_opacity=read_pause_float(QStringLiteral("PauseScreen/bottom_gradient/opacity"),pause_layout.bottom_gradient_opacity,0,1);
     pause_layout.selection_grow_seconds=read_pause_float(QStringLiteral("PauseScreen/selection_grow_seconds"),0.f,0.f,1.f);
     pause_layout.transition_seconds=read_pause_float(QStringLiteral("PauseScreen/transition_seconds"),OOT3D::PauseMenu::DefaultTransitionSeconds,.02f,2.f);
     pause_layout.slot_content_scale=read_pause_float(QStringLiteral("PauseScreen/slot_content_scale"),1.f,.25f,2.f);
@@ -2112,6 +2138,9 @@ void GMainWindow::ConnectWidgetEvents() {
     OOT3D::PauseMenu::SetLayout(pause_layout,false);
     OOT3D::settings_size.store(std::clamp(
         oot_editor_config->value(QStringLiteral("General/settings_size"), 0).toInt(), -5, 10));
+    const int initial_language=oot_editor_config->value(QStringLiteral("General/initial_game_language"),-1).toInt();
+    if(OOT3D::IsPlayerBuild() && OOT3D::GameLanguage::SupportedLanguage(initial_language))
+        OOT3D::GameLanguage::set_game_language=initial_language;
     OOT3D::StartupHint::enabled=oot_editor_config->value(
         QStringLiteral("General/show_startup_settings_hint"),true).toBool();
     constexpr std::array pose_names{"logo", "copyright", "press_start", "press_start_extra"};
@@ -2142,10 +2171,30 @@ void GMainWindow::ConnectWidgetEvents() {
             const float value = oot_editor_config->value(QString::fromLatin1(key), fallback).toFloat(&ok);
             return ok && std::isfinite(value) ? std::clamp(value, low, high) : fallback;
         };
+        const auto read_contour=[&](const char* prefix,OOT3D::HUD::SpriteContour& layer,float max_width=3) {
+            const auto key=[&](const char* field){return QString::fromLatin1(prefix)+QString::fromLatin1(field);};
+            const auto number=[&](const char* field,float fallback,float low,float high){
+                return read_pause_float(key(field),fallback,low,high);
+            };
+            layer.enabled=oot_editor_config->value(key("enabled"),false).toBool();
+            layer.width=number("width",1,.25f,max_width);
+            layer.height=number("height",layer.width,.25f,max_width); // Legacy width covered both axes.
+            layer.opacity=number("opacity",.65f,0,1);
+            layer.x=number("x",0,-20,20);layer.y=number("y",0,-20,20);
+            layer.softness=number("softness",0,0,1);
+            constexpr std::array channels{"red","green","blue"};
+            for(unsigned c=0;c<3;++c)layer.color[c]=number(channels[c],layer.color[c],0,1);
+        };
         hud_layout[i] = {read("x", hud_layout[i].x, -400, 400), read("y", hud_layout[i].y, -240, 240), read("scale", hud_layout[i].scale, .1f, 3)};
         if (i == OOT3D::HUD::Minimap) hud_layout.minimap_lock_corner=oot_editor_config->value(QStringLiteral("lock_corner"),true).toBool();
         if (i == OOT3D::HUD::Rupees) {
             hud_layout.hd_rupee_numbers=oot_editor_config->value(QStringLiteral("hd_numbers"),true).toBool();
+            read_contour("contour_",hud_layout.rupee_contour);
+            auto& outline=hud_layout.rupee_digit_outline;
+            outline.enabled=oot_editor_config->value(QStringLiteral("digit_outline"),outline.enabled).toBool();
+            outline.thickness=read("digit_outline_thickness",outline.thickness,outline.MinThickness,outline.MaxThickness);
+            outline.color={read("digit_outline_red",outline.color[0],0,1),read("digit_outline_green",outline.color[1],0,1),
+                           read("digit_outline_blue",outline.color[2],0,1)};
             hud_layout.rupee_number_gap=read("number_gap",0,-100,100);
             hud_layout.hd_rupee_text={read("hd_text_x",0,-100,100),read("hd_text_y",0,-100,100),read("hd_text_scale",1,.1f,3)};
             hud_layout.hd_rupee_spacing=read("hd_digit_spacing",0,-8,24);
@@ -2153,7 +2202,15 @@ void GMainWindow::ConnectWidgetEvents() {
                 read("hd_shadow_x",.75f,-3,3),read("hd_shadow_y",.75f,-3,3),
                 read("hd_shadow_blur",0,0,2),read("hd_shadow_strength",.8f,0,1)};
         }
-        if (i == OOT3D::HUD::Hearts) hud_layout.heart_spacing = read("spacing", hud_layout.heart_spacing, -8, 20);
+        if (i == OOT3D::HUD::Hearts) {
+            hud_layout.heart_spacing=read("spacing",hud_layout.heart_spacing,-8,20);
+            hud_layout.heart_brightness=read("brightness",hud_layout.heart_brightness,0,2);
+            constexpr std::array keys{"color_red","color_green","color_blue"};
+            for(unsigned c=0;c<keys.size();++c)hud_layout.heart_color[c]=read(keys[c],hud_layout.heart_color[c],0,1);
+            read_contour("contour_",hud_layout.heart_contours.shadow);
+            read_contour("outline_",hud_layout.heart_contours.outline);
+            read_contour("defense_",hud_layout.heart_contours.double_defense);
+        }
         if (i == OOT3D::HUD::Timer) {
             hud_layout.hd_timer_numbers=oot_editor_config->value(QStringLiteral("hd_numbers"),true).toBool();
             hud_layout.hd_timer_text={read("hd_text_x",0,-100,100),read("hd_text_y",0,-100,100),read("hd_text_scale",1,.1f,3)};
@@ -2167,9 +2224,19 @@ void GMainWindow::ConnectWidgetEvents() {
                 read("shadow_blur",1,0,4),read("shadow_strength",.6f,0,1)};
         }
         if (i == OOT3D::HUD::Magic) {
+            auto& shadow=hud_layout.magic_shadow;
+            shadow.enabled=oot_editor_config->value(QStringLiteral("shadow_enabled"),shadow.enabled).toBool();
+            shadow.x=read("shadow_x",shadow.x,-20,20);
+            shadow.y=read("shadow_y",shadow.y,-20,20);
+            shadow.blur=read("shadow_softness",shadow.blur,0,12);
+            shadow.strength=read("shadow_opacity",shadow.strength,0,1);
+            read_contour("contour_",hud_layout.magic_contour,8);
+            hud_layout.magic_border_roundness=read("contour_roundness",0,0,1);
             hud_layout.magic_height=read("height",hud_layout.magic_height,1,8);
-            hud_layout.magic_border=read("border",hud_layout.magic_border,1,4);
+            hud_layout.magic_border=read("border",hud_layout.magic_border,0,4);
             hud_layout.magic_background_opacity=read("background_opacity",hud_layout.magic_background_opacity,0,1);
+            constexpr std::array keys{"fill_red","fill_green","fill_blue"};
+            for(unsigned c=0;c<keys.size();++c)hud_layout.magic_fill_color[c]=read(keys[c],OOT3D::HUD::NativeMagicFill[c],0,1);
         }
         oot_editor_config->endGroup();
     }
@@ -2190,6 +2257,13 @@ void GMainWindow::ConnectWidgetEvents() {
     }
     hud_layout.navi_text={read_pause_float(QStringLiteral("HUD/navi_text/x"),0,-400,400),
         read_pause_float(QStringLiteral("HUD/navi_text/y"),0,-240,240),1};
+    // Recover the original row separation when upgrading an independently positioned key counter.
+    const auto& wallet=hud_layout[OOT3D::HUD::Rupees];
+    const float old_distance=(20+wallet.y-hud_layout[OOT3D::HUD::Keys].y)/wallet.scale;
+    hud_layout.counter_distance=read_pause_float(QStringLiteral("HUD/rupees/key_distance"),
+        std::clamp(old_distance,0.f,OOT3D::UserHUD::Layout::MaxCounterDistance),0,OOT3D::UserHUD::Layout::MaxCounterDistance);
+    hud_layout.padding=OOT3D::UserHUD::ReadPadding(*oot_editor_config,QStringLiteral("HUD/padding/"));
+    hud_layout.overall_scale=read_pause_float(QStringLiteral("HUD/overall_scale"),1,.5f,2);
     OOT3D::UserHUD::LoadAuthoredTitles(*oot_editor_config,hud_layout);
     OOT3D::HUD::SetLayout(hud_layout, upgrade_minimap);
     auto button_layout=OOT3D::HUDDefaults::Buttons();
@@ -2245,6 +2319,10 @@ void GMainWindow::ConnectWidgetEvents() {
     OOT3D::UserHUD::LoadConfig(*oot_editor_config);
     const bool interpolation_enabled=oot_editor_config->value(QStringLiteral("Interpolation/enabled"),true).toBool();
     OOT3D::Interpolation::cpu_vertices=oot_editor_config->value(QStringLiteral("Interpolation/cpu_vertices"),OOT3D::IsPlayerBuild()).toBool();
+    OOT3D::PlayerGraphics::fxaa=oot_editor_config->value(QStringLiteral("Graphics/fxaa"),false).toBool();
+    OOT3D::PlayerGraphics::bloom=oot_editor_config->value(QStringLiteral("Graphics/bloom"),false).toBool();
+    OOT3D::PlayerGraphics::bloom_intensity=std::clamp(oot_editor_config->value(
+        QStringLiteral("Graphics/bloom_intensity"),OOT3D::PlayerGraphics::DefaultBloomIntensity).toInt(),0,100);
     OOT3D::PlayerGraphics::disable_fog=oot_editor_config->value(QStringLiteral("Graphics/disable_fog"),false).toBool();
     OOT3D::Interpolation::present_60=interpolation_enabled;
     OOT3D::Interpolation::enabled=interpolation_enabled;
@@ -2275,6 +2353,18 @@ void GMainWindow::ConnectWidgetEvents() {
     OOT3D::Rumble::enabled = oot_editor_config->value(QStringLiteral("Controller/rumble_enabled"), false).toBool();
     OOT3D::ControlSwap::enabled=oot_editor_config->value(QStringLiteral("Controller/swap_start_select"),false).toBool();
     OOT3D::ControlSwap::shoulders=oot_editor_config->value(QStringLiteral("Controller/swap_shoulders"),false).toBool();
+    OOT3D::GameControlOptions::hold_targeting=oot_editor_config->value(QStringLiteral("Controller/hold_targeting"),true).toBool();
+    OOT3D::GameControlOptions::invert_camera_y=oot_editor_config->value(QStringLiteral("Controller/invert_camera_y"),false).toBool();
+    OOT3D::GameControlOptions::motion_controls=oot_editor_config->value(QStringLiteral("Controller/motion_controls"),true).toBool();
+    const auto save_game_controls=[oot_editor_config] {
+        using namespace OOT3D::GameControlOptions;
+        if(!dirty.exchange(false))return;
+        oot_editor_config->setValue(QStringLiteral("Controller/hold_targeting"),hold_targeting.load());
+        oot_editor_config->setValue(QStringLiteral("Controller/invert_camera_y"),invert_camera_y.load());
+        oot_editor_config->setValue(QStringLiteral("Controller/motion_controls"),motion_controls.load());
+        oot_editor_config->sync();
+    };
+    connect(qApp,&QCoreApplication::aboutToQuit,this,save_game_controls);
     OOT3D::ControlSwap::cycle_arrows=false; // Removed option; ignore older saved enables.
     OOT3D::Randomizer::Activity::enabled=oot_editor_config->value(QStringLiteral("Multiplayer/activity_log"),true).toBool();
     {
@@ -2311,13 +2401,15 @@ void GMainWindow::ConnectWidgetEvents() {
     oot_rumble_timer->start(16);
     auto* oot_settings_timer = new QTimer(this);
     if (OOT3D::IsPlayerBuild()) AutoConfigureController(system, *config);
-    connect(oot_settings_timer, &QTimer::timeout, this, [this, oot_editor_config, controller_ticks=0u]() mutable {
+    connect(oot_settings_timer, &QTimer::timeout, this, [this, oot_editor_config, save_game_controls, controller_ticks=0u]() mutable {
+        save_game_controls();
         if (OOT3D::IsPlayerBuild() && controller_ticks++ % 15 == 0)
             AutoConfigureController(system, *config);
         OOT3D::Interpolation::Timing::display_request_fps =
             game_title_id == OOT3D::TitleScreen::ProgramId && emu_thread &&
-            emu_thread->IsRunning() && OOT3D::Interpolation::Replaying()
-                ? OOT3D::Interpolation::TargetFPS() : 0;
+            emu_thread->IsRunning()
+                ? std::max(OOT3D::Interpolation::menu_page.load()!=OOT3D::Interpolation::MenuPage::None?60:0,
+                           OOT3D::Interpolation::Replaying()?OOT3D::Interpolation::TargetFPS():0) : 0;
         if(const auto* display=render_window->screen()) {
             const float refresh=float(display->refreshRate());
             if(std::isfinite(refresh) && refresh>=30 && refresh<=1000 &&
@@ -2335,6 +2427,53 @@ void GMainWindow::ConnectWidgetEvents() {
         if(!QApplication::activeModalWidget() && OOT3D::configure_controls.exchange(false))
             OnConfigureControls();
         if(!QApplication::activeModalWidget()) {
+            using OOT3D::DefaultsDialog;
+            const auto request=OOT3D::defaults_dialog.exchange(DefaultsDialog::None);
+            if(request!=DefaultsDialog::None && OOT3D::PlayerDefaultsDirectory()) {
+                OOT3D::PlayerDefaultsDraft draft(QString::fromUtf8(OOT3D::PlayerDefaultsDirectory()));
+                QString error;
+                if(!draft.Writable()) error=tr("Could not open the player defaults for writing.");
+                else if(request==DefaultsDialog::ImportHUD || request==DefaultsDialog::ExportHUD) {
+                    const bool importing=request==DefaultsDialog::ImportHUD;
+                    const auto filter=tr("SariaUI HUD presets (*.json)");
+                    const auto path=importing ? QFileDialog::getOpenFileName(this,tr("Import default HUD"),{},filter) :
+                        QFileDialog::getSaveFileName(this,tr("Export default HUD"),QStringLiteral("SariaUI-HUD.json"),filter);
+                    if(!path.isEmpty() && importing) {
+                        QVariantMap values;
+                        error=OOT3D::UserHUD::ImportPreset(path,&values);
+                        if(error.isEmpty()) for(auto it=values.cbegin();it!=values.cend();++it) draft.setValue(it.key(),it.value());
+                    } else if(!path.isEmpty()) {
+                        error=OOT3D::UserHUD::ExportPreset(path,OOT3D::UserHUD::HUDSettings(
+                            OOT3D::UserHUD::ReadHUDLayout(draft),draft.value(QStringLiteral("UserHUD/hd_numbers"),-1).toInt()));
+                    }
+                } else {
+                    const bool textures=request==DefaultsDialog::TexturesShortcut;
+                    const QString key=textures ? QStringLiteral("UI/Shortcuts/Main Window/Toggle Custom Textures/KeySeq") :
+                                                QStringLiteral("UI/Shortcuts/Main Window/Fullscreen/KeySeq");
+                    QString sequence=draft.value(key).toString();
+                    const auto original=sequence;
+                    OnConfigurePresentationShortcut(textures,&sequence);
+                    if(sequence!=original) draft.setValue(key,sequence);
+                }
+                draft.Flush();
+                if(!draft.Writable()) error=tr("Could not save the player defaults.");
+                if(!error.isEmpty()) QMessageBox::warning(this,tr("Player defaults"),error);
+                ++OOT3D::defaults_revision;
+            }
+            const auto preset_action = OOT3D::hud_preset_request.exchange(OOT3D::HUDPresetAction::None);
+            if (preset_action != OOT3D::HUDPresetAction::None) {
+                const bool importing = preset_action == OOT3D::HUDPresetAction::Import;
+                const auto filter = tr("SariaUI HUD presets (*.json)");
+                const QString path = importing
+                    ? QFileDialog::getOpenFileName(this, tr("Import HUD settings"), {}, filter)
+                    : QFileDialog::getSaveFileName(this, tr("Export HUD settings"), QStringLiteral("SariaUI-HUD.json"), filter);
+                if (!path.isEmpty()) {
+                    const auto error = importing ? OOT3D::UserHUD::ImportPreset(path)
+                                                 : OOT3D::UserHUD::ExportPreset(path);
+                    if (!error.isEmpty())
+                        QMessageBox::warning(this, tr("HUD settings"), error);
+                }
+            }
             if(OOT3D::configure_textures_shortcut.exchange(false))
                 OnConfigurePresentationShortcut(true);
             else if(OOT3D::configure_fullscreen_shortcut.exchange(false))
@@ -2347,6 +2486,15 @@ void GMainWindow::ConnectWidgetEvents() {
         }
         OOT3D::PlayerGraphics::ApplyPending(Settings::values,
             [&] { system.ApplySettings(); }, [&] { config->Save(); });
+        if(OOT3D::PlayerGraphics::fxaa_dirty.exchange(false)) {
+            oot_editor_config->setValue(QStringLiteral("Graphics/fxaa"),OOT3D::PlayerGraphics::fxaa.load());
+            oot_editor_config->sync();
+        }
+        if(OOT3D::PlayerGraphics::bloom_dirty.exchange(false)) {
+            oot_editor_config->setValue(QStringLiteral("Graphics/bloom"),OOT3D::PlayerGraphics::bloom.load());
+            oot_editor_config->setValue(QStringLiteral("Graphics/bloom_intensity"),OOT3D::PlayerGraphics::bloom_intensity.load());
+            oot_editor_config->sync();
+        }
         if(OOT3D::PlayerGraphics::fog_dirty.exchange(false)) {
             oot_editor_config->setValue(QStringLiteral("Graphics/disable_fog"),OOT3D::PlayerGraphics::disable_fog.load());
             oot_editor_config->sync();
@@ -2825,6 +2973,14 @@ void GMainWindow::ConnectWidgetEvents() {
             oot_editor_config->setValue(QStringLiteral("PauseScreen/horizontal"),layout.horizontal);
             oot_editor_config->setValue(QStringLiteral("PauseScreen/stack_background"),layout.stack_background);
             oot_editor_config->setValue(QStringLiteral("PauseScreen/header_y"),layout.header_y);
+            oot_editor_config->setValue(QStringLiteral("PauseScreen/background_vignette/enabled"),layout.background_vignette.enabled);
+            oot_editor_config->setValue(QStringLiteral("PauseScreen/background_vignette/width_percent"),layout.background_vignette.width_percent);
+            oot_editor_config->setValue(QStringLiteral("PauseScreen/background_vignette/height_percent"),layout.background_vignette.height_percent);
+            oot_editor_config->setValue(QStringLiteral("PauseScreen/background_vignette/opacity"),layout.background_vignette.opacity);
+            oot_editor_config->setValue(QStringLiteral("PauseScreen/bottom_gradient/enabled"),layout.bottom_gradient);
+            oot_editor_config->setValue(QStringLiteral("PauseScreen/bottom_gradient/width_percent"),layout.bottom_gradient_width_percent);
+            oot_editor_config->setValue(QStringLiteral("PauseScreen/bottom_gradient/height"),layout.bottom_gradient_height);
+            oot_editor_config->setValue(QStringLiteral("PauseScreen/bottom_gradient/opacity"),layout.bottom_gradient_opacity);
             oot_editor_config->setValue(QStringLiteral("PauseScreen/selection_grow_seconds"),layout.selection_grow_seconds);
             oot_editor_config->setValue(QStringLiteral("PauseScreen/transition_seconds"),layout.transition_seconds);
             oot_editor_config->setValue(QStringLiteral("PauseScreen/slot_content_scale"),layout.slot_content_scale);
@@ -2958,6 +3114,11 @@ void GMainWindow::ConnectWidgetEvents() {
                 OOT3D::ActorDrawDistance::multiplier.load());
             oot_editor_config->sync();
         }
+        if (OOT3D::GameLanguage::game_language_status.load()==2 &&
+            oot_editor_config->contains(QStringLiteral("General/initial_game_language"))) {
+            oot_editor_config->remove(QStringLiteral("General/initial_game_language"));
+            oot_editor_config->sync();
+        }
         if (OOT3D::StartupHint::dirty.exchange(false)) {
             oot_editor_config->setValue(QStringLiteral("General/show_startup_settings_hint"),
                 OOT3D::StartupHint::enabled.load());
@@ -3059,6 +3220,11 @@ void GMainWindow::ConnectWidgetEvents() {
         }
         if (OOT3D::HUD::dirty.exchange(false)) {
             const auto layout = OOT3D::HUD::GetLayout();
+            oot_editor_config->setValue(QStringLiteral("HUD/overall_scale"),layout.overall_scale);
+            oot_editor_config->setValue(QStringLiteral("HUD/padding/top"),layout.padding.top);
+            oot_editor_config->setValue(QStringLiteral("HUD/padding/bottom"),layout.padding.bottom);
+            oot_editor_config->setValue(QStringLiteral("HUD/padding/left"),layout.padding.left);
+            oot_editor_config->setValue(QStringLiteral("HUD/padding/right"),layout.padding.right);
             OOT3D::UserHUD::SaveAuthoredTitles(*oot_editor_config,layout);
             constexpr std::array names{"hearts", "rupees", "magic", "a_button", "loading_icon", "minimap", "keys", "timer", "minigame", "shard_agony", "target_indicator", "carrots"};
             for (unsigned i = 0; i < layout.size(); ++i) {
@@ -3068,10 +3234,35 @@ void GMainWindow::ConnectWidgetEvents() {
                 oot_editor_config->setValue(QStringLiteral("scale"), layout[i].scale);
                 if (i == OOT3D::HUD::Minimap)
                     oot_editor_config->setValue(QStringLiteral("lock_corner"),layout.minimap_lock_corner);
-                if (i == OOT3D::HUD::Hearts)
-                    oot_editor_config->setValue(QStringLiteral("spacing"), layout.heart_spacing);
-                if (i == OOT3D::HUD::Rupees)
+                const auto write_contour=[&](const char* prefix,const OOT3D::HUD::SpriteContour& layer) {
+                    const auto write=[&](const char* field,auto value){
+                        oot_editor_config->setValue(QString::fromLatin1(prefix)+QString::fromLatin1(field),value);
+                    };
+                    write("enabled",layer.enabled);write("width",layer.width);write("height",layer.height);
+                    write("opacity",layer.opacity);write("softness",layer.softness);
+                    write("x",layer.x);write("y",layer.y);
+                    write("red",layer.color[0]);write("green",layer.color[1]);write("blue",layer.color[2]);
+                };
+                if (i == OOT3D::HUD::Hearts) {
+                    oot_editor_config->setValue(QStringLiteral("spacing"),layout.heart_spacing);
+                    oot_editor_config->setValue(QStringLiteral("brightness"),layout.heart_brightness);
+                    constexpr std::array keys{"color_red","color_green","color_blue"};
+                    for(unsigned c=0;c<keys.size();++c)oot_editor_config->setValue(QString::fromLatin1(keys[c]),layout.heart_color[c]);
+                    write_contour("contour_",layout.heart_contours.shadow);
+                    write_contour("outline_",layout.heart_contours.outline);
+                    write_contour("defense_",layout.heart_contours.double_defense);
+                }
+                if (i == OOT3D::HUD::Rupees) {
+                    write_contour("contour_",layout.rupee_contour);
+                    const auto& outline=layout.rupee_digit_outline;
+                    oot_editor_config->setValue(QStringLiteral("digit_outline"),outline.enabled);
+                    oot_editor_config->setValue(QStringLiteral("digit_outline_thickness"),outline.thickness);
+                    oot_editor_config->setValue(QStringLiteral("digit_outline_red"),outline.color[0]);
+                    oot_editor_config->setValue(QStringLiteral("digit_outline_green"),outline.color[1]);
+                    oot_editor_config->setValue(QStringLiteral("digit_outline_blue"),outline.color[2]);
+                    oot_editor_config->setValue(QStringLiteral("key_distance"),layout.counter_distance);
                     oot_editor_config->setValue(QStringLiteral("number_gap"),layout.rupee_number_gap);
+                }
                 if (i == OOT3D::HUD::Carrots) {
                     oot_editor_config->setValue(QStringLiteral("opacity"),layout.carrot_opacity);
                     oot_editor_config->setValue(QStringLiteral("spacing"),layout.carrot_spacing);
@@ -3083,9 +3274,19 @@ void GMainWindow::ConnectWidgetEvents() {
                     oot_editor_config->setValue(QStringLiteral("shadow_strength"),layout.carrot_shadow.strength);
                 }
                 if (i == OOT3D::HUD::Magic) {
+                    const auto& shadow=layout.magic_shadow;
+                    oot_editor_config->setValue(QStringLiteral("shadow_enabled"),shadow.enabled);
+                    oot_editor_config->setValue(QStringLiteral("shadow_x"),shadow.x);
+                    oot_editor_config->setValue(QStringLiteral("shadow_y"),shadow.y);
+                    oot_editor_config->setValue(QStringLiteral("shadow_softness"),shadow.blur);
+                    oot_editor_config->setValue(QStringLiteral("shadow_opacity"),shadow.strength);
+                    write_contour("contour_",layout.magic_contour);
+                    oot_editor_config->setValue(QStringLiteral("contour_roundness"),layout.magic_border_roundness);
                     oot_editor_config->setValue(QStringLiteral("height"),layout.magic_height);
                     oot_editor_config->setValue(QStringLiteral("border"),layout.magic_border);
                     oot_editor_config->setValue(QStringLiteral("background_opacity"),layout.magic_background_opacity);
+                    constexpr std::array keys{"fill_red","fill_green","fill_blue"};
+                    for(unsigned c=0;c<keys.size();++c)oot_editor_config->setValue(QString::fromLatin1(keys[c]),layout.magic_fill_color[c]);
                 }
                 oot_editor_config->endGroup();
             }
@@ -3820,6 +4021,7 @@ void GMainWindow::ShutdownGame() {
     OOT3D::BossChallenge::on_top.store(false);
     OOT3D::FileSelect::on_top.store(false);
     OOT3D::PauseMenu::item_page.store(false);
+    OOT3D::Interpolation::menu_page=OOT3D::Interpolation::MenuPage::None;
     OOT3D::PauseMenu::gear_page.store(false);
 #endif
 
@@ -6820,7 +7022,7 @@ int LaunchQtFrontend(int argc, char* argv[]) {
     FileUtil::SetUserPath(oot_user_absolute.toStdString());
     Q_INIT_RESOURCE(release_defaults);
     if (!OOT3D::ReleaseDefaults::Prepare(
-            QString::fromStdString(FileUtil::GetUserPath(FileUtil::UserPath::ConfigDir)))) {
+            QString::fromStdString(FileUtil::GetUserPath(FileUtil::UserPath::ConfigDir)), OOT3D::IsPlayerBuild())) {
         QMessageBox::critical(nullptr, QStringLiteral("SariaUI"),
                               QStringLiteral("Cannot prepare default settings."));
         return 1;

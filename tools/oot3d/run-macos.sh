@@ -2,13 +2,19 @@
 set -euo pipefail
 source_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 project_dir="$(cd "$source_dir/.." && pwd)"
-app="$source_dir/build-macos/bin/Release/azahar.app/Contents/MacOS/azahar"
+bundle="$source_dir/build-macos/bin/Release/azahar.app"
+app="$bundle/Contents/MacOS/azahar"
 if [[ ! -x "$app" ]]; then
     echo "Build the app first: $source_dir/tools/oot3d/build-macos.sh" >&2
     exit 1
 fi
+profile=user
+if [[ ${1:-} == --player2 ]]; then
+    profile=user-player2
+    shift
+fi
 if [[ $# -gt 1 ]]; then
-    echo "Usage: $0 [path-to-game.cci]" >&2
+    echo "Usage: $0 [--player2] [path-to-game.cci]" >&2
     exit 1
 fi
 if [[ $# -eq 1 ]]; then
@@ -27,6 +33,9 @@ if [[ ! -f "$rom" ]]; then
     exit 1
 fi
 rom="$(cd "$(dirname "$rom")" && pwd)/$(basename "$rom")"
-export OOT3D_USER_PATH="$project_dir/private/user"
+export OOT3D_USER_PATH="$project_dir/private/$profile"
 mkdir -p "$OOT3D_USER_PATH"
+if [[ $profile == user-player2 ]]; then
+    exec /usr/bin/open -n --env "OOT3D_USER_PATH=$OOT3D_USER_PATH" "$bundle" --args "$rom"
+fi
 exec "$app" "$rom"

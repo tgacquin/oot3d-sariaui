@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "oot3d/hud_layout.h"
+#include "oot3d/magic_lens_pulse.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -9,24 +10,61 @@
 #include <vector>
 
 namespace OOT3D::MagicMeter {
+// The HUD shader supplies an opaque black texel for the meter background.
+inline constexpr float BackgroundMarker = .125f;
+inline bool HasLayers(const HUD::Layout& l) {
+    return (l.magic_contour.enabled && l.magic_contour.opacity>0) ||
+           (l.magic_shadow.enabled && l.magic_shadow.strength>0);
+}
+// These unlit 2D atlas batches use neither view vectors nor projective UVs.
+// Initialize the shader markers before drawing the meter or copying heart contours.
+template<class V> void PrepareHudColors(std::span<V> vertices,unsigned fill_quad,const HUD::Layout& layout) {
+    const bool custom_fill=layout.magic_fill_color!=HUD::NativeMagicFill;
+    const bool hearts=layout.CustomHeartColor();
+    for(auto& vertex:vertices)vertex.tex_coord0_w=0;
+    // Also remove the atlas rim when native geometry is hidden or changing
+    // shape and cannot be rebuilt by Append.
+    const float opacity=std::isfinite(layout.magic_background_opacity)?
+        std::clamp(layout.magic_background_opacity,0.f,1.f):1.f;
+    for(auto& vertex:vertices.subspan((fill_quad-3)*6,18)) {
+        vertex.tex_coord0_w=BackgroundMarker;
+        vertex.view[0]=0;
+        vertex.view[1]=opacity;
+    }
+    if(hearts) {
+        // The 20 heart quads immediately follow the fill in the native 92-quad top HUD batch.
+        for(auto& vertex:vertices.subspan((fill_quad+1)*6,20*6)) {
+            vertex.tex_coord0_w=.5f;
+            vertex.tex_coord2[0]=layout.heart_brightness;
+            for(unsigned c=0;c<3;++c)vertex.view[c]=layout.heart_color[c];
+        }
+    }
+    if(!custom_fill)return;
+    for(auto& vertex:vertices.subspan(fill_quad*6,6)) {
+        vertex.tex_coord0_w=-2;
+        for(unsigned c=0;c<3;++c)vertex.view[c]=layout.magic_fill_color[c];
+    }
+}
 // The renderer supplies only the verified native HUD's four magic quads.
 // Interpolate the fill edge on the extra presentation frame, never game state.
 template<class Vertex> struct History {
     std::array<Vertex,24> previous{};
+    std::array<std::array<float,4>,3> start_edge{};
+    bool moving=false;
     std::uint64_t frame=0;
     std::int64_t time=0;
     unsigned epoch=0;
     bool seen=false;
-    template<class Same> bool Apply(std::span<Vertex> meter,std::uint64_t next,
-            std::int64_t now,unsigned generation,Same same) {
+    bool Observe(std::span<const Vertex> meter,std::uint64_t next,
+            std::int64_t now,unsigned generation) {
+        moving=false;
         if(meter.size()!=24){seen=false;return false;}
         std::array<Vertex,24> current;
         std::copy(meter.begin(),meter.end(),current.begin());
         bool valid=seen && next==frame+1 && now-time>=20000 && now-time<=50000 && generation==epoch;
         for(unsigned i=0;valid && i<24;++i) {
-            valid=same(previous[i],current[i]);
             // The frame and left edge must stay still: do not smear HUD moves,
-            // fades, upgrades, hidden geometry, or an editor layout change.
+            // upgrades, hidden geometry, or an editor layout change.
             if(i<20 || i==22)valid &= previous[i].position==current[i].position;
             for(unsigned c=0;c<4;++c)
                 valid &= std::isfinite(previous[i].position[c]) && std::isfinite(current[i].position[c]);
@@ -46,43 +84,35 @@ template<class Vertex> struct History {
             for(unsigned c=0;c<4;++c)
                 valid &= std::abs(current[i].position[c]-previous[i].position[c]-axis[c]*dot/length)<.00001f;
         }
-        bool changed=false;
-        if(valid)for(unsigned i:{20u,21u,23u})for(unsigned c=0;c<4;++c) {
-            changed |= previous[i].position[c]!=current[i].position[c];
-            meter[i].position[c]=(previous[i].position[c]+current[i].position[c])*.5f;
+        // A native file-entry fade can change opacity on every tick while the
+        // fill is growing. Sample only the edge geometry; this draw retains
+        // its own atlas coordinates, visibility and color.
+        valid = valid && current[18].color[3]>0 && current[18].position!=current[19].position &&
+                 previous[18].position!=previous[19].position;
+        if(valid)for(unsigned k=0;k<3;++k)for(unsigned c=0;c<4;++c) {
+            const unsigned i=RightEdge[k];
+            start_edge[k][c]=previous[i].position[c];
+            moving |= start_edge[k][c]!=current[i].position[c];
         }
         previous=current;frame=next;time=now;epoch=generation;seen=true;
-        return changed;
+        return moving;
+    }
+
+    static constexpr std::array<unsigned,3> RightEdge{20,21,23};
+    void Sample(std::span<Vertex,24> meter,float phase) const {
+        if(!moving)return;
+        for(unsigned k=0;k<RightEdge.size();++k)for(unsigned c=0;c<4;++c) {
+            auto& edge=meter[RightEdge[k]].position[c];
+            edge=std::lerp(start_edge[k][c],edge,phase);
+        }
     }
 };
 inline bool Valid(const HUD::Layout& l) {
     return std::isfinite(l.magic_width) && l.magic_width>=.5f && l.magic_width<=4 &&
         std::isfinite(l.magic_height) && l.magic_height>=1 && l.magic_height<=8 &&
-        std::isfinite(l.magic_border) && l.magic_border>=1 && l.magic_border<=4 &&
+        std::isfinite(l.magic_border) && l.magic_border>=0 && l.magic_border<=4 &&
+        std::isfinite(l.magic_padding_ratio) && l.magic_padding_ratio>0 &&
         std::isfinite(l.magic_background_opacity) && l.magic_background_opacity>=0 && l.magic_background_opacity<=1;
-}
-inline bool Changed(const HUD::Layout& l) {
-    return Valid(l) && (l.magic_width!=1 || l.magic_height!=1 || l.magic_border!=1 || l.magic_background_opacity!=1);
-}
-struct Patch {
-    unsigned quad;
-    float x0,y0,x1,y1,v0,v1;
-};
-// Native meter: three 8px-high frame pieces, with 2px margins around
-// the 4px-high fill. Single/double magic have outer widths 82/164.
-inline std::array<Patch,10> Patches(float width,float fraction,const HUD::Layout& l) {
-    const float b=l.magic_border,h=l.magic_height;
-    width*=l.magic_width;
-    const float cap=std::min(8*b,width*.5f);
-    const std::array<float,4> x{0,cap,width-cap,width};
-    const std::array<float,4> y{0,2*b,2*b+4*h,4*b+4*h};
-    constexpr std::array<float,4> v{0,.25f,.75f,1};
-    std::array<Patch,10> out{};
-    for(unsigned q=0;q<3;++q)for(unsigned row=0;row<3;++row)
-        out[q*3+row]={q,x[q],y[row],x[q+1],y[row+1],v[row],v[row+1]};
-    out[9]={3,2*b,2*b,2*b+(width-4*b)*std::clamp(fraction,0.f,1.f),
-        2*b+4*h,0,1};
-    return out;
 }
 // Input is exactly the four verified magic quads, after the native vertex
 // shader: TL,BL,TR, TR,BL,BR. Work in their own screen axes so rotation,
@@ -90,8 +120,9 @@ inline std::array<Patch,10> Patches(float width,float fraction,const HUD::Layout
 // interpolate blends all shader varyings; background opacity multiplies native alpha.
 template<class Vertex,class Interpolate>
 bool Append(std::span<const Vertex> input,const HUD::Layout& l,
-            std::vector<Vertex>& output,Interpolate interpolate) {
-    if(input.size()!=24 || !Changed(l))return false;
+            std::vector<Vertex>& output,Interpolate interpolate,float frame_brightness=1.f) {
+    const auto& contour=l.magic_contour;
+    if(input.size()!=24 || !Valid(l))return false;
     std::array<float,4> origin{},dx{},dy{};
     for(unsigned c=0;c<4;++c) {
         origin[c]=input[0].position[c];
@@ -124,42 +155,87 @@ bool Append(std::span<const Vertex> input,const HUD::Layout& l,
     // Empty/hidden native fills can collapse to a point; never revive them.
     const bool fill_visible=fill_width>0 && at(input[18],2,2) && at(input[19],2,6);
     if(fill_width>0 && !fill_visible)return false;
-    const auto patches=Patches(width,fill_visible?fill_width/(width-4):0,l);
-    for(const auto& p:patches) {
-        if(p.quad==3 && !fill_visible)continue;
-        const auto* source=input.data()+p.quad*6;
-        const auto emit=[&](float u0,float u1,float v0,float v1,bool background) {
-            if(background && l.magic_background_opacity==0)return;
-            std::array<Vertex,4> corners;
-            for(unsigned i=0;i<4;++i) {
-                const float u=i%2?u1:u0,v=i/2?v1:v0;
-                corners[i]=interpolate(interpolate(source[0],source[2],u),
-                                       interpolate(source[1],source[5],u),v);
-                const float x=p.x0+(p.x1-p.x0)*u;
-                const float y=p.y0+(p.y1-p.y0)*(v-p.v0)/(p.v1-p.v0);
-                for(unsigned c=0;c<4;++c)corners[i].position[c]=origin[c]+dx[c]*x+dy[c]*y;
-                if(background)corners[i].color[3]*=l.magic_background_opacity;
+    const float padding=2*l.magic_border*l.magic_padding_ratio;
+    // Keep the authored frame thickness at every HUD scale. At the smallest
+    // sizes reserve one local unit for the fill so it still shows the amount.
+    const float bar_width=std::max(width*l.magic_width,2*padding+1);
+    const float bar_height=std::max(4*(l.magic_height+l.magic_border),2*padding+1);
+    const float fill_height=bar_height-2*padding;
+    // Work in border widths, so a one-unit inset is the inner edge on all
+    // sides. Legacy contours can still have different horizontal/vertical widths.
+    float unit_x=0,unit_y=0,half_x=0,half_y=0,inner_radius=0;
+    if(HasLayers(l) && origin[3]>0 &&
+       std::any_of(input.begin(),input.begin()+18,[](const Vertex& v){return v.color[3]>0;})) {
+        const float pixels_x=std::hypot(dx[0]*120.f,dx[1]*200.f)/origin[3];
+        const float pixels_y=std::hypot(dy[0]*120.f,dy[1]*200.f)/origin[3];
+        if(pixels_x>0 && pixels_y>0) {
+            const bool bordered=contour.enabled && contour.opacity>0 && contour.width>0 && contour.height>0;
+            const float thickness_x=bordered?contour.width:1.f,thickness_y=bordered?contour.height:1.f;
+            unit_x=thickness_x/pixels_x;
+            unit_y=thickness_y/pixels_y;
+            half_x=bar_width/(2*unit_x);
+            half_y=bar_height/(2*unit_y);
+            const float rim_width=bordered?1.f:0.f;
+            const float radius=bordered?std::clamp(l.magic_border_roundness,0.f,1.f)*(1+std::min(half_x,half_y)):0;
+            inner_radius=std::max(radius-1,0.f);
+            const auto top=interpolate(input[6],input[8],.5f);
+            const auto bottom=interpolate(input[7],input[11],.5f);
+            const auto rim=interpolate(top,bottom,1.f/16);
+            const auto add_layer=[&](bool shadow) {
+                const auto& settings=l.magic_shadow;
+                const float feather=shadow?settings.blur/std::sqrt(thickness_x*thickness_y):0.f;
+                const float offset_x=(bordered?contour.x:0)+(shadow?settings.x:0);
+                const float offset_y=(bordered?contour.y:0)+(shadow?settings.y:0);
+                constexpr std::array<unsigned,4> source{0,1,14,17}; // TL, BL, TR, BR
+                std::array<Vertex,4> quad;
+                for(unsigned i=0;i<4;++i) {
+                    auto& v=quad[i];
+                    v=rim;
+                    const float px=(i>=2?1:-1)*(half_x+rim_width+feather);
+                    const float py=(i%2?1:-1)*(half_y+rim_width+feather);
+                    const float x=(half_x+px)*unit_x+offset_x/pixels_x;
+                    const float y=(half_y+py)*unit_y+offset_y/pixels_y;
+                    for(unsigned c=0;c<4;++c)v.position[c]=origin[c]+dx[c]*x+dy[c]*y;
+                    for(unsigned c=0;c<3;++c)v.color[c]=shadow?0.f:contour.color[c]*frame_brightness;
+                    v.color[3]=input[source[i]].color[3]*(shadow?settings.strength:contour.opacity);
+                    v.tex_coord0_w=shadow?-5.f:-4.f;
+                    v.tex_coord1={px,py};
+                    v.tex_coord2={half_x+(shadow?rim_width:0),half_y+(shadow?rim_width:0)};
+                    v.view[0]=radius;
+                    v.view[1]=shadow?feather:contour.softness;
+                }
+                for(unsigned i:{0u,1u,2u,2u,1u,3u})output.push_back(quad[i]);
+            };
+            if(l.magic_shadow.enabled && l.magic_shadow.strength>0)add_layer(true);
+            if(bordered)add_layer(false);
+        }
+    }
+    const auto frame_begin=output.size();
+    const auto emit=[&](std::array<unsigned,4> source,float left,float top,float right,float bottom,bool background) {
+        std::array<Vertex,4> corners;
+        for(unsigned i=0;i<4;++i) {
+            auto& v=corners[i];
+            v=input[source[i]];
+            const float x=i>=2?right:left;
+            const float y=i%2?bottom:top;
+            for(unsigned c=0;c<4;++c)v.position[c]=origin[c]+dx[c]*x+dy[c]*y;
+            if(background) {
+                v.tex_coord0_w=BackgroundMarker;
+                v.view[0]=inner_radius;
+                v.view[1]=l.magic_background_opacity;
             }
-            for(unsigned index:{0u,2u,1u,1u,2u,3u})output.push_back(corners[index]);
-        };
-        if(p.quad==3 || l.magic_background_opacity==1) {
-            emit(0,1,p.v0,p.v1,false);
-            continue;
         }
-        // The native 8px frame has a one-texel white rim. Its black interior
-        // includes the extra pixel between that rim and the 4px green fill.
-        // Slice both cap edges and the top/bottom strips so alpha changes never
-        // dim the rim or the separately drawn green fill. Keep native UVs for
-        // custom texture replacements, as with height and border controls.
-        const std::array<float,3> us{0,p.quad==0?.125f:.875f,1};
-        const bool cap=p.quad!=1,split_y=p.v0==0 || p.v1==1;
-        const std::array<float,3> vs{p.v0,p.v0==0?.125f:.875f,p.v1};
-        for(unsigned x=0;x<(cap?2u:1u);++x)for(unsigned y=0;y<(split_y?2u:1u);++y) {
-            const float u0=cap?us[x]:0,u1=cap?us[x+1]:1;
-            const float v0=split_y?vs[y]:p.v0,v1=split_y?vs[y+1]:p.v1;
-            const bool inside_x=p.quad==1 || (p.quad==0?x==1:x==0);
-            emit(u0,u1,v0,v1,inside_x && v0>=.125f && v1<=.875f);
-        }
+        for(unsigned i:{0u,1u,2u,2u,1u,3u})output.push_back(corners[i]);
+    };
+    if(l.magic_background_opacity>0)emit({0,1,14,17},0,0,bar_width,bar_height,true);
+    if(fill_visible) {
+        const float fraction=std::clamp(fill_width/(width-4),0.f,1.f);
+        emit({18,19,20,23},padding,padding,padding+(bar_width-2*padding)*fraction,padding+fill_height,false);
+    }
+    if(inner_radius>0)for(auto& v:std::span{output}.subspan(frame_begin)) {
+        v.tex_coord1={coordinate(v,dx,xx)/unit_x-half_x,coordinate(v,dy,yy)/unit_y-half_y};
+        v.tex_coord2={half_x,half_y};
+        if(v.tex_coord0_w!=BackgroundMarker)v.tex_coord0_w=v.tex_coord0_w== -2.f ? -(6+inner_radius) : 1+inner_radius;
     }
     return true;
 }

@@ -58,15 +58,23 @@ int main() {
     Check(!OOT3D::HandleSettingsFunctionKey(1,false));
     OOT3D::available=true;
     Check(OOT3D::HandleSettingsFunctionKey(1,false));
-    Check(OOT3D::visible && OOT3D::player_view==OOT3D::IsPlayerBuild());
+    Check(OOT3D::visible && (OOT3D::settings_view.load()==OOT3D::SettingsView::Player)==OOT3D::IsPlayerBuild());
     Check(OOT3D::HandleSettingsFunctionKey(1,true));
     Check(OOT3D::visible); // Holding the key cannot repeatedly toggle the menu.
     Check(OOT3D::HandleSettingsFunctionKey(1,false));
     Check(!OOT3D::visible);
     Check(OOT3D::HandleSettingsFunctionKey(2,false));
     Check(OOT3D::visible==!OOT3D::IsPlayerBuild());
-    if (!OOT3D::IsPlayerBuild()) Check(OOT3D::player_view);
-    Check(!OOT3D::HandleSettingsFunctionKey(3,false));
+    if (!OOT3D::IsPlayerBuild()) Check((OOT3D::settings_view.load()==OOT3D::SettingsView::Player));
+    if (OOT3D::IsPlayerBuild()) {
+        Check(!OOT3D::HandleSettingsFunctionKey(3,false) && !OOT3D::visible);
+    } else {
+        Check(OOT3D::HandleSettingsFunctionKey(3,false) && OOT3D::visible && (OOT3D::settings_view.load()==OOT3D::SettingsView::Defaults));
+        Check(OOT3D::HandleSettingsFunctionKey(3,true) && OOT3D::visible);
+        Check(OOT3D::HandleSettingsFunctionKey(2,false) && OOT3D::visible && !(OOT3D::settings_view.load()==OOT3D::SettingsView::Defaults));
+        Check(OOT3D::HandleSettingsFunctionKey(3,false) && (OOT3D::settings_view.load()==OOT3D::SettingsView::Defaults));
+        Check(OOT3D::HandleSettingsFunctionKey(3,false) && !OOT3D::visible);
+    }
     OOT3D::available=false; OOT3D::visible=false;
     using namespace InputCommon::ControllerAutoConfig;
     using Common::ParamPackage;

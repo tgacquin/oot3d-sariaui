@@ -16,11 +16,12 @@ int main(int argc,char** argv) {
     std::vector<unsigned char> bytes{std::istreambuf_iterator<char>(f),{}};
     const auto word=[&](size_t a){assert(a+4<=bytes.size());U32 v=0;for(unsigned i=0;i<4;++i)v|=U32(bytes[a+i])<<(8*i);return v;};
     constexpr U32 cmb=0x8000000,renderer=0x8010000,skl=0x8020000,wrapper=0x8030000,play=0x8040000;
-    unsigned models=0,primitives=0;
+    unsigned models=0,primitives=0,torches=0;
     for(size_t a=0;a+32<bytes.size();a+=4) {
         if(word(a)!=0x20626d63)continue;
         const std::string name(reinterpret_cast<const char*>(&bytes[a+16]),16);
-        if(!name.starts_with("drop_gi_"))continue;
+        const bool torch=name.starts_with("torch4_modelT");
+        if(!torch && !name.starts_with("drop_gi_"))continue;
         const unsigned size=word(a+4);assert(size && a+size<=bytes.size());
         Memory m;for(unsigned i=0;i<size;i+=4)m.Write(cmb+i,word(a+i));
         m.Write(renderer,0x4ebd98);m.Write(renderer+8,skl);m.Write(skl+4,wrapper);m.Write(wrapper,cmb+0x44);
@@ -35,7 +36,7 @@ int main(int argc,char** argv) {
             const auto before=m.words;
             PickupFog::Capture(m,r,1000000);assert(m.words==before && PickupFog::draws.size()==1);
             auto d=PickupFog::draws.back();assert(d.count && d.count<=10 && d.indices);
-            assert(PickupFog::Match(d.palette,d.indices,80,7,0x55,1000000));
+            assert(PickupFog::Match(d.palette,d.indices,80,7,0x55,1000000)==(torch?PickupFog::Torch:PickupFog::Surface));
             assert(PickupFog::Match(d.palette,d.indices,81,7,0x55,1033333));
             assert(!PickupFog::Match(d.palette,d.indices+1,80,7,0x55,1000000));
             assert(!PickupFog::Match(d.palette,d.indices,82,7,0x55,1066666));
@@ -48,8 +49,9 @@ int main(int argc,char** argv) {
             m.Write(0x5be5b8+0xfc,play+0x188);m.Write(cmb+0x10,0);PickupFog::Capture(m,r,1000000);assert(PickupFog::draws.empty());
             m.words=before;++primitives;
         }
-        ++models;
+        if(torch)++torches;else ++models;
     }
-    assert(models==15 && primitives>=15);
-    std::cout<<models<<" real collectible CMBs / "<<primitives<<" primitives: ownership, full palette, world view, freshness and isolation passed\n";
+    assert((models==15 && torches==2) || (models==0 && torches==1));
+    assert(primitives>=models+torches);
+    std::cout<<models<<" collectible and "<<torches<<" torch CMBs / "<<primitives<<" primitives: ownership, full palette, world view, freshness and isolation passed\n";
 }

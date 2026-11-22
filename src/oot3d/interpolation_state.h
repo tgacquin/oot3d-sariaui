@@ -52,6 +52,7 @@ struct CameraSample {
     // Exit-only cut policy: entering or remaining in first person still pairs.
     bool first_person{};
     float native_fov{};
+    unsigned aim_mode{};
 };
 // Native camera modes: free look, adult aim (bow/hookshot), child aim
 // (slingshot). Z aiming, hookshot travel and boomerang aim are third person.
@@ -99,27 +100,28 @@ class PresentationClock {
     std::optional<std::uint64_t> frame;
     std::int64_t time{};
     unsigned stable{};
+    int source_rate{};
     bool paired{};
     bool guest_timed{};
 public:
     void Reset() { frame.reset();stable=0;paired=false;guest_timed=false; }
     Presentation Next(std::uint64_t next,std::int64_t now,bool eligible,
-                      std::optional<std::int64_t> guest_ms=std::nullopt) {
+                      std::optional<std::int64_t> guest_ms=std::nullopt,int source_fps=30) {
+        if(source_rate!=source_fps) {Reset();source_rate=source_fps;}
         if(frame && *frame==next)return paired?Presentation::Skip:Presentation::Native;
         const auto timestamp=guest_ms.value_or(now);
         const auto elapsed=timestamp-time;
         const bool continuous=frame && next==*frame+1 && guest_timed==guest_ms.has_value() &&
-            elapsed>=25 && elapsed<=50;
+            (source_fps==60 ? elapsed>=12 && elapsed<=23 : elapsed>=25 && elapsed<=50);
         // Cadence describes the guest frames, including frames whose private
         // replay is incomplete. A pause/menu transition can temporarily lose
         // its midpoint while continuing at 30 Hz; requiring two more eligible
         // frames afterward hides most of a short opening/closing animation.
         // Use completed-buffer emulated timestamps when available. Host waits
         // (notably the pause backdrop capture) do not change the game's rate.
-        // Eligibility still gates every pair; a guest 60 Hz interval, frame
-        // gap, guest-time stall/rewind or clock-source change resets cadence.
+        // Frame gaps, stalls and changes of source cadence restart the track.
         stable=continuous?std::min(stable+1,2u):0;
-        frame=next;time=timestamp;guest_timed=guest_ms.has_value();paired=eligible && stable>=2;
+        frame=next;time=timestamp;guest_timed=guest_ms.has_value();paired=eligible && stable>=(source_fps==60?1u:2u);
         return paired?Presentation::Pair:Presentation::Native;
     }
 };

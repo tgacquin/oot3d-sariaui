@@ -21,7 +21,7 @@ template<class M> bool BindMaterial(M& m,U32 model,U32 source) {
 }
 // Independent guest mesh, sampler and linear texture allocation. Shared by
 // generated shadows and locally extracted frames; never modifies a native atlas.
-template<class Geometry,unsigned TextureWidth,unsigned TextureHeight,unsigned TextureFormat=0,bool BorrowTexture=false> struct Hook {
+template<class Geometry,unsigned TextureWidth,unsigned TextureHeight,unsigned TextureFormat=0,bool BorrowTexture=false,bool ActiveRange=false> struct Hook {
     static_assert(TextureFormat==0 || TextureFormat==4 || TextureFormat==12 || TextureFormat==13); // RGBA8 / RGBA4 / ETC1 / ETC1A4.
     static constexpr U32 Quads=std::tuple_size_v<decltype(Geometry::positions)>/12;
     static constexpr U32 Descriptor=0x1c0,Positions=0x2e0,UVs=Positions+Quads*48,
@@ -38,6 +38,7 @@ template<class Geometry,unsigned TextureWidth,unsigned TextureHeight,unsigned Te
     U32 block=0,model=0,source=0,entry=0,texture=0,renderer=0;
     std::array<U32,16> saved{};
     Geometry geometry;
+    U32 DrawQuads() const {return ActiveRange?geometry.count:Quads;}
     bool Drawing() const {return stage==Stage::Draw;}
     bool Pending() const {return stage!=Stage::Idle;}
     U32 TextureAddress() const {return texture;}
@@ -58,25 +59,32 @@ template<class Geometry,unsigned TextureWidth,unsigned TextureHeight,unsigned Te
         for(unsigned i=0;i<copy.size();++i) {
             auto v=m.Read(source+4*i);if(!v || !m.Read(model+4*i))return false;copy[i]=*v;
         }
-        copy[1]=block;copy[2]=renderer;copy[0x174/4]=Quads*6;copy[0x178/4]&=~0x60u;
+        copy[1]=block;copy[2]=renderer;copy[0x174/4]=DrawQuads()*6;copy[0x178/4]&=~0x60u;
         copy[0x1dc/4]=0; // The native factory also leaves this zero for a borrowed material.
         constexpr std::array<float,12> identity{1,0,0,0,0,1,0,0,0,0,1,0};
         for(unsigned i=0;i<identity.size();++i)copy[3+i]=std::bit_cast<U32>(identity[i]);
         for(unsigned i=0;i<copy.size();++i)m.Write(model+4*i,copy[i]);
         return BindMaterial(m,model,source);
     }
-    template<class M> void SetGeometry(M& m) {
-        const auto write=[&](U32 at,const auto& a) {
-            for(unsigned i=0;i<a.size();++i)m.Write(block+at+4*i,std::bit_cast<U32>(a[i]));
+    template<class M> bool SetGeometry(M& m) {
+        const auto write=[&](U32 at,const auto& data,unsigned stride) {
+            const auto values=std::span<const float>(data).first(DrawQuads()*stride);
+            if constexpr(requires { m.WriteFloats(block+at,values); })
+                return m.WriteFloats(block+at,values);
+            for(unsigned i=0;i<values.size();++i)m.Write(block+at+4*i,std::bit_cast<U32>(values[i]));
+            return true;
         };
-        write(Positions,geometry.positions);write(UVs,geometry.uvs);write(Colors,geometry.colors);
+        return write(Positions,geometry.positions,12) && write(UVs,geometry.uvs,8) &&
+               write(Colors,geometry.colors,16);
     }
     template<class M> bool Prepare(M& m) {
         const U32 desc=m.Read(m.Read(source+4).value_or(0)).value_or(0);
         if(!TitleScreen::Pointer(block,AllocationSize) || !TitleScreen::Pointer(desc,0x120))return false;
         std::array<U32,0x120/4> copy{};
         for(unsigned i=0;i<copy.size();++i) {auto v=m.Read(desc+4*i);if(!v)return false;copy[i]=*v;}
-        for(U32 i=0;i<AllocationSize;i+=4)if(!m.Read(block+i))return false;
+        if constexpr(requires { m.Mapped(block,AllocationSize); }) {
+            if(!m.Mapped(block,AllocationSize))return false;
+        } else for(U32 i=0;i<AllocationSize;i+=4)if(!m.Read(block+i))return false;
         copy[0]=block+Positions;copy[1]=block+UVs;copy[2]=block+Colors;
         copy[3]=Quads*4;copy[4]=block+Indices;copy[5]=Quads*6;
         // Every quad below is an independent indexed triangle pair. Native
@@ -89,7 +97,7 @@ template<class Geometry,unsigned TextureWidth,unsigned TextureHeight,unsigned Te
             const U32 b=q*4,at=block+Indices+q*12;
             m.Write(at,b|((b+2)<<16));m.Write(at+4,(b+1)|((b+1)<<16));m.Write(at+8,(b+2)|((b+3)<<16));
         }
-        SetGeometry(m);return true;
+        return SetGeometry(m);
     }
     template<class M,class R> void Resume(M& m,R& r) {
         const auto call=[&](Stage next,U32 fn,U32 a,U32 b=0,U32 c=0) {
@@ -146,10 +154,10 @@ template<class Geometry,unsigned TextureWidth,unsigned TextureHeight,unsigned Te
             renderer=m.Read(model+8).value_or(0);
             if(!RefreshModel(m)){finish();return;}
             m.Write(block+Cookie,Magic);m.Write(block+Cookie+4,renderer);m.Write(block+Cookie+8,model);m.Write(block+Cookie+12,texture);
-            call(Stage::Positions,0x36759c,block,sizeof(geometry.positions),block+Positions);return;
+            call(Stage::Positions,0x36759c,block,DrawQuads()*48,block+Positions);return;
         }
-        if(stage==Stage::Positions) {call(Stage::UVs,0x317d1c,block,sizeof(geometry.uvs),block+UVs);return;}
-        if(stage==Stage::UVs) {call(Stage::Colors,0x2f9934,block,sizeof(geometry.colors),block+Colors);return;}
+        if(stage==Stage::Positions) {call(Stage::UVs,0x317d1c,block,DrawQuads()*32,block+UVs);return;}
+        if(stage==Stage::UVs) {call(Stage::Colors,0x2f9934,block,DrawQuads()*64,block+Colors);return;}
         if(stage==Stage::Colors) {
             const U32 count=m.Read(block+0x128).value_or(0),current=m.Read(block+0x124).value_or(0);
             if(count<1 || count>2 || current>=count){finish();return;}
@@ -165,7 +173,7 @@ template<class Geometry,unsigned TextureWidth,unsigned TextureHeight,unsigned Te
         finish();
     }
     template<class M,class R> void Begin(M& m,R& r,U32 return_pc,Geometry g,std::span<const U32> image,U32 source_model) {
-        if(!g.count || (!BorrowTexture && image.size()*4!=TextureBytes))return;
+        if(!g.count || g.count>Quads || (!BorrowTexture && image.size()*4!=TextureBytes))return;
         source=source_model;
         if(!TitleScreen::Pointer(source,0x1e4) || m.Read(source)!=std::optional<U32>{0x4ebd60})return;
         // Menus can briefly expose a model before its descriptor/material is
@@ -182,7 +190,7 @@ template<class Geometry,unsigned TextureWidth,unsigned TextureHeight,unsigned Te
             creation_failed=false;
             pixels.assign(image.begin(),image.end());
             stage=failed_stage;
-            if(stage!=Stage::Allocate)SetGeometry(m);
+            if(stage!=Stage::Allocate && !SetGeometry(m)){creation_failed=true;stage=Stage::Idle;r=saved;return;}
             if(stage==Stage::TextureAllocate) {
                 r[0]=0x10000;r[1]=0x101;r[2]=0;r[3]=TextureBytes;r[15]=0x2a8bdc;
             } else {
@@ -203,8 +211,8 @@ template<class Geometry,unsigned TextureWidth,unsigned TextureHeight,unsigned Te
             // The allocation belongs to us, not to whichever menu supplied its
             // template last frame. Rebind in place, including same-address native
             // model reuse, instead of leaking allocations on every naming visit.
-            if(!RefreshModel(m)){r=saved;return;}
-            SetGeometry(m);stage=Stage::Positions;r[0]=block;r[1]=sizeof(geometry.positions);
+            if(!RefreshModel(m) || !SetGeometry(m)){r=saved;return;}
+            stage=Stage::Positions;r[0]=block;r[1]=DrawQuads()*48;
             r[2]=block+Positions;r[15]=0x36759c;
         }
     }

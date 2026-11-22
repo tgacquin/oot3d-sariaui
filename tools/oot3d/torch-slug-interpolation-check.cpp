@@ -44,7 +44,7 @@ int main(int argc,char** argv) {
             if(s.skinning==0) {
                 for(const auto& body:history.Pairs())if(body.ready &&
                     body.current.skinning==2 && body.current.frame==s.frame) {
-                    assert(Pose::TorchSlugRootPrefix(body,pair));
+                    assert(Pose::SkinnedRootPrefix(body,pair));
                     checked_body=body;checked_root=pair;
                 }
             }
@@ -83,7 +83,7 @@ int main(int argc,char** argv) {
         assert(checked_body && checked_root);
         const auto& body=*checked_body;
         const auto& root=*checked_root;
-        assert(Pose::TorchSlugRootPrefix(body,root));
+        assert(Pose::SkinnedRootPrefix(body,root));
         for(bool previous:{false,true})for(unsigned kind=0;kind<8;++kind) {
             auto wrong=root;auto& s=previous?wrong.previous:wrong.current;
             if(kind==0)s.model="other";
@@ -94,7 +94,7 @@ int main(int argc,char** argv) {
             if(kind==5)s.bone_ids[0]=1;
             if(kind==6)s.world[0][0][3]+=1;
             if(kind==7)s.vertex_offset[0][3]+=1;
-            assert(!Pose::TorchSlugRootPrefix(body,wrong));
+            assert(!Pose::SkinnedRootPrefix(body,wrong));
         }
         std::cout<<"Torch Slug phase "<<fraction<<": "<<ready<<"/"<<adjacent<<" ready palettes, "
             <<repaired<<" sheared joints, "<<draws<<" captured draws resolved\n";

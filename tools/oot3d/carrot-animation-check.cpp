@@ -74,7 +74,7 @@ int main(int argc,char** argv) {
     // colored sprite, and leave the original geometry/colors untouched.
     h.Reset();in.visible=true;in.count=6;mesh=original;
     update(3000000);update(3150000);render(3150000);const auto foreground=out;
-    OOT3D::HUD::CarrotShadow shadow{true,3,2,0,.6f};
+    OOT3D::HUD::DropShadow shadow{true,3,2,0,.6f};
     out.clear();h.Append(out,3150000,shadow);assert(out.size()==72);
     assert(std::equal(foreground.begin(),foreground.end(),out.begin()+36));
     for(unsigned j=0;j<36;++j) {

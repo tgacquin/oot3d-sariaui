@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/oot3d/defaults">
         <file alias="presentation.ini">defaults/presentation.ini</file>
+        <file alias="player.ini">defaults/player.ini</file>
         <file alias="runtime.ini">defaults/runtime.ini</file>
         <file alias="oot3d-world-map-outline.json">defaults/oot3d-world-map-outline.json</file>
         <file alias="oot3d-map-cutout.json">defaults/oot3d-map-cutout.json</file>

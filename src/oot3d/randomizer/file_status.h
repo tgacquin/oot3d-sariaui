@@ -9,7 +9,7 @@
 
 namespace OOT3D::Randomizer::FileStatus {
 enum class Error {None,Missing,Incompatible,Placement,Generation,Timeout,Settings,Generator,
-                  Storage,Memory,Prices,Unsupported,Connection,Count};
+                  Storage,Memory,Prices,Unsupported,Connection,GeneratorMismatch,Count};
 inline std::string_view ErrorLabel(Error error,unsigned language=1) {
     constexpr std::string_view labels[][3]={
         {"","",""},
@@ -25,6 +25,7 @@ inline std::string_view ErrorLabel(Error error,unsigned language=1) {
         {"Disable custom prices.","Désactivez les prix modifiés.","Desactiva los precios modificados."},
         {"Unsupported game version.","Version du jeu non compatible.","Versión del juego no compatible."},
         {"Connection failed. Retry via F1.","Échec de connexion. Réessayez via F1.","Falló la conexión. Reintenta desde F1."},
+        {"Generator mismatch. Restart SariaUI.","Générateur incompatible. Relancez SariaUI.","Generador incompatible. Reinicia SariaUI."},
     };
     static_assert(std::size(labels)==static_cast<unsigned>(Error::Count));
     const auto i=static_cast<unsigned>(error);

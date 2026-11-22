@@ -160,6 +160,7 @@ class ReleaseChecks(unittest.TestCase):
             editor, runtime = root / 'editor.ini', root / 'runtime.ini'
             editor.write_text('[HUD]\nhearts\\x=-12\n[Interpolation]\ntarget_fps=120\n'
                 'match_refresh_rate=true\n[Randomizer]\nseed=private-seed\n'
+                '[Graphics]\nfxaa=true\nbloom=true\nactor_draw_distance=1\n'
                 '[UserHUD]\nhearts\\x=20\n[Multiplayer]\nroom=private-room\n'
                 'player_names\\scale=0.8\n')
             runtime.write_text('[Renderer]\nresolution_factor=5\nphysical_device=2\n'
@@ -183,6 +184,9 @@ class ReleaseChecks(unittest.TestCase):
             self.assertEqual(presentation['HUD']['hearts\\x'], '-12')
             self.assertEqual(presentation['Multiplayer']['player_names\\scale'], '0.8')
             self.assertEqual(presentation['Interpolation']['target_fps'], '60')
+            self.assertEqual(presentation['Graphics']['fxaa'], 'true')
+            self.assertEqual(presentation['Graphics']['bloom'], 'true')
+            self.assertEqual(presentation['Graphics']['actor_draw_distance'], '3.75')
             self.assertEqual(presentation['Interpolation']['cpu_vertices'], 'true')
             self.assertEqual(frontend['Renderer']['use_hw_shader'], 'false')
             self.assertEqual(presentation['Interpolation']['match_refresh_rate'], 'false')

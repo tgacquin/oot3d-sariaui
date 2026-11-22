@@ -8,7 +8,7 @@
 namespace OOT3D::DungeonSides {
 using TitleScreen::U32;
 using PauseShadow::Rect;
-constexpr unsigned Capacity=200; // Capacity of the shared guest layer buffers.
+constexpr unsigned Capacity=50; // The largest native layer has 200 vertices (50 quads).
 struct Geometry {
     std::array<float,Capacity*12> positions{};
     std::array<float,Capacity*8> uvs{};
@@ -24,7 +24,7 @@ struct Geometry {
 // The source atlas can contain map parchment, wells and floor buttons in one
 // draw. Split only verified dungeon owners, preserving their native samplers,
 // material fades and UVs. Deferred side contents render above the shadows.
-using Layer=GuestUI::Hook<Geometry,64,8,0,true>;
+using Layer=GuestUI::Hook<Geometry,64,8,0,true,true>;
 // The atlas and its replacement parchment share local coordinates. Trim
 // only the floor artwork, preserving UVs/colors rather than squeezing it.
 inline void ClipFloorRight(std::array<float,12>& p,std::array<float,8>& uv,
@@ -116,13 +116,20 @@ struct Hook {
         for(const auto& layer:backs)if(layer.Drawing())return true;
         return false;
     }
+    U32 ForegroundSource(U32 model) const {
+        if(next && next<=used) {
+            const auto& layer=fronts[next-1];
+            if(layer.Drawing() && layer.model==model)return layer.source;
+        }
+        return model;
+    }
     bool Finishing() const {return finish_started;}
     void Reset() {parchment.ready=false;parchment_first=false;used=next=0;immediate=-1;backgrounds.reset();paper_bounds.reset();alpha=0;finish_started=false;floor_line_started=false;top_shadow_started=false;top_fade_started=false;}
     template<class M,class R> bool NativeDraw(M& m,R& r,bool enabled) {
         if(!enabled || Drawing() || blocks.Drawing() || top_fade.Drawing() || top_shadow.Drawing() || floor_line.Drawing() || !PauseMenu::DungeonPage(m))return false;
         const U32 model=r[0],mesh=m.Read(model+4).value_or(0),desc=m.Read(mesh).value_or(0);
         const unsigned vertices=m.Read(desc+0xc).value_or(0),current=m.Read(mesh+0x124).value_or(2);
-        if(!vertices || vertices%4 || vertices>200 || current>=2 || used==sources.size())return false;
+        if(!vertices || vertices%4 || vertices>Capacity*4 || current>=2 || used==sources.size())return false;
         if(!PauseMenu::DungeonQuadPart(m,mesh,0,vertices/4))return false;
         // The native four-icon group includes the banner Skulltula. Let the
         // header queue draw it after the location paper/title, not in our back pass.

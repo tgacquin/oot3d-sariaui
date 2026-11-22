@@ -10,9 +10,19 @@ bool OOT3D::IsPlayerBuild() {
 #endif
 }
 
+const char* OOT3D::PlayerDefaultsDirectory() {
+#ifdef OOT3D_DEFAULTS_DIR
+    return OOT3D_DEFAULTS_DIR;
+#else
+    return nullptr;
+#endif
+}
+
 bool OOT3D::HandleSettingsFunctionKey(unsigned function_key, bool repeat) {
-    if (!available.load() || (function_key != 1 && function_key != 2)) return false;
+    if (!available.load() || (function_key < 1 || function_key > (IsPlayerBuild() ? 2u : 3u))) return false;
     if (repeat || (IsPlayerBuild() && function_key == 2)) return true;
-    Toggle(IsPlayerBuild() || function_key == 2);
+    const auto view = function_key == 3 ? SettingsView::Defaults :
+        IsPlayerBuild() || function_key == 2 ? SettingsView::Player : SettingsView::Editor;
+    Toggle(view);
     return true;
 }

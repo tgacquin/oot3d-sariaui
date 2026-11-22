@@ -3,6 +3,336 @@
 // Only changed byte spans are embedded; the loaded cartridge supplies all other text.
 #pragma once
 namespace OOT3D::Messages {
+inline constexpr Edit SpanishEdits0002[]{
+    {193,13,std::string_view{"",0}},
+};
+inline constexpr Edit SpanishEdits0003[]{
+    {198,0,std::string_view{"\x65",1}},
+    {199,1,std::string_view{"",0}},
+    {202,13,std::string_view{"",0}},
+};
+inline constexpr Edit SpanishEdits0004[]{
+    {225,13,std::string_view{"",0}},
+};
+inline constexpr Edit SpanishEdits0005[]{
+    {174,13,std::string_view{"",0}},
+};
+inline constexpr Edit SpanishEdits0008[]{
+    {188,14,std::string_view{"",0}},
+};
+inline constexpr Edit SpanishEdits0009[]{
+    {166,14,std::string_view{"",0}},
+};
+inline constexpr Edit SpanishEdits000D[]{
+    {203,13,std::string_view{"",0}},
+};
+inline constexpr Edit SpanishEdits000E[]{
+    {199,13,std::string_view{"",0}},
+};
+inline constexpr Edit SpanishEdits0010[]{
+    {62,3,std::string_view{"\x5a\x4c",2}},
+    {78,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0011[]{
+    {56,3,std::string_view{"\x5a\x4c",2}},
+    {72,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0012[]{
+    {57,3,std::string_view{"\x5a\x4c",2}},
+    {73,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0013[]{
+    {59,3,std::string_view{"\x5a\x4c",2}},
+    {75,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0014[]{
+    {56,3,std::string_view{"\x5a\x4c",2}},
+    {72,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0015[]{
+    {55,3,std::string_view{"\x5a\x4c",2}},
+    {71,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0016[]{
+    {57,3,std::string_view{"\x5a\x4c",2}},
+    {73,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0017[]{
+    {60,3,std::string_view{"\x5a\x4c",2}},
+    {76,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits001C[]{
+    {45,3,std::string_view{"\x5a\x4c",2}},
+    {61,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits001D[]{
+    {46,3,std::string_view{"\x5a\x4c",2}},
+    {62,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0026[]{
+    {308,1,std::string_view{"\xc3\xa1\x67\x69",4}},
+    {310,4,std::string_view{"",0}},
+    {464,0,std::string_view{"\x65",1}},
+    {465,1,std::string_view{"",0}},
+    {470,13,std::string_view{"",0}},
+};
+inline constexpr Edit SpanishEdits0030[]{
+    {55,0,std::string_view{"\x4f\x70\x72\x69\x6d\x65\x20\x53\x45\x4c\x45\x43",12}},
+    {56,3,std::string_view{"",0}},
+    {60,28,std::string_view{"",0}},
+    {99,3,std::string_view{"",0}},
+    {105,3,std::string_view{"\x4f\x62\x6a\x65",4}},
+    {109,1,std::string_view{"\x6f\x73\x7f\x1d\x00\x2e\x7f\x1c\x45",9}},
+    {111,0,std::string_view{"\x69\x67\x65\x20\x65",5}},
+    {112,4,std::string_view{"",0}},
+    {123,6,std::string_view{"\x20",1}},
+    {139,1,std::string_view{"\x6f",1}},
+    {142,1,std::string_view{"",0}},
+    {144,1,std::string_view{"",0}},
+    {146,2,std::string_view{"",0}},
+    {156,0,std::string_view{"\x2c\x20\x5a\x4c",4}},
+    {159,3,std::string_view{"\x5a\x52",2}},
+    {176,3,std::string_view{"\x5a\x4c",2}},
+    {192,3,std::string_view{"\x5a\x52",2}},
+    {242,3,std::string_view{"\x5a\x4c",2}},
+    {259,3,std::string_view{"\x5a\x52",2}},
+    {503,3,std::string_view{"\x5a\x4c",2}},
+    {520,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0031[]{
+    {95,3,std::string_view{"\x5a\x4c",2}},
+    {111,3,std::string_view{"\x5a\x52",2}},
+    {128,3,std::string_view{"\x5a\x4c",2}},
+    {144,3,std::string_view{"\x5a\x52",2}},
+    {211,3,std::string_view{"\x5a\x4c",2}},
+    {227,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0032[]{
+    {92,3,std::string_view{"\x5a\x4c",2}},
+    {108,3,std::string_view{"\x5a\x52",2}},
+    {123,3,std::string_view{"\x5a\x4c",2}},
+    {139,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0033[]{
+    {91,3,std::string_view{"\x5a\x4c",2}},
+    {107,3,std::string_view{"\x5a\x52",2}},
+    {144,3,std::string_view{"\x5a\x4c",2}},
+    {161,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0034[]{
+    {44,0,std::string_view{"\x4f\x70\x72\x69\x6d\x65\x20\x53",8}},
+    {45,1,std::string_view{"\x4c\x45\x43\x54",4}},
+    {47,1,std::string_view{"\x70",1}},
+    {49,0,std::string_view{"\x72\x61\x20\x61\x62\x72\x69\x72",8}},
+    {53,13,std::string_view{"\x4f",1}},
+    {75,7,std::string_view{"\x2e",1}},
+    {84,0,std::string_view{"\x45\x6c\x69\x67\x65\x20\x65\x6c\x20\x6f\x62\x6a\x65\x74\x6f\x20\x79\x20",18}},
+    {86,1,std::string_view{"\xc3\xad",2}},
+    {90,1,std::string_view{"",0}},
+    {92,2,std::string_view{"\x6f",1}},
+    {96,1,std::string_view{"",0}},
+    {98,1,std::string_view{"",0}},
+    {100,2,std::string_view{"",0}},
+    {110,0,std::string_view{"\x2c\x20\x5a\x4c",4}},
+    {113,3,std::string_view{"\x5a\x52",2}},
+    {140,3,std::string_view{"\x5a\x4c",2}},
+    {156,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0035[]{
+    {98,3,std::string_view{"\x5a\x4c",2}},
+    {114,3,std::string_view{"\x5a\x52",2}},
+    {140,3,std::string_view{"\x5a\x4c",2}},
+    {156,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0036[]{
+    {153,3,std::string_view{"\x5a\x4c",2}},
+    {169,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0037[]{
+    {38,0,std::string_view{"\x4f\x70\x72\x69\x6d\x65\x20\x53\x45\x4c\x45\x43",12}},
+    {39,3,std::string_view{"",0}},
+    {43,28,std::string_view{"",0}},
+    {82,3,std::string_view{"",0}},
+    {88,13,std::string_view{"\x4f",1}},
+    {110,0,std::string_view{"\x2e",1}},
+    {112,0,std::string_view{"\x45\x6c\x69\x67\x65\x20\x65\x6c\x20\x6f\x62\x6a\x65\x74\x6f\x20",16}},
+    {116,1,std::string_view{"\xc3\xad",2}},
+    {120,1,std::string_view{"",0}},
+    {125,1,std::string_view{"",0}},
+    {127,1,std::string_view{"",0}},
+    {129,2,std::string_view{"",0}},
+    {139,0,std::string_view{"\x2c\x20\x5a\x4c",4}},
+    {142,3,std::string_view{"\x5a\x52",2}},
+    {169,3,std::string_view{"\x5a\x4c",2}},
+    {185,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0038[]{
+    {53,3,std::string_view{"\x5a\x4c",2}},
+    {69,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0039[]{
+    {55,3,std::string_view{"\x5a\x4c",2}},
+    {71,3,std::string_view{"\x5a\x52",2}},
+    {223,3,std::string_view{"\x5a\x4c",2}},
+    {239,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0042[]{
+    {77,3,std::string_view{"\x5a\x4c",2}},
+    {93,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0043[]{
+    {93,3,std::string_view{"\x5a\x4c",2}},
+    {109,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0044[]{
+    {94,3,std::string_view{"\x5a\x4c",2}},
+    {110,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0045[]{
+    {53,3,std::string_view{"\x5a\x4c",2}},
+    {69,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0046[]{
+    {99,3,std::string_view{"\x5a\x4c",2}},
+    {115,3,std::string_view{"\x5a\x52",2}},
+    {266,3,std::string_view{"\x5a\x4c",2}},
+    {282,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0047[]{
+    {42,3,std::string_view{"\x5a\x4c",2}},
+    {58,3,std::string_view{"\x5a\x52",2}},
+    {180,3,std::string_view{"\x5a\x4c",2}},
+    {196,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0048[]{
+    {91,3,std::string_view{"\x5a\x4c",2}},
+    {107,3,std::string_view{"\x5a\x52",2}},
+    {193,3,std::string_view{"\x5a\x4c",2}},
+    {209,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits004A[]{
+    {75,2,std::string_view{"\x4f\x70\x72\x69\x6d\x65\x7f\x1c\x64\x65\x72\x65",12}},
+    {78,0,std::string_view{"\x68",1}},
+    {80,5,std::string_view{"",0}},
+    {91,2,std::string_view{"\x63\x72\x75\x7a\x20\x64\x65\x20\x63\x6f",10}},
+    {95,1,std::string_view{"\x72\x6f",2}},
+    {97,11,std::string_view{"\x7f\x1c",2}},
+    {113,2,std::string_view{"\x74\x6f\x63",3}},
+};
+inline constexpr Edit SpanishEdits004C[]{
+    {39,1,std::string_view{"\x4f\x70\x72\x69\x6d\x65\x20\x53\x45\x4c\x45\x43\x54\x20\x79\x20\x6c\x75\x65\x67\x6f\x20\x7f\x24\x0a\x20\x70\x61\x72\x61\x7f\x1c\x61\x62\x72",35}},
+    {42,11,std::string_view{"",0}},
+    {57,13,std::string_view{"\x45",1}},
+    {76,2,std::string_view{"",0}},
+    {80,1,std::string_view{"\x2e",1}},
+    {82,5,std::string_view{"\x45",1}},
+    {88,7,std::string_view{"\x69\x67",2}},
+    {96,10,std::string_view{"",0}},
+    {109,3,std::string_view{"\x20",1}},
+    {113,1,std::string_view{"\x73\x63\x75\x64",4}},
+    {137,0,std::string_view{"\x20\x70\x61\x72\x61\x20\x65\x71\x75\x69\x70\x61\x72\x74\x65",15}},
+};
+inline constexpr Edit SpanishEdits004D[]{
+    {42,1,std::string_view{"\x4f\x70\x72\x69\x6d",5}},
+    {45,1,std::string_view{"\x53\x45\x4c\x45\x43\x54\x20\x79",8}},
+    {48,0,std::string_view{"\x75\x65\x67\x6f\x20\x7f\x24\x0a\x20\x70",10}},
+    {49,0,std::string_view{"\x72\x61\x7f\x1c\x61\x62\x72\x69\x72",9}},
+    {53,13,std::string_view{"\x45",1}},
+    {74,0,std::string_view{"\x2e",1}},
+    {75,1,std::string_view{"\x45\x6c\x69\x67\x65",5}},
+    {77,6,std::string_view{"",0}},
+    {84,3,std::string_view{"\x6c",1}},
+    {94,0,std::string_view{"\x7f\x1c\x63\x6f\x6e\x20\x7f\x24\x00\x20\x79\x20\x6f\x70\x72\x69\x6d\x65\x20\x7f\x24\x06",22}},
+    {107,2,std::string_view{"\x74\x65",2}},
+};
+inline constexpr Edit SpanishEdits0058[]{
+    {150,3,std::string_view{"\x5a\x4c",2}},
+    {166,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits005D[]{
+    {74,3,std::string_view{"\x5a\x4c",2}},
+    {91,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0066[]{
+    {47,2,std::string_view{"\x4f\x70\x72\x69\x6d\x65\x20\x53\x45\x4c\x45\x43",12}},
+    {50,0,std::string_view{"\x20\x79\x20\x6c\x75\x65\x67",7}},
+    {51,2,std::string_view{"",0}},
+    {56,24,std::string_view{"\x0b",1}},
+    {87,2,std::string_view{"\x61\x62\x72\x69",4}},
+    {91,13,std::string_view{"",0}},
+    {107,0,std::string_view{"\x7f\x1d\x41",3}},
+    {111,1,std::string_view{"\x7f\x1d\x00\x2e",4}},
+    {253,6,std::string_view{"\x45\x6c\x69\x67",4}},
+    {260,1,std::string_view{"",0}},
+    {263,5,std::string_view{"",0}},
+    {269,12,std::string_view{"",0}},
+    {288,5,std::string_view{"",0}},
+    {294,30,std::string_view{"",0}},
+    {326,6,std::string_view{"",0}},
+    {333,6,std::string_view{"\x20\x7f\x24\x00",4}},
+};
+inline constexpr Edit SpanishEdits0069[]{
+    {151,3,std::string_view{"\x5a\x4c",2}},
+    {167,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits007A[]{
+    {53,3,std::string_view{"\x5a\x4c",2}},
+    {69,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0098[]{
+    {73,3,std::string_view{"\x5a\x4c",2}},
+    {89,3,std::string_view{"\x5a\x52",2}},
+    {272,3,std::string_view{"\x5a\x4c",2}},
+    {288,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits0099[]{
+    {61,3,std::string_view{"\x5a\x4c",2}},
+    {78,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits009A[]{
+    {148,3,std::string_view{"\x5a\x4c",2}},
+    {164,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits00A3[]{
+    {44,3,std::string_view{"\x5a\x4c",2}},
+    {60,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits00A4[]{
+    {43,0,std::string_view{"\x4f\x70\x72\x69\x6d\x65\x20\x53\x45\x4c\x45\x43",12}},
+    {44,0,std::string_view{"\x20\x79\x20\x6c\x75\x65\x67",7}},
+    {45,2,std::string_view{"",0}},
+    {50,1,std::string_view{"\x0a",1}},
+    {52,24,std::string_view{"",0}},
+    {80,1,std::string_view{"\x7f\x1c",2}},
+    {87,6,std::string_view{"",0}},
+    {96,13,std::string_view{"\x45",1}},
+    {116,1,std::string_view{"\x00\x2e\x20\x45\x6c\x69\x67\x65\x20\x6c\x61\x20\x65\x73\x70\x61\x64\x61",18}},
+    {119,0,std::string_view{"\x63\x6f\x6e\x20",4}},
+    {120,1,std::string_view{"\x24",1}},
+    {122,0,std::string_view{"\x20",1}},
+    {123,0,std::string_view{"\x20\x6f\x70\x72\x69\x6d\x65\x20\x7f\x24\x06\x20\x70\x61\x72\x61",16}},
+    {131,2,std::string_view{"\x74\x65",2}},
+};
+inline constexpr Edit SpanishEdits00AD[]{
+    {105,3,std::string_view{"\x5a\x4c",2}},
+    {121,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits00AE[]{
+    {58,3,std::string_view{"\x5a\x4c",2}},
+    {74,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits00AF[]{
+    {99,3,std::string_view{"\x5a\x4c",2}},
+    {116,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits00B1[]{
+    {45,3,std::string_view{"\x5a\x4c",2}},
+    {61,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits00CB[]{
+    {44,3,std::string_view{"\x5a\x4c",2}},
+    {60,3,std::string_view{"\x5a\x52",2}},
+};
 inline constexpr Edit SpanishEdits0101[]{
     {24,2,std::string_view{"",0}},
     {28,0,std::string_view{"\x6c\x73\x61\x20",4}},
@@ -11,6 +341,9 @@ inline constexpr Edit SpanishEdits0101[]{
     {36,1,std::string_view{"\x7f\x1c",2}},
     {68,2,std::string_view{"",0}},
     {72,20,std::string_view{"\x2e",1}},
+};
+inline constexpr Edit SpanishEdits0103[]{
+    {169,35,std::string_view{"",0}},
 };
 inline constexpr Edit SpanishEdits1017[]{
     {121,0,std::string_view{"\x70",1}},
@@ -21,6 +354,170 @@ inline constexpr Edit SpanishEdits1017[]{
     {135,4,std::string_view{"\x63",1}},
     {143,0,std::string_view{"\x20\x62\x69\x65\x6e\x2c",6}},
     {145,25,std::string_view{"",0}},
+};
+inline constexpr Edit SpanishEdits1025[]{
+    {109,3,std::string_view{"\x5a\x4c",2}},
+    {126,3,std::string_view{"\x5a\x52",2}},
+    {131,0,std::string_view{"\x20\x73\x75\x65\x6c\x74\x61\x20\x65\x6c\x20\x62\x6f\x74\xc3\xb3\x6e",17}},
+    {143,20,std::string_view{"",0}},
+};
+inline constexpr Edit SpanishEdits1035[]{
+    {29,17,std::string_view{"",0}},
+    {64,1,std::string_view{"\x62\x6f\x74\x6f\x6e",5}},
+    {66,11,std::string_view{"\x73",1}},
+    {81,6,std::string_view{"\x6f\x62\x6a\x65",4}},
+    {88,12,std::string_view{"\x6f\x73",2}},
+    {105,0,std::string_view{"\x62\x6f\x74\xc3\xb3\x6e\x20",7}},
+    {108,1,std::string_view{"",0}},
+    {110,3,std::string_view{"\x63\x63\x69\xc3\xb3",5}},
+    {114,14,std::string_view{"",0}},
+};
+inline constexpr Edit SpanishEdits1036[]{
+    {4,37,std::string_view{"",0}},
+    {44,2,std::string_view{"\x62\x6f\x74",3}},
+    {48,40,std::string_view{"",0}},
+    {90,50,std::string_view{"",0}},
+    {154,0,std::string_view{"\x20\x73\x6f\x6e\x7f\x1c\x7f\x24\x1e",9}},
+    {155,0,std::string_view{"\x20\x7f\x24\x1f\x2c\x20\x5a\x4c",8}},
+    {158,5,std::string_view{"\x5a\x52\x2e",3}},
+    {165,1,std::string_view{"\x5a\x4c\x20\x63",4}},
+    {167,1,std::string_view{"\x72\x72\x65\x73\x70\x6f\x6e\x64\x65\x20",10}},
+    {170,0,std::string_view{"\x49\x20\x79\x20\x5a\x52\x20\x61\x20\x49\x49\x2e\x7f\x01\x7f\x1c\x4f\x70\x72\x69\x6d",21}},
+    {171,1,std::string_view{"",0}},
+    {173,1,std::string_view{"\x53\x45\x4c\x45\x43\x54\x20\x70\x61\x72\x61\x20\x61\x62\x72\x69\x72\x20\x7f\x1d\x43\x4f",22}},
+    {179,4,std::string_view{"\x73\x7f\x1d\x00\x2e\x7f\x1c\x45",8}},
+    {184,1,std::string_view{"",0}},
+    {186,10,std::string_view{"\x67",1}},
+    {198,4,std::string_view{"",0}},
+    {203,11,std::string_view{"",0}},
+    {215,13,std::string_view{"",0}},
+    {242,0,std::string_view{"\x00\x20\x79\x20\x61\x73\xc3\xad\x67\x6e\x61\x6c\x6f\x7f",14}},
+    {243,1,std::string_view{"\x61",1}},
+    {253,0,std::string_view{"\x2c\x20\x5a\x4c",4}},
+    {256,3,std::string_view{"\x5a\x52",2}},
+    {264,1,std::string_view{"\x4f\x70\x72\x69\x6d",5}},
+    {267,1,std::string_view{"",0}},
+    {269,1,std::string_view{"\x6c\x20\x62",3}},
+    {271,3,std::string_view{"\x74\xc3\xb3",3}},
+    {275,2,std::string_view{"",0}},
+    {282,0,std::string_view{"\x65\x6c\x65\x67\x69\x73\x74\x65\x7f\x1c\x70",11}},
+    {283,0,std::string_view{"\x72\x61\x20\x75",4}},
+    {284,2,std::string_view{"\x61\x72\x20\x65\x6c\x20\x6f\x62\x6a\x65\x74\x6f\x2e\x7f\x01\x7f\x1c\xc2\xa1\x41\x73\xc3\xad\x20\x70\x6f\x64\x72\xc3\xa1\x73\x20\x74\x65",34}},
+    {288,1,std::string_view{"\x72",1}},
+    {290,2,std::string_view{"\x74\x75",2}},
+    {301,0,std::string_view{"\x20\x66\x61\x76\x6f\x72\x69\x74\x6f\x73",10}},
+    {303,6,std::string_view{"",0}},
+    {310,1,std::string_view{"",0}},
+    {313,10,std::string_view{"\x61",1}},
+    {324,14,std::string_view{"",0}},
+    {340,8,std::string_view{"\x63\x6f\x6e",3}},
+    {351,4,std::string_view{"",0}},
+    {356,19,std::string_view{"",0}},
+    {377,1,std::string_view{"\x63",1}},
+    {379,2,std::string_view{"\x61\x74\x72",3}},
+    {382,10,std::string_view{"",0}},
+    {396,2,std::string_view{"\x6f",1}},
+    {399,8,std::string_view{"",0}},
+    {408,3,std::string_view{"",0}},
+    {412,15,std::string_view{"",0}},
+};
+inline constexpr Edit SpanishEdits1037[]{
+    {9,8,std::string_view{"",0}},
+    {19,0,std::string_view{"\x6c",1}},
+    {20,2,std::string_view{"\x62\x6f\x74\xc3\xb3\x6e",6}},
+    {23,17,std::string_view{"\x41",1}},
+};
+inline constexpr Edit SpanishEdits1039[]{
+    {1,2,std::string_view{"",0}},
+    {4,61,std::string_view{"",0}},
+    {69,0,std::string_view{"\x6d\x69\x6e\x69",4}},
+    {76,0,std::string_view{"\x20\x6d\x75\x65\x73\x74\x72\x61\x20\x74\x75\x73\x20\x61\x6c\x72\x65\x64\x65\x64\x6f\x72\x65\x73",24}},
+    {242,3,std::string_view{"\x65\x6c",2}},
+    {246,2,std::string_view{"\x73\x74\x69\x63\x6b",5}},
+    {250,6,std::string_view{"\x7a\x71\x75\x69",4}},
+    {257,0,std::string_view{"\x72\x64\x6f\x20\x28\x4c\x33\x29",8}},
+    {262,1,std::string_view{"\x7f\x1c",2}},
+    {271,27,std::string_view{"\x6f",1}},
+    {306,0,std::string_view{"\x20\x65\x6c\x20\x6d\x69\x6e\x69\x6d\x61\x70\x61\x2e\x7f\x01\x7f\x1c\x50\x75\x65\x64\x65",22}},
+    {307,0,std::string_view{"\x20\x63\x61\x6d\x62\x69\x61\x72\x20",9}},
+    {308,1,std::string_view{"\x73\x74\x65",3}},
+    {310,0,std::string_view{"\x61\x74\x61\x6a",4}},
+    {311,0,std::string_view{"\x20\x65\x6e\x20\x6c\x6f\x73\x7f\x1c\x61\x6a\x75\x73\x74\x65\x73\x20\x64\x65\x20\x63\x6f\x6e\x74\x72\x6f\x6c\x65\x73\x2e\x7f\x01\x7f\x1c\x4f",35}},
+    {317,3,std::string_view{"\x53\x45\x4c\x45\x43\x54",6}},
+    {321,31,std::string_view{"\x79",1}},
+    {354,42,std::string_view{"",0}},
+    {398,16,std::string_view{"",0}},
+    {415,14,std::string_view{"",0}},
+    {430,32,std::string_view{"",0}},
+    {465,25,std::string_view{"\x0b",1}},
+    {500,1,std::string_view{"",0}},
+    {502,0,std::string_view{"\x6f\x73",2}},
+    {504,9,std::string_view{"",0}},
+    {525,0,std::string_view{"\x6f\x73\x20\x6c",4}},
+    {531,0,std::string_view{"\x20\x65\x6e\x20\x65\x6c\x20\x7f\x1d\x41\x6d\x61\x70\x61\x7f\x1d\x00\x2e\x7f\x1c\x43\x6f\x6e\x20\x7f\x24\x0a\x20\x70\x75\x65\x64\x65\x73\x20\x76\x6f\x6c\x76\x65\x72\x20\x61\x20\x4f\x62\x6a\x65\x74\x6f\x73",51}},
+};
+inline constexpr Edit SpanishEdits103A[]{
+    {193,1,std::string_view{"\x50\x75\x65\x64\x65\x73\x20\x61\x73\x69\x67\x6e\x61\x72\x20\x6c",16}},
+    {205,9,std::string_view{"",0}},
+    {215,22,std::string_view{"",0}},
+    {246,0,std::string_view{"\x2c\x7f\x1c\x5a\x4c",5}},
+    {249,3,std::string_view{"\x5a\x52",2}},
+    {254,2,std::string_view{"\x55\x73\x61\x20\x65\x6c\x20\x62\x6f\x74\xc3\xb3\x6e",13}},
+    {259,0,std::string_view{"\x65\x20\x65\x6c\x65\x67",6}},
+    {260,0,std::string_view{"\x73\x74",2}},
+    {261,0,std::string_view{"\x7f\x1c\x70\x61",4}},
+    {262,2,std::string_view{"\x61",1}},
+    {273,16,std::string_view{"",0}},
+    {293,2,std::string_view{"",0}},
+    {296,1,std::string_view{"\x62\x6a\x65\x74",4}},
+    {298,25,std::string_view{"",0}},
+    {445,0,std::string_view{"\x4f\x70\x72\x69\x6d\x65\x20",7}},
+    {446,1,std::string_view{"\x45\x4c\x45\x43\x54",5}},
+    {448,1,std::string_view{"\x79\x20\x6c",3}},
+    {450,1,std::string_view{"",0}},
+    {452,20,std::string_view{"\x67",1}},
+    {473,6,std::string_view{"",0}},
+    {482,26,std::string_view{"\x0a",1}},
+    {519,4,std::string_view{"\x7f\x1c",2}},
+    {526,14,std::string_view{"\x45",1}},
+    {549,0,std::string_view{"\x20\x4f\x70\x72\x69\x6d\x65\x20",8}},
+    {550,4,std::string_view{"\x24\x0b",2}},
+    {555,7,std::string_view{"\x70",1}},
+    {563,10,std::string_view{"\x72",1}},
+    {575,0,std::string_view{"\x76\x6f\x6c\x76",4}},
+    {576,1,std::string_view{"\x72",1}},
+    {578,1,std::string_view{"\x61\x20\x4f",3}},
+    {584,9,std::string_view{"\x73\x2e\x7f\x01",4}},
+    {595,3,std::string_view{"\x45\x6c\x69\x67\x65",5}},
+    {600,1,std::string_view{"\x6f",1}},
+    {613,0,std::string_view{"\x20\x75\x73\x61\x72\x20\x63\x6f\x6e\x20\x7f\x24\x00\x7f\x1c\x79\x20\x6f\x70\x72\x69\x6d\x65\x20\x7f\x24\x06\x20\x70\x61\x72\x61",32}},
+    {628,4,std::string_view{"\x45\x6e",2}},
+    {633,9,std::string_view{"\x7f\x1d\x43\x4f",4}},
+    {648,66,std::string_view{"",0}},
+    {717,12,std::string_view{"\x2c",1}},
+    {732,0,std::string_view{"\x69\x67\x65\x20\x75\x6e",6}},
+    {740,11,std::string_view{"\x79",1}},
+    {754,1,std::string_view{"\xc3\xad",2}},
+    {758,1,std::string_view{"\x6c\x6f",2}},
+    {761,5,std::string_view{"",0}},
+    {767,16,std::string_view{"",0}},
+    {792,0,std::string_view{"\x2c\x20\x5a\x4c",4}},
+    {795,0,std::string_view{"\x5a\x52\x2e",3}},
+    {796,2,std::string_view{"\x1c\x5a\x4c\x20\x63\x6f\x72\x72\x65\x73\x70\x6f\x6e\x64\x65\x20\x61\x20\x49\x20\x79\x20\x5a\x52\x20\x61\x20\x49\x49",29}},
+};
+inline constexpr Edit SpanishEdits103D[]{
+    {147,1,std::string_view{"",0}},
+    {149,2,std::string_view{"\x70\x72\x69\x6d\x65\x20\x53\x45\x4c\x45\x43\x54\x20\x79\x7f\x1c\x6c\x75\x65\x67\x6f",21}},
+    {154,1,std::string_view{"\x0a",1}},
+    {167,4,std::string_view{"",0}},
+    {174,13,std::string_view{"\x45",1}},
+    {200,5,std::string_view{"\x45\x6c\x69\x67",4}},
+    {206,13,std::string_view{"",0}},
+    {230,16,std::string_view{"",0}},
+    {250,37,std::string_view{"",0}},
+    {290,2,std::string_view{"\x20",1}},
+    {299,2,std::string_view{"\x65",1}},
+    {305,1,std::string_view{"\x7f\x1c",2}},
 };
 inline constexpr Edit SpanishEdits103E[]{
     {21,2,std::string_view{"\x6d\x69\x72",3}},
@@ -45,6 +542,31 @@ inline constexpr Edit SpanishEdits103F[]{
     {281,3,std::string_view{"\x1c",1}},
     {299,1,std::string_view{"\x2e",1}},
 };
+inline constexpr Edit SpanishEdits10C5[]{
+    {0,1,std::string_view{"\x4f\x70\x72",3}},
+    {2,0,std::string_view{"\x6d\x65\x20\x64\x65\x72\x65\x63\x68\x61\x20\x65\x6e\x20\x6c\x61\x20\x63\x72\x75\x7a\x20\x64\x65\x20\x63\x6f\x6e\x74\x72\x6f\x6c\x7f\x1c\x70\x61\x72\x61",38}},
+    {7,1,std::string_view{"\x72",1}},
+    {19,0,std::string_view{"\x2e",1}},
+    {20,0,std::string_view{"\x53\x69\x20\x68\x61",5}},
+    {21,2,std::string_view{"\x65",1}},
+    {24,10,std::string_view{"\x66\x61",2}},
+    {35,2,std::string_view{"\x74",1}},
+    {38,1,std::string_view{"",0}},
+    {41,25,std::string_view{"",0}},
+    {79,8,std::string_view{"\x20\x76",2}},
+    {91,0,std::string_view{"\x73",1}},
+};
+inline constexpr Edit SpanishEdits10C7[]{
+    {2,1,std::string_view{"\x4f\x70\x72\x69\x6d\x65\x20\x64\x65\x72\x65\x63\x68\x61\x20\x65\x6e\x20\x6c\x61\x20\x63\x72\x75\x7a\x20\x64\x65\x20\x63\x6f\x6e\x74\x72\x6f\x6c\x7f\x1c\x70\x61\x72\x61\x20\x73\x61\x63\x61\x72\x20\x6c\x61\x20\x6f\x63\x61\x72\x69\x6e\x61\x2e\x20\x4c\x75\x65\x67\x6f\x20\x6f\x70\x72\x69\x6d\x65\x20\x53\x54\x41\x52\x54\x7f\x1c\x70",82}},
+    {42,87,std::string_view{"",0}},
+    {136,3,std::string_view{"\x45\x6c\x69\x67\x65\x20\x75\x6e",8}},
+    {141,0,std::string_view{"\x6d\x65",2}},
+    {143,8,std::string_view{"\x64\xc3\xad\x61",4}},
+    {161,2,std::string_view{"\x73\x75",2}},
+    {170,1,std::string_view{"\x7f\x1c",2}},
+    {173,4,std::string_view{"\x73\x75\x20",3}},
+    {186,34,std::string_view{"",0}},
+};
 inline constexpr Edit SpanishEdits10D8[]{
     {39,3,std::string_view{"\x6c",1}},
     {43,2,std::string_view{"",0}},
@@ -55,6 +577,51 @@ inline constexpr Edit SpanishEdits10D8[]{
     {64,19,std::string_view{"\x79",1}},
     {90,2,std::string_view{"\x7f\x1c",2}},
 };
+inline constexpr Edit SpanishEdits2044[]{
+    {57,3,std::string_view{"\x5a\x4c",2}},
+    {73,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits2065[]{
+    {236,0,std::string_view{"\x4f\x70\x72\x69\x6d\x65\x20\x53\x45\x4c\x45\x43",12}},
+    {237,0,std::string_view{"\x20\x79\x20\x6c\x75\x65\x67",7}},
+    {238,2,std::string_view{"",0}},
+    {243,25,std::string_view{"\x0b",1}},
+    {281,0,std::string_view{"\x65",1}},
+    {282,1,std::string_view{"",0}},
+    {287,13,std::string_view{"",0}},
+};
+inline constexpr Edit SpanishEdits2071[]{
+    {192,2,std::string_view{"\x50\x61\x72\x61",4}},
+    {195,3,std::string_view{"\x76",1}},
+    {200,2,std::string_view{"",0}},
+    {203,20,std::string_view{"\x64",1}},
+    {226,0,std::string_view{"\x64\x65",2}},
+    {228,1,std::string_view{"\x73\x74\xc3\xa1\x2c",5}},
+    {230,0,std::string_view{"\x6f\x70\x72\x69\x6d",5}},
+    {231,1,std::string_view{"\x20\x53\x45\x4c\x45\x43\x54\x20\x79",9}},
+    {234,7,std::string_view{"\x6c\x75\x65\x67",4}},
+    {242,2,std::string_view{"",0}},
+    {247,1,std::string_view{"\x0b",1}},
+    {260,0,std::string_view{"\x65",1}},
+    {261,1,std::string_view{"",0}},
+    {266,14,std::string_view{"",0}},
+};
+inline constexpr Edit SpanishEdits4003[]{
+    {72,11,std::string_view{"\x43",1}},
+    {90,1,std::string_view{"",0}},
+    {92,0,std::string_view{"\x65",1}},
+    {93,1,std::string_view{"",0}},
+    {98,13,std::string_view{"",0}},
+    {116,2,std::string_view{"",0}},
+    {120,0,std::string_view{"\x20",1}},
+    {135,0,std::string_view{"\x6f\x2e\x7f\x1c\x4f\x70\x72\x69\x6d\x65\x20\x53\x45\x4c\x45\x43\x54\x20\x79\x20\x6c\x75\x65\x67\x6f\x20\x7f\x24\x0b\x20\x70\x61\x72\x61\x20\x61\x62\x72\x69\x72\x6c",41}},
+};
+inline constexpr Edit SpanishEdits406A[]{
+    {12,3,std::string_view{"\x5a\x4c",2}},
+    {28,3,std::string_view{"\x5a\x52",2}},
+    {43,1,std::string_view{"\x7f\x1c",2}},
+    {46,2,std::string_view{"\x20",1}},
+};
 inline constexpr Edit SpanishEdits5056[]{
     {28,0,std::string_view{"\x70\x75\x6c\x73\x61\x7f\x1c\x65\x6c\x20\x73",11}},
     {29,0,std::string_view{"\x69\x63\x6b\x20\x64\x65\x72\x65\x63\x68",10}},
@@ -64,12 +631,96 @@ inline constexpr Edit SpanishEdits5056[]{
     {49,0,std::string_view{"\x74\x75\x7f\x1c",4}},
     {58,2,std::string_view{"",0}},
 };
+inline constexpr Edit SpanishEdits700C[]{
+    {17,3,std::string_view{"\x5a\x4c",2}},
+    {33,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits70A3[]{
+    {67,3,std::string_view{"\x5a\x4c",2}},
+    {83,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit SpanishEdits70ED[]{
+    {17,3,std::string_view{"\x5a\x4c",2}},
+    {33,3,std::string_view{"\x5a\x52",2}},
+};
 inline constexpr Message Spanish[]{
+    {0x0002,0xB8A11F6C70BD824CULL,274,SpanishEdits0002,Dependency::None},
+    {0x0003,0x5A4349670A8226BEULL,241,SpanishEdits0003,Dependency::None},
+    {0x0004,0x4DB7532CD852B8BCULL,248,SpanishEdits0004,Dependency::None},
+    {0x0005,0x4BBDAFBB875295E1ULL,256,SpanishEdits0005,Dependency::None},
+    {0x0008,0xFCDB6160C980FF21ULL,212,SpanishEdits0008,Dependency::None},
+    {0x0009,0x2AD5C43D7A8F17C1ULL,190,SpanishEdits0009,Dependency::None},
+    {0x000D,0x4A75CCF813FA5055ULL,226,SpanishEdits000D,Dependency::None},
+    {0x000E,0x74F92649767D5CB2ULL,222,SpanishEdits000E,Dependency::None},
+    {0x0010,0x5726D8848478BED0ULL,146,SpanishEdits0010,Dependency::None},
+    {0x0011,0xDDA81D6FF833E85BULL,103,SpanishEdits0011,Dependency::None},
+    {0x0012,0xA68B7DAE10C36C42ULL,118,SpanishEdits0012,Dependency::None},
+    {0x0013,0x30CAEEF18EDA0275ULL,134,SpanishEdits0013,Dependency::None},
+    {0x0014,0x25D0828647E64430ULL,138,SpanishEdits0014,Dependency::None},
+    {0x0015,0x971E1B51A149FC63ULL,140,SpanishEdits0015,Dependency::None},
+    {0x0016,0x27F610245743ECDFULL,108,SpanishEdits0016,Dependency::None},
+    {0x0017,0xF02F5EF61BA7CDCDULL,113,SpanishEdits0017,Dependency::None},
+    {0x001C,0x22B2C5265493D8BFULL,102,SpanishEdits001C,Dependency::None},
+    {0x001D,0x9747D2D908B47307ULL,103,SpanishEdits001D,Dependency::None},
+    {0x0026,0xA975DB5A43C6ED8FULL,547,SpanishEdits0026,Dependency::None},
+    {0x0030,0x1335D5D7BE538598ULL,580,SpanishEdits0030,Dependency::None},
+    {0x0031,0x7DC3F9DA96444813ULL,279,SpanishEdits0031,Dependency::None},
+    {0x0032,0x86673A93C9EB34BCULL,257,SpanishEdits0032,Dependency::None},
+    {0x0033,0x66248A5E54266DB7ULL,242,SpanishEdits0033,Dependency::None},
+    {0x0034,0x10273730CA141BE7ULL,199,SpanishEdits0034,Dependency::None},
+    {0x0035,0x2EA0041A838684FEULL,213,SpanishEdits0035,Dependency::None},
+    {0x0036,0xC4BD4749F5688607ULL,316,SpanishEdits0036,Dependency::None},
+    {0x0037,0x65AF00FEF77E9957ULL,334,SpanishEdits0037,Dependency::None},
+    {0x0038,0x5F637FC36DA0D52BULL,156,SpanishEdits0038,Dependency::None},
+    {0x0039,0x8EADA9BA54633769ULL,280,SpanishEdits0039,Dependency::None},
+    {0x0042,0x85199BC5B1AE65B3ULL,137,SpanishEdits0042,Dependency::None},
+    {0x0043,0x480DC70050549133ULL,203,SpanishEdits0043,Dependency::None},
+    {0x0044,0xF5B02AAC19D05C2DULL,209,SpanishEdits0044,Dependency::None},
+    {0x0045,0x31950CD8E3B6AF6EULL,116,SpanishEdits0045,Dependency::None},
+    {0x0046,0x9B81C68EA21C70A9ULL,333,SpanishEdits0046,Dependency::None},
+    {0x0047,0x5733C8DA7E1D3F5BULL,229,SpanishEdits0047,Dependency::None},
+    {0x0048,0xF3B798F7B0C05B35ULL,246,SpanishEdits0048,Dependency::None},
+    {0x004A,0x30FA2D385B6FAC2AULL,256,SpanishEdits004A,Dependency::None},
+    {0x004C,0x331B52F0C1ABF6E0ULL,279,SpanishEdits004C,Dependency::None},
+    {0x004D,0xC8E4314E9B7C0778ULL,112,SpanishEdits004D,Dependency::None},
+    {0x0058,0x2AFC463A3A50FEF8ULL,234,SpanishEdits0058,Dependency::None},
+    {0x005D,0xBA4B7BFECA8A3073ULL,97,SpanishEdits005D,Dependency::None},
+    {0x0066,0x9F670BE62FE18DCDULL,342,SpanishEdits0066,Dependency::None},
+    {0x0069,0x658C346E98CDC594ULL,189,SpanishEdits0069,Dependency::None},
+    {0x007A,0xEAC4E69D5ECC7E40ULL,152,SpanishEdits007A,Dependency::None},
+    {0x0098,0x73B649D22692F710ULL,328,SpanishEdits0098,Dependency::None},
+    {0x0099,0xF222708E3FAF641DULL,144,SpanishEdits0099,Dependency::None},
+    {0x009A,0x3A2A29F8DF5840F7ULL,196,SpanishEdits009A,Dependency::None},
+    {0x00A3,0x2BE4330E5D0BBAA0ULL,129,SpanishEdits00A3,Dependency::None},
+    {0x00A4,0x53AE375B3798E284ULL,264,SpanishEdits00A4,Dependency::None},
+    {0x00AD,0x28E4E6981C08C9E3ULL,127,SpanishEdits00AD,Dependency::None},
+    {0x00AE,0xBC7E0241F43549CFULL,326,SpanishEdits00AE,Dependency::None},
+    {0x00AF,0x373D461DFB0FBA91ULL,122,SpanishEdits00AF,Dependency::None},
+    {0x00B1,0x8FDF53A5B08B24A3ULL,131,SpanishEdits00B1,Dependency::None},
+    {0x00CB,0x5CC495355A42DD06ULL,130,SpanishEdits00CB,Dependency::None},
     {0x0101,0x9841645A19DAF733ULL,97,SpanishEdits0101,Dependency::None},
+    {0x0103,0xAC8A40A6E7788341ULL,210,SpanishEdits0103,Dependency::None},
     {0x1017,0xF39FCE12667BF8BDULL,175,SpanishEdits1017,Dependency::NaviUp},
+    {0x1025,0x81BFDFC55ED7C9F0ULL,342,SpanishEdits1025,Dependency::None},
+    {0x1035,0x53D2165CFBB27B90ULL,146,SpanishEdits1035,Dependency::None},
+    {0x1036,0x9C29922046D8FB7CULL,430,SpanishEdits1036,Dependency::None},
+    {0x1037,0x1E0D63F84E25251BULL,211,SpanishEdits1037,Dependency::None},
+    {0x1039,0x688694CC6CFB9610ULL,534,SpanishEdits1039,Dependency::None},
+    {0x103A,0x7052DC4485241D8CULL,869,SpanishEdits103A,Dependency::None},
+    {0x103D,0x2090EC84390ED464ULL,420,SpanishEdits103D,Dependency::None},
     {0x103E,0xDAB5120FB82E529EULL,55,SpanishEdits103E,Dependency::None},
     {0x103F,0x90541174E499C7D8ULL,302,SpanishEdits103F,Dependency::NaviUp},
+    {0x10C5,0xDF3F4A9B5880E574ULL,294,SpanishEdits10C5,Dependency::None},
+    {0x10C7,0xE706895BEB04D86AULL,299,SpanishEdits10C7,Dependency::SongListStart},
     {0x10D8,0xDA131BDCD7EC36C9ULL,112,SpanishEdits10D8,Dependency::None},
+    {0x2044,0xC39E973193F29212ULL,156,SpanishEdits2044,Dependency::None},
+    {0x2065,0x1E5B4024E236C6C4ULL,446,SpanishEdits2065,Dependency::None},
+    {0x2071,0x24F18BE91869E534ULL,363,SpanishEdits2071,Dependency::None},
+    {0x4003,0x631333EED499F36DULL,721,SpanishEdits4003,Dependency::None},
+    {0x406A,0x04CCB4DE8CD441D6ULL,75,SpanishEdits406A,Dependency::None},
     {0x5056,0xD28FF64E0C3DC01AULL,71,SpanishEdits5056,Dependency::None},
+    {0x700C,0x94238F657EAF2F07ULL,88,SpanishEdits700C,Dependency::None},
+    {0x70A3,0xE90409D95E3A7ED3ULL,376,SpanishEdits70A3,Dependency::None},
+    {0x70ED,0xA90460B661E45917ULL,88,SpanishEdits70ED,Dependency::None},
 };
 }

@@ -93,8 +93,8 @@ int main(int argc,char** argv) {
     assert(IsHDCounterMesh(123,456,3));
     assert(IsHDCounterMesh(789,456,3)); // Native color-only blink/fade.
     assert(!IsHDCounterMesh(123,456,2) && !IsHDCounterMesh(789,999,3));
-    PublishMesh({234,1,true,567,true}); // Small-key counter uses the same toggle.
-    assert(IsHDCounterMesh(234,567,1));
+    PublishMesh({234,1,true,567,true}); // The key row uses the same styled counter path.
+    assert(IsHDCounterMesh(234,567,1) && IsHDCounterMesh(999,567,1));
     PublishMesh({235,3,true,568,false}); // Unrelated digits stay native.
     assert(!IsHDCounterMesh(235,568,3));
     PublishMesh({345,3,false,456,true});

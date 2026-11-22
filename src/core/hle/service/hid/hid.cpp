@@ -4,6 +4,7 @@
 
 #ifdef ENABLE_OOT3D_PRESENTATION
 #include "oot3d/orbit_camera.h"
+#include "oot3d/gyro_aim.h"
 #include "oot3d/pause_input.h"
 #include "oot3d/death_menu.h"
 #include "oot3d/control_swap.h"
@@ -201,8 +202,12 @@ void Module::UpdatePadCallback(std::uintptr_t user_data, s64 cycles_late) {
     OOT3D::OrbitCamera::stick_y.store(orbit_live ? orbit_y : 0);
 #endif
 #ifdef ENABLE_OOT3D_PRESENTATION
+    const auto poll_song_cursor=[&] {
+        OOT3D::Ocarina::input.PollDirections(state.hex&0xf0,(state.hex>>24)&0xf0,
+            system.CoreTiming().GetGlobalTimeUs().count());
+    };
     bool menu_touch=false;
-    const auto menu_input=[&](unsigned triggers) {
+    const auto menu_input=[&](unsigned triggers,s16 stick_x,s16 stick_y) {
         struct GuestMemory { Memory::MemorySystem& memory;
             std::optional<u32> Read(u32 a) {return memory.Read32OrNullopt(a);}
         } guest{system.Memory()};
@@ -215,8 +220,24 @@ void Module::UpdatePadCallback(std::uintptr_t user_data, s64 cycles_late) {
         OOT3D::DeathMenu::PollStart((state.hex&8)!=0);
         if(!orbit_live || OOT3D::visible.load() || !OOT3D::DPad::CodeMatches(guest) ||
            !OOT3D::DPad::Gameplay(guest))OOT3D::MinimapControl::Consume(false);
+        // Timestamp shelf navigation at the 234 Hz HID poll, before gameplay
+        // consumes the D-pad. Circle-pad units here range from -154 to 154.
+        if(OOT3D::GyroAim::enabled.load()) {
+            using namespace OOT3D::Interpolation;
+            const auto camera=CameraSnapshot();
+            if(orbit_live && !OOT3D::visible.load() && Replaying() && menu_page==MenuPage::None &&
+               camera.valid && camera.aim_mode && camera.epoch==generation.load() &&
+               std::abs(stick_x)<16 && std::abs(stick_y)<16 &&
+               !(artic_controller && artic_controller->IsReady()) && motion_device) {
+                const auto rate=std::get<1>(motion_device->GetStatus());
+                OOT3D::GyroAim::history.Add(camera.epoch,system.CoreTiming().GetGlobalTimeUs().count(),
+                                            {rate.x,rate.y,rate.z});
+            } else OOT3D::GyroAim::history.Reset();
+        }
+        const u32 shop_stick=(stick_x>30?0x10u:stick_x< -30?0x20u:0u) |
+                             (stick_y>30?0x40u:stick_y< -30?0x80u:0u);
         OOT3D::DPad::input.Filter(guest,state.hex,orbit_live && !OOT3D::visible.load(),
-            system.CoreTiming().GetGlobalTimeUs().count());
+            system.CoreTiming().GetGlobalTimeUs().count(),shop_stick);
         OOT3D::Ocarina::input.Filter(guest,state.hex,orbit_live && !OOT3D::visible.load(),triggers);
         OOT3D::ArrowCycle::input.Poll(guest,state.hex,orbit_live && !OOT3D::visible.load() &&
             OOT3D::Ocarina::State(guest)==0,system.CoreTiming().GetGlobalTimeUs().count());
@@ -244,7 +265,7 @@ void Module::UpdatePadCallback(std::uintptr_t user_data, s64 cycles_late) {
         s16 circle_pad_y = data.c_pad_y;
 
 #ifdef ENABLE_OOT3D_PRESENTATION
-        menu_input((data.pad>>14)&3);
+        menu_input((data.pad>>14)&3,circle_pad_x,circle_pad_y);
 #endif
         system.Movie().HandlePadAndCircleStatus(state, circle_pad_x, circle_pad_y);
 #ifdef ENABLE_MM3D_PRESENTATION
@@ -253,6 +274,9 @@ void Module::UpdatePadCallback(std::uintptr_t user_data, s64 cycles_late) {
         MM3D::FileSelectInput::Filter(state.hex,circle_pad_x,circle_pad_y);
 #endif
 
+#ifdef ENABLE_OOT3D_PRESENTATION
+        poll_song_cursor();
+#endif
         mem->pad.current_state.hex = state.hex;
         mem->pad.index = next_pad_index;
         next_pad_index = (next_pad_index + 1) % mem->pad.entries.size();
@@ -347,7 +371,7 @@ void Module::UpdatePadCallback(std::uintptr_t user_data, s64 cycles_late) {
         circle_pad_old_y.push_back(circle_pad_new_y);
 
 #ifdef ENABLE_OOT3D_PRESENTATION
-        menu_input((oot_zl->GetStatus()?1u:0u)|(oot_zr->GetStatus()?2u:0u));
+        menu_input((oot_zl->GetStatus()?1u:0u)|(oot_zr->GetStatus()?2u:0u),circle_pad_x,circle_pad_y);
 #endif
         system.Movie().HandlePadAndCircleStatus(state, circle_pad_x, circle_pad_y);
 #ifdef ENABLE_MM3D_PRESENTATION
@@ -362,6 +386,9 @@ void Module::UpdatePadCallback(std::uintptr_t user_data, s64 cycles_late) {
         state.circle_left.Assign(direction.left);
         state.circle_right.Assign(direction.right);
 
+#ifdef ENABLE_OOT3D_PRESENTATION
+        poll_song_cursor();
+#endif
         mem->pad.current_state.hex = state.hex;
         mem->pad.index = next_pad_index;
         next_pad_index = (next_pad_index + 1) % mem->pad.entries.size();

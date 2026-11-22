@@ -2,6 +2,7 @@
 #pragma once
 #include "oot3d/loading_icon_state.h"
 #include "oot3d/hud_layout.h"
+#include "oot3d/magic_lens_pulse.h"
 #include "oot3d/pause_ammo.h"
 #include "oot3d/hud_buttons_layout.h"
 #include "oot3d/atlas_seams.h"
@@ -32,6 +33,31 @@ template<class M> std::optional<Element> AuxiliaryModel(M& m,U32 model) {
        m.Read(Action+0x88)==std::optional<U32>{model})return ShardAgony;
     return {};
 }
+// Native top-screen timer and minigame controllers own separate models.
+// Scope their draw transform by ownership; do not affect shared digit atlases
+// used by item ammunition, pause menus or other counters.
+template<class M> std::optional<HUD::Element> ExtraHUDModel(M& m,U32 model) {
+    if(!Pointer(model,0x1e4) || m.Read(model)!=std::optional<U32>{0x4ebd60})return {};
+    const auto number=[&](U32 owner) {
+        return Pointer(owner,0x14) && m.Read(owner+0x10)==std::optional<U32>{model};
+    };
+    if(const auto auxiliary=HUD::AuxiliaryModel(m,model))return auxiliary;
+    if(number(m.Read(HUD::Action+0x2c).value_or(0)))return HUD::Timer;
+    if(number(m.Read(HUD::Action+0x30).value_or(0)))return HUD::Minigame;
+    const U32 owner=m.Read(HUD::Action+0x40).value_or(0);
+    if(!Pointer(owner,0x534))return {};
+    if(m.Read(owner+8)==std::optional<U32>{model})return HUD::Minigame;
+    const U32 kind=m.Read(owner+0x428).value_or(0xffffffff);
+    if(kind<2) {
+        const unsigned count=m.Read(owner+0x224).value_or(0);
+        if(count>64)return {};
+        for(unsigned i=0;i<count;++i)
+            if(number(m.Read(owner+0xc+i*4).value_or(0)))return HUD::Minigame;
+    } else if(kind==2 || kind==3 || kind==5 || kind==6) {
+        if(number(m.Read(owner+0xc).value_or(0)))return HUD::Minigame;
+    }
+    return {};
+}
 // Native 0x444544 selects mode 1 from the minigame ammo at play+0x5c74,
 // mode 2 for the Bombchu Bowling actor in scene 0x4b, mode 3 from
 // play+0x2e40, mode 4 from save+0x94, and mode 5 while riding Epona.
@@ -59,7 +85,7 @@ template<class M> HUDButtons::Button SpecialBButton(M& memory) {
 // USA Rev 1. Each site follows regeneration of the upload vertices from the
 // native geometry plus animation offsets. Never modify the source geometry:
 // hidden/animated elements and Reset must not accumulate our transforms.
-constexpr std::array<TitleScreen::Site, 10> Sites{{
+constexpr std::array<TitleScreen::Site, 9> Sites{{
     {0x42dda8, 0xe5940004, 0xe5900010},
     {0x42b860, 0xe5940018, 0xe5900010},
     {0x2fc968, 0xe5940008, 0xe5900010},
@@ -69,7 +95,6 @@ constexpr std::array<TitleScreen::Site, 10> Sites{{
     {0x2fea98, 0xe5900214, 0xe5901000}, // Queue model draw begins.
     {0x2feaa8, 0xe5960014, 0xe2844001}, // Queue model draw returns.
     {0x3fba04, 0xe28d102c, 0xed8d0a12}, // Fresh material color, before uniform upload.
-    {0x47946c, 0xe1d410f6, 0xedcd0a16}, // Native title-card Y, before screen-space draw.
 }};
 inline U32 Instruction(U32 pc, U32 word) {
     for (unsigned i = 0; i < Sites.size(); ++i)
@@ -174,6 +199,7 @@ struct RoutingState {
     bool preparing_keys = false, keys_ready = false;
     unsigned counter_stage = 0;
     U32 drawing_top_model = 0;
+    MagicMeter::LensPulse lens_pulse;
     HUDFade::State fade;
     MinimapControl::InstrumentFade minimap_fade;
     HUDReturn::State hud_return;
@@ -222,59 +248,33 @@ template<class M> void Quads(M& memory, U32 helper, unsigned first, unsigned cou
         }
     }
 }
-// Apply after the shared Rupees pose, to its fresh number upload only. The
-// native counter uses right-to-left quads at x=20+10*(count-q-1), y=110.
-// Keep its fixed-width alignment and leave collapsed leading digits collapsed.
-template<class M> void RupeeNumberLayout(M& memory,U32 helper,const Layout& layout) {
-    const auto group=layout[Rupees];
-    const auto text=(layout.hd_numbers && layout.hd_rupee_numbers)?layout.hd_rupee_text:Pose{};
-    const float spacing=(layout.hd_numbers && layout.hd_rupee_numbers)?layout.hd_rupee_spacing:0;
-    if(!Valid(group) || !Valid(text) || !std::isfinite(layout.rupee_number_gap) ||
-       std::abs(layout.rupee_number_gap)>100 || !std::isfinite(spacing) || spacing< -8 || spacing>24)return;
-    if(layout.rupee_number_gap==0 && text.x==0 && text.y==0 && text.scale==1 && spacing==0)return;
+// Both rows use the same digit cells and text origin, one pixel above the icon pivot.
+template<class M> void CounterNumberLayout(M& memory,U32 helper,const Layout& layout,Element row) {
+    const auto group=layout[row];
+    const auto style=RupeeDigits(layout);
+    const auto text=style.text;
+    if(!Valid(group) || !Valid(text) || !std::isfinite(style.gap) || std::abs(style.gap)>100 ||
+       !std::isfinite(style.spacing) || style.spacing< -8 || style.spacing>24)return;
+    if(style.gap==0 && text.x==0 && text.y==0 && text.scale==1 && style.spacing==0)return;
     const auto count=memory.Read(helper);
     const U32 vertices=memory.Read(helper+0x10).value_or(0);
     if(!count || !*count || *count>4 || !Pointer(vertices,*count*48))return;
-    const auto pose=TopPose(group,Rupees);
-    const float ax=2+(20-2)*group.scale+pose.x,ay=111+(110-111)*group.scale+pose.y;
+    const auto pose=TopPose(group,row);
+    const float ax=2+18*group.scale+pose.x;
+    const float ay=(row==Keys?151.f:111.f)-group.scale+pose.y;
     for(unsigned q=0;q<*count;++q) {
         std::array<float,12> v;
-        if(!TitleScreen::ReadFloats(memory,vertices+q*48,v))continue;
-        const float dx=group.scale*(layout.rupee_number_gap+text.x+spacing*(*count-q-1)*text.scale);
+        if(!TitleScreen::ReadFloats(memory,vertices+q*48,v) || v[0]==v[3] || v[1]==v[7])continue;
+        // Key uploads can include parked leading cells. Use the visible column
+        // position so a one-digit key count receives no extra tracking.
+        const unsigned column=row==Keys
+            ? unsigned(std::clamp(std::round((v[0]-ax)/(10*group.scale)),0.f,float(*count-1)))
+            : *count-q-1;
+        const float dx=group.scale*style.OffsetX(column);
         for(unsigned i=0;i<12;i+=3) {
             memory.Write(vertices+q*48+i*4,std::bit_cast<U32>(ax+(v[i]-ax)*text.scale+dx));
             memory.Write(vertices+q*48+(i+1)*4,std::bit_cast<U32>(ay+(v[i+1]-ay)*text.scale+group.scale*text.y));
         }
-    }
-}
-// Keys use the same 12x21 atlas cells as rupees, but their HUD group can
-// have a different scale. Match only HD digit size to Rupees' effective text
-// scale. Keep the key icon/pose independent and scale around the visible
-// number's left edge and vertical center; parked leading digits stay parked.
-template<class M> void KeyNumberLayout(M& m,U32 helper,const Layout& layout) {
-    if(!layout.hd_numbers || !layout.hd_rupee_numbers || !Valid(layout[Keys]) || !Valid(layout[Rupees]) ||
-       !Valid(layout.hd_rupee_text))return;
-    const float scale=layout[Rupees].scale*layout.hd_rupee_text.scale/layout[Keys].scale;
-    if(scale==1)return;
-    const unsigned count=m.Read(helper).value_or(0);
-    const U32 vertices=m.Read(helper+0x10).value_or(0);
-    if(!count || count>4 || !Pointer(vertices,count*48))return;
-    std::array<std::array<float,12>,4> quads{};
-    std::array<bool,4> visible{};
-    float left=INFINITY,top=INFINITY,bottom=-INFINITY;
-    for(unsigned q=0;q<count;++q) {
-        if(!TitleScreen::ReadFloats(m,vertices+q*48,quads[q]))return;
-        const auto& v=quads[q];
-        visible[q]=v[3]>v[0] && v[7]>v[1];
-        if(!visible[q])continue;
-        left=std::min(left,v[0]);top=std::min(top,v[1]);bottom=std::max(bottom,v[7]);
-    }
-    if(!std::isfinite(left))return;
-    const float center=(top+bottom)*.5f;
-    for(unsigned q=0;q<count;++q)if(visible[q])for(unsigned i=0;i<12;i+=3) {
-        const auto& v=quads[q];
-        m.Write(vertices+q*48+i*4,std::bit_cast<U32>(left+(v[i]-left)*scale));
-        m.Write(vertices+q*48+(i+1)*4,std::bit_cast<U32>(center+(v[i+1]-center)*scale));
     }
 }
 // Local HD-only placement; source geometry is regenerated each frame.
@@ -409,12 +409,6 @@ template<class M> bool LoadingRect(M& memory, U32 controller, U32 rect, const Po
 template<class M, class R> void Handle(M& memory, R& regs, unsigned site, const Layout& layout,
                                       RoutingState& routing, bool paused = false,
                                       std::int64_t now_us = 0) {
-    if(site==9) {
-        const auto xy=memory.Read(regs[4]+4).value_or(0);
-        const int native_y=static_cast<std::int16_t>(xy>>16);
-        regs[1]=static_cast<U32>(UserHUD::AreaTitleY(native_y,layout.reposition_area_titles,layout.area_title_y));
-        return;
-    }
     if(site==6) {
         regs[0]=memory.Read(regs[0]+0x214).value_or(0); // Displaced LDR.
         routing.drawing_top_model=regs[6]==HUDFade::Queue+5*4 &&
@@ -438,7 +432,8 @@ template<class M, class R> void Handle(M& memory, R& regs, unsigned site, const 
         const U32 score=memory.Read(Action+0x30).value_or(0);
         if(Pointer(score,0x14) && memory.Read(score+0x10)==std::optional<U32>{owner})
             if(auto mesh=Mesh(memory,memory.Read(score+8).value_or(0),true))PublishNumberMesh(*mesh,NumberKind::Score);
-        const U32 ammo=FindAmmoCounter(memory,[&](U32 c){return memory.Read(c+0x10)==std::optional<U32>{owner};});
+        bool pause_ammo=false;
+        const U32 ammo=FindAmmoCounter(memory,[&](U32 c){return memory.Read(c+0x10)==std::optional<U32>{owner};},&pause_ammo);
         if(ammo) {
             auto mesh=SubmittedNumberMesh(memory,owner);
             // Non-rotating legacy helpers retain their existing registration.
@@ -450,7 +445,7 @@ template<class M, class R> void Handle(M& memory, R& regs, unsigned site, const 
         if(Rumble::enabled.load() && AuxiliaryModel(memory,owner)==ShardAgony) {
             memory.Write(regs[13]+0x38,std::bit_cast<U32>(0.f));return;
         }
-        MinimapControl::Material(memory,owner,regs[13]+0x38,MinigameActive(memory)?0.f:MinimapControl::Opacity()*routing.minimap_fade.opacity);
+        MinimapControl::Material(memory,owner,regs[13]+0x38,MinigameActive(memory)?0.f:MinimapControl::Opacity()*routing.minimap_fade.opacity*layout.minimap_opacity*layout.overall_opacity);
         if(MinigameActive(memory)) {
             const auto number=[&](U32 root,U32 offset) {
                 const U32 counter=memory.Read(root+offset).value_or(0);
@@ -475,6 +470,16 @@ template<class M, class R> void Handle(M& memory, R& regs, unsigned site, const 
             const float envelope=routing.hud_return.hidden?0.f:
                 routing.hud_return.returning?routing.hud_return.opacity:1.f;
             memory.Write(regs[13]+0x38,std::bit_cast<U32>(routing.fade.action_opacity*envelope));
+        }
+        // A and the native accessory models bypass the routed HUD pass. Scale
+        // their fresh material after capturing native visibility for the shared fade.
+        if (layout.overall_opacity!=1 && owner &&
+            (memory.Read(Action+0x20)==owner || (ammo && !pause_ammo) || ExtraHUDModel(memory,owner))) {
+            const U32 alpha=regs[13]+0x38;
+            if(const auto value=memory.Read(alpha)) {
+                const float native=std::bit_cast<float>(*value);
+                if(native>=0 && native<=1)memory.Write(alpha,std::bit_cast<U32>(native*layout.overall_opacity));
+            }
         }
         const U32 model=routing.drawing_top_model;
         // 3f9680 draws model+8 (the renderer); 3fb9ac reads its owning
@@ -529,6 +534,7 @@ template<class M, class R> void Handle(M& memory, R& regs, unsigned site, const 
         if (regs[0] == 0x5c0ba8 && regs[1] == 5) {
             HUDFade::Update(memory,routing.fade,paused || routing.hud_return.hidden,now_us,
                 routing.hud_return.returning?std::optional<float>{routing.hud_return.opacity}:std::nullopt);
+            routing.fade.opacity*=layout.overall_opacity;
             const unsigned state = memory.Read(Main + 0x34).value_or(0);
 
         if (!paused && state != 0 && state != 0x17) {
@@ -558,6 +564,13 @@ template<class M, class R> void Handle(M& memory, R& regs, unsigned site, const 
     if (!helper || !Pointer(*helper, 0x20)) return;
     bool pause_ammo=false,b_ammo=false;
     if (site == 0 && regs[4] == Main && memory.Read(*helper) == std::optional<U32>{92}) {
+        // USA Rev 1: 331a0c sets save.magicState to 7 for Lens consumption.
+        // 331980 clears play->actorCtx.lensActive when another magic use takes over.
+        constexpr U32 magic_state = 0x587958 + 0x1580;
+        const U32 play = memory.Read(HUDFade::UI+0xc).value_or(0);
+        const bool lens_active = !paused && (memory.Read(magic_state).value_or(0) & 0xffff) == 7 &&
+            Pointer(play,0x2090) && (memory.Read(play+0x208c).value_or(0) >> 24) != 0;
+        MagicMeter::lens_elapsed_us = routing.lens_pulse.Sample(lens_active,now_us,Interpolation::generation.load());
         CarrotAnimation::Publish(memory,paused);
         routing.hud_return.Track(memory,paused,now_us);
         if(routing.hud_return.returning || routing.hud_return.hidden || MountedHUD(memory)) {
@@ -658,8 +671,7 @@ template<class M, class R> void Handle(M& memory, R& regs, unsigned site, const 
         const auto count = memory.Read(*helper);
         if (count && *count <= 4) {
             Quads(memory, *helper, 0, *count, TopPose(layout[key?Keys:Rupees], key?Keys:Rupees), 2, key?151:111, 320);
-            if(key)KeyNumberLayout(memory,*helper,layout);
-            else RupeeNumberLayout(memory,*helper,layout);
+            CounterNumberLayout(memory,*helper,layout,key?Keys:Rupees);
         }
     }
 }

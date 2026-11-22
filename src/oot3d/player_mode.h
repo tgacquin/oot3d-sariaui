@@ -5,7 +5,8 @@
 namespace OOT3D {
 // A build property, never a saved preference or an editor toggle.
 bool IsPlayerBuild();
-// Returns whether F1/F2 was consumed. F2 is inert in a player build.
+const char* PlayerDefaultsDirectory();
+// Returns whether a settings key was consumed. F3 authors defaults in developer builds.
 bool HandleSettingsFunctionKey(unsigned function_key, bool repeat);
 
 inline bool PlayerShortcutAllowed(std::string_view name) {

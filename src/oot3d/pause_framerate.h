@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "oot3d/pause_menu.h"
+#include "oot3d/interpolation_rate.h"
 #include "oot3d/pause_selection.h"
 #include "oot3d/file_select_timing.h"
 #include "oot3d/boss_challenge_layout.h"
@@ -10,7 +11,7 @@ using TitleScreen::U32;
 constexpr U32 FirstSVC=0xfff120, Renderer=0x5be5b8;
 // Original US code: frame deadline/accounting, preview angle, item-flight
 // easing/duration, input repeat and the equip-completion effect's clock.
-constexpr std::array<TitleScreen::Site,38> Sites{{
+constexpr std::array<TitleScreen::Site,40> Sites{{
     {0x41af74,0xe2800002,0xe585008c},
     {0x3fd3c4,0xe2811002,0xe0800001},
     {0x425704,0xeeb80ac0,0xee200a2b},
@@ -49,6 +50,8 @@ constexpr std::array<TitleScreen::Site,38> Sites{{
     {0x41d548,0x13a0000c,0x1a000002}, // Boss selector initial held-input delay.
     {0x41d558,0xd3a00003,0xe25cc001}, // Boss selector repeat interval.
     {0x4346d4,0xe5846080,0xe2856008}, // Landing pulse begins after equip commit.
+    {0x439554,0xe320f000,0xebfc081c}, // Save page vertical selection.
+    {0x4396a0,0xe3a03000,0xe58d3000}, // Options touch / confirm, after the Back hit test.
 
 }};
 // Save/Options use their own integer slide clock (owner+2c). Count in
@@ -106,7 +109,10 @@ template<class M> bool CodeMatches(M& m) {
         if(m.Read(s.code.pc)!=std::optional<U32>{s.code.instruction} ||
            m.Read(s.code.pc+4)!=std::optional<U32>{s.code.following})return false;
     // Pane timing shares the existing description hook; require it too.
-    return m.Read(0x2f2d7c)==std::optional<U32>{0xeeb00a68} &&
+    return m.Read(0x439658)==SaveMenu::Owner && m.Read(0x4395e8)==0xe3a03000 &&
+           m.Read(0x439720)==0xe320f000 && m.Read(0x43ae7c)==0x587958 &&
+           m.Read(0x43b590)==0xe5c8002d && m.Read(0x43b598)==0xe5c603d8 &&
+           m.Read(0x43b5a0)==0xe5c8000f && m.Read(0x2f2d7c)==std::optional<U32>{0xeeb00a68} &&
            m.Read(0x41af84)==std::optional<U32>{0x54cc34};
 }
 inline U32 Compare(U32 cpsr,U32 a,U32 b) {
@@ -168,6 +174,14 @@ struct Hook {
 
     template<class M,class R,class F>
     void Handle(M& m,R& r,F& f,U32& cpsr,unsigned site,std::int64_t now=0) {
+        if(site==38) {
+            // Both remaining buttons are on row zero. Recover old states
+            // with Options focused, then continue with the normal hit tests.
+            if(m.Read(r[4]+0x38)!=0)m.Write(r[4]+0x38,0);
+            r[15]=0x4395e8;
+            return;
+        }
+        if(site==39) {r[3]=0;r[15]=0x439720;return;} // B / Start still close the menu.
         if(site==37) {
             m.Write(r[4]+0x80,r[6]); // Displaced STR.
             landing_clock=fast && r[4]==0x5066f8 && frame_us>0;
@@ -224,8 +238,11 @@ struct Hook {
             SaveMenu::animate=fast;
             if(!SaveMenu::Active(m) || (m.Read(SaveMenu::Owner+0x28)==2 &&
                m.Read(SaveMenu::Owner+0x24)==1))SaveMenu::returning_from_options=false;
-            file.Frame(r[5]==Renderer && (FileSelect::Active(m) || FileSelect::NameActive(m)) &&
-                FileSelectTiming::CodeMatches(m));
+            const bool keyboard=r[5]==Renderer && FileSelect::NameActive(m);
+            file.Frame(r[5]==Renderer && (keyboard || FileSelect::Active(m)) && FileSelectTiming::CodeMatches(m));
+            using Interpolation::MenuPage;
+            Interpolation::menu_page=file.active?(keyboard?MenuPage::NameEntry:MenuPage::FileSelect):
+                fast?PauseMenu::PresentationPage(m):MenuPage::None;
             if(!fast) {preview_fraction=0;preview_owner=0;remainder={};}
             if(m.Read(0x5066f8+0x34)!=std::optional<U32>{9})remainder={};
             r[0]+=(fast || death_fast || file.active || boss_fast)?1:2;

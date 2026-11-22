@@ -212,8 +212,11 @@ struct Artwork {
             auto masked=map_pixels;
             if(outline) {
                 const auto boundary=Boundary(*outline);
-                for(unsigned y=0;y<MapHeight;++y)for(unsigned x=0;x<MapWidth;++x)
-                    masked[y*MapWidth+x][3]*=Alpha(boundary,outline->feather,x+.5f,y+.5f);
+                OutlineRow row;
+                for(unsigned y=0;y<MapHeight;++y) {
+                    row.Prepare(boundary,outline->feather,y+.5f);
+                    for(unsigned x=0;x<MapWidth;++x)masked[y*MapWidth+x][3]*=row.At(x+.5f);
+                }
             }
             EdgeShadow shadow;
             if(shadow_enabled)shadow.Build(masked,crop,shadow_width);
@@ -276,6 +279,7 @@ struct WarmSource {
     std::shared_ptr<const PaperImage> paper_image;
     std::shared_ptr<const std::vector<U32>> compressed;
     std::vector<Color> map;
+    std::shared_ptr<const std::vector<U32>> dungeon_atlas;
     DungeonParchment::Paper paper;
 };
 inline Artwork WarmRecipe(const PauseMenu::Layout& layout,bool reflected) {
@@ -329,7 +333,7 @@ struct Hook {
     std::shared_ptr<const Outline> cached_outline;
     std::shared_ptr<Pixels> composed;
     LightingCache lighting;
-    std::vector<U32> compressed;
+    std::vector<U32> compressed,bytes;
     std::vector<Color> map_pixels;
     std::vector<float> cached_key;
     Geometry prepared;
@@ -394,7 +398,7 @@ struct Hook {
             crop=c;map_color=color;z=p[2];
         }
         if(found!=1)return fail("map quad not found");
-        std::vector<U32> bytes(131072/4);
+        bytes.resize(131072/4);
         if(!GuestUI::ReadTextureWords(m,address,bytes))return false;
         const bool changed=compressed!=bytes;
         if(changed || map_pixels.empty()) {
@@ -408,7 +412,7 @@ struct Hook {
                 (*source)[y*MapFrame::SourceWidth+x]=(U32(c[0])<<24)|(U32(c[1])<<16)|(U32(c[2])<<8)|alpha;
             }
             source_image.store(std::shared_ptr<const MapFrame::SourcePixels>(source));
-            compressed=std::move(bytes);
+            compressed.swap(bytes);
         }
         const bool paper_changed=new_paper!=paper_source;
         if(paper_changed && new_paper)paper.Set(new_paper->colors,PaperWidth,PaperHeight);

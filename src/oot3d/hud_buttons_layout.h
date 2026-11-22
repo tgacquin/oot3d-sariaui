@@ -34,6 +34,26 @@ inline void ArrangeDiamond(Layout& l) {
         p.y=cy+l.diamond_spacing*(d[0]*sine+d[1]*cosine);
     }
 }
+inline constexpr float BubbleWidth(unsigned i) {return i==B?48.f:40.f;}
+inline constexpr float BubbleAspectY=47.f/48.f;
+inline std::array<float,2> ItemPivot(const Layout& l) {
+    std::array<float,2> center{};
+    for(unsigned i=X;i<Count;++i) {
+        center[0]+=l.buttons[i].pose.x/4;
+        center[1]+=l.buttons[i].pose.y/4;
+    }
+    return center;
+}
+inline PausePrompts::Pose ItemPose(const Layout& l,unsigned i,const std::array<float,2>& pivot) {
+    auto p=l.buttons[i].pose;
+    p.x=pivot[0]+(p.x-pivot[0])*l.item_scale+l.item_x;
+    p.y=pivot[1]+(p.y-pivot[1])*l.item_scale+l.item_y;
+    p.scale*=l.item_scale;
+    const auto personal=UserHUD::Sanitize(l.user_items[i-X]);
+    p.x+=personal.x;p.y+=personal.y;
+    if(personal.scale!=0)p.scale=std::clamp(p.scale*UserHUD::Factor(personal),.1f,16.f);
+    return p;
+}
 inline std::mutex mutex;
 inline Layout layout;
 inline std::atomic<bool> dirty{false};

@@ -2,6 +2,7 @@
 #include "oot3d/actor_capture.h"
 #include <cassert>
 #include <iostream>
+#include <map>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -26,6 +27,8 @@ static void CheckActorCapture(const char* path,const std::string& model) {
         skeletons.push_back(std::move(skeleton));
     }
     Pose::History history;unsigned paired=0,resolved=0,mixed=0;
+    unsigned adjacent=0;
+    std::map<std::pair<unsigned,unsigned>,std::uint64_t> previous_frames;
     std::uint64_t frame=0;std::int64_t time=0;
     const auto check_frame=[&] {
         const auto& entries=history.Pairs();
@@ -38,8 +41,39 @@ static void CheckActorCapture(const char* path,const std::string& model) {
                     Pose::PaletteNear(p.current.native[0],other.current.native[0])) {
                     native[1]=other.current.native[1];prefix=true;
                 }
-            const auto result=Pose::Resolve(entries,native,p.current.camera,frame,time);
+            const unsigned vertices=model=="cow"?(p.current.key.count==10?2274:126):0;
+            const auto result=Pose::Resolve(entries,native,p.current.camera,frame,time,nullptr,vertices);
             ++paired;assert(result);++resolved;
+            if(model=="cow" || model=="ht_hata") {
+                for(float phase:{.25f,.75f}) {
+                    sample_fraction=phase;
+                    const auto pose=Pose::Resolve(entries,native,p.current.camera,frame,time,nullptr,vertices);
+                    assert(pose && pose->count==p.current.key.count);
+                }
+                sample_fraction=.5f;
+            }
+            if(model=="rb_cap") {
+                for(float phase:{.25f,.5f,.75f}) {
+                    sample_fraction=phase;
+                    const auto turn=Pose::Resolve(entries,native,p.current.camera,frame,time);
+                    assert(turn && turn->count==3);
+                    Matrix world[3];
+                    for(unsigned bone=0;bone<3;++bone) {
+                        const auto& current=p.current.skeleton_pose->bones[bone];
+                        const auto rest=Pose::InverseBone(current.bind);assert(rest);
+                        world[bone]=Math::Multiply(turn->palette[bone],*rest);
+                        if(!bone)continue;
+                        const auto length=[](const Matrix& a,const Matrix& b) {
+                            return std::hypot(a[0][3]-b[0][3],a[1][3]-b[1][3],a[2][3]-b[2][3]);
+                        };
+                        const auto before=length(p.previous.skeleton_pose->bones[bone-1].world,
+                                                 p.previous.skeleton_pose->bones[bone].world);
+                        const auto after=length(p.current.skeleton_pose->bones[bone-1].world,current.world);
+                        assert(std::abs(length(world[bone-1],world[bone])-std::lerp(before,after,phase))<.02);
+                    }
+                }
+                sample_fraction=.5f;
+            }
             if(prefix){assert(result->count==2);++mixed;}
         }
     };
@@ -49,6 +83,9 @@ static void CheckActorCapture(const char* path,const std::string& model) {
         if(s.frame!=frame){check_frame();frame=s.frame;}time=s.time;
         const auto ids=d["bone_ids"].toArray();s.key={unsigned(d["renderer"].toInteger()),unsigned(d["skeleton"].toInteger()),
             unsigned(d["resource"].toInteger()),unsigned(d["primitive"].toInteger()),unsigned(ids.size())};
+        const auto id=std::pair{s.key.renderer,s.key.primitive};
+        if(previous_frames.contains(id) && previous_frames[id]+1==s.frame)++adjacent;
+        previous_frames[id]=s.frame;
         s.bone_count=d["bone_count"].toInt();s.skinning=d["skinning"].toInt();
         const int snapshot=d["skeleton_snapshot"].toInt(-1);
         if(snapshot>=0) {assert(unsigned(snapshot)<skeletons.size());s.skeleton_pose=skeletons[snapshot];}
@@ -63,7 +100,9 @@ static void CheckActorCapture(const char* path,const std::string& model) {
         history.Observe(s);
     }
     check_frame();
-    assert(paired>60 && resolved==paired && (Pose::LinkModel(model) || mixed>20));
+    // A hood capture contains a single mesh per sampled frame.
+    assert(paired>(model=="rb_cap"?20u:60u) && resolved==paired &&
+           (Pose::HierarchyModel(model) || ((model=="cow" || model=="ht_hata") && paired==adjacent) || mixed>20));
     std::cout<<model<<" capture: "<<resolved<<" adjacent mesh poses resolved, "<<mixed<<" mixed rigid prefixes\n";
 }
 int main(int argc,char** argv) {

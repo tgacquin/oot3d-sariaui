@@ -47,6 +47,39 @@ inline std::array<float, 3> Normal(const F::Quad& q) {
     for (unsigned c = 0; c < 3; ++c) n[c] = u[(c+1)%3]*v[(c+2)%3] - u[(c+2)%3]*v[(c+1)%3];
     return n;
 }
+// Stalchild emergence leaves and Peahat clods share half-atlas squares,
+// 0.6-unit size steps, and a horizontal edge throughout the tumble.
+inline bool GroundFlake(const F::Quad& q, float size) {
+    const bool captured_size = (size >= 5.38f && size <= 7.82f) ||
+                               (size >= 10.78f && size <= 19.22f);
+    return captured_size &&
+           std::abs(size - .6f*std::round(size/.6f)) < .02f &&
+           std::abs(q.vertices[2][0][1] - q.vertices[0][0][1]) < .003f &&
+           F::Near(q.vertices[0][2][1] - q.vertices[1][2][1], .5f) &&
+           F::Near(q.vertices[2][2][0] - q.vertices[0][2][0], .5f);
+}
+
+// Compare both signed rotations, independent of world position and atlas
+// cell. Each tick the horizontal edge turns -4 degrees in XZ and the other
+// edge pitches -21.2 degrees relative to it.
+inline bool GroundFlakeTurn(const F::Quad& now, const F::Quad& old, float size) {
+    const auto axes = [size](const F::Quad& q) {
+        const auto& origin = q.vertices[0][0];
+        const auto& side = q.vertices[1][0];
+        const auto& horizontal = q.vertices[2][0];
+        const float x = (horizontal[0]-origin[0])/size;
+        const float z = (horizontal[2]-origin[2])/size;
+        return std::array{x, z, ((side[2]-origin[2])*x-(side[0]-origin[0])*z)/size,
+                          (side[1]-origin[1])/size};
+    };
+    const auto a = axes(old), b = axes(now);
+    constexpr float yaw_cos=.99756f, yaw_sin=-.06976f;
+    constexpr float pitch_cos=.93232f, pitch_sin=-.36162f;
+    return std::abs(b[0]-(yaw_cos*a[0]-yaw_sin*a[1])) < .004f &&
+           std::abs(b[1]-(yaw_sin*a[0]+yaw_cos*a[1])) < .004f &&
+           std::abs(b[2]-(pitch_cos*a[2]-pitch_sin*a[3])) < .004f &&
+           std::abs(b[3]-(pitch_sin*a[2]+pitch_cos*a[3])) < .004f;
+}
 inline std::optional<std::vector<F::Quad>> Decode(std::span<const Vertex> inputs,
                                                 std::span<const std::uint32_t> order) {
     std::vector<F::Vertex> canonical(inputs.size());
@@ -55,7 +88,7 @@ inline std::optional<std::vector<F::Quad>> Decode(std::span<const Vertex> inputs
     if (!quads || quads->empty() || quads->size() > 128) return {};
     for (const auto& q : *quads) {
         const float size = Size(q);
-        if (size < 1 || size > 16) return {};
+        if (size < 1 || (size > 16 && !GroundFlake(q,size))) return {};
         const auto n = Normal(q);
         float vv = 0, nn = 0, dot = 0;
         for (unsigned c = 0; c < 3; ++c) {
@@ -98,15 +131,20 @@ inline std::optional<unsigned> Match(const F::Quad& q, const std::vector<F::Quad
         // Spider flakes fall vertically; the same material's Deku Baba leaves
         // drift sideways and initially rise. Both keep their individual size.
         // Order changes at births/deaths; never associate by slot or atlas cell.
-        if (std::abs(ac[0]-bc[0]) > 2 || std::abs(ac[2]-bc[2]) > 2 ||
-            ac[1]-bc[1] > 3 || ac[1]-bc[1] < -26 || std::abs(Size(a)-Size(b)) > .02f) continue;
+        const float dx=ac[0]-bc[0], dy=ac[1]-bc[1], dz=ac[2]-bc[2];
+        if (std::abs(dx)>26 || std::abs(dz)>26 || dy < -72 || dy > 6) continue;
+        const float size=Size(a);
+        if (std::abs(size-Size(b))>.02f) continue;
+        const bool slow=std::abs(dx)<=2 && std::abs(dz)<=2 && dy>=-26 && dy<=3 && size<=16;
+        if (!slow && !(GroundFlake(a,size) && GroundFlake(b,size) && GroundFlakeTurn(a,b,size)))
+            continue;
         bool continuous = true;
         for (unsigned edge : {1u, 2u}) {
             float dot = 0;
             for (unsigned c = 0; c < 3; ++c)
                 dot += (a.vertices[edge][0][c]-a.vertices[0][0][c]) *
                        (b.vertices[edge][0][c]-b.vertices[0][0][c]);
-            if (dot < .5f*Size(a)*Size(b)) continuous = false;
+            if (dot < .5f*size*Size(b)) continuous = false;
         }
         if (!continuous) continue;
         const float score = (ac[1]-bc[1])*(ac[1]-bc[1]) +

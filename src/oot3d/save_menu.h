@@ -234,7 +234,7 @@ template<class M> bool CopyPositions(M& m,U32 mesh,U32 dst,U32 src,U32 bytes) {
         // original positions before editor transforms so hidden labels, panels
         // and cursor corners cannot reappear in the widescreen margins.
         const bool hidden=state==1 || min_x>=320 || max_x<=0 || min_y>=240 || max_y<=0 ||
-            (selection && page==InputPage::Hidden) ||
+            part==Options || (selection && page==InputPage::Hidden) ||
             (labels && state==3) || (atlas && ((q>=43)!=(state==3)));
         if(hidden)for(unsigned i=3;i<12;i+=3) {
             v[i]=v[0];v[i+1]=v[1];v[i+2]=v[2];
@@ -313,14 +313,14 @@ inline std::optional<std::array<float,2>> MapPointer(float u,float v,float width
         if(nx>=0 && nx<320 && ny>=0 && ny<198)return std::array{nx/320,ny/240};
         return {};
     }
-    for(Part part:{Back,Options,Save,DontSave}) {
+    for(Part part:{Back,Save,DontSave}) {
         const auto p=poses[part];if(!Valid(p))continue;
         const auto a=Anchors[part];
         const float nx=a[0]+(x-a[0]-p.x/.8f)/p.scale,ny=a[1]+(y-a[1]-p.y/.8f)/p.scale;
-        const float left=part==Back?4:part==Options?112:part==Save?164:39;
-        const float right=left+(part==Back?52:part==Options?96:120);
-        const float top=part==Back || part==Options?204:96;
-        const float bottom=part==Back || part==Options?236:144;
+        const float left=part==Back?4:part==Save?164:39;
+        const float right=left+(part==Back?52:120);
+        const float top=part==Back?204:96;
+        const float bottom=part==Back?236:144;
         if(nx>=left && nx<=right && ny>=top && ny<=bottom)
             return std::array{nx/320,ny/240};
     }

@@ -378,6 +378,8 @@ static_assert(std::has_unique_object_representations_v<ProcTexConfig>);
 union UserConfig {
     u32 raw{};
     BitField<0, 1, u32> use_custom_normal;
+    BitField<1, 1, u32> hud_colors;
+    BitField<2, 1, u32> torch_fog;
 
     // Whether a FSConfig + UserConfig combination can be
     // cached to disk. Right now, this is true if the

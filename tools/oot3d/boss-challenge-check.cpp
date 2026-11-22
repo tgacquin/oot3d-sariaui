@@ -559,7 +559,7 @@ int main(int argc,char** argv) {
     }
     {
         namespace W=OOT3D::Widescreen;
-        D::Hook fade;fade.stage=D::Hook::Stage::Native;fade.route=true;fade.owner=death;
+        D::Hook fade;fade.stage=D::Hook::Stage::Native;fade.native_top_draw=true;fade.route=true;fade.owner=death;
         e.Write(death+8,0x10010);
         constexpr U32 pane=0x895000,model=0x895200;
         e.Write(death+D::LayoutOffset+0x418+250*4,pane);
@@ -567,6 +567,8 @@ int main(int argc,char** argv) {
         W::enabled=true;W::supported_layout=true;
         const auto t=fade.NativeFadeTransform(e,model);assert(t);
         assert(std::abs(t->sx*400-240*W::Aspect)<.001f && t->sy==1);
+        e.Write(death+8,0x10000);
+        fade.route=false;assert(fade.NativeFadeTransform(e,model));
         assert(!fade.NativeFadeTransform(e,model+4));
         W::enabled=false;assert(!fade.NativeFadeTransform(e,model));
         W::supported_layout=false;

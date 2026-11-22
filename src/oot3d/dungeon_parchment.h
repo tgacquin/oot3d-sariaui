@@ -169,6 +169,37 @@ inline std::shared_ptr<Pixels> Compose(const Paper& paper,std::span<const Rect> 
     }
     return out;
 }
+struct Recipe {
+    std::array<Rect,4> boxes{};
+    unsigned count=0;
+    std::array<float,17> key{};
+    Recipe(const PauseMenu::Layout& layout,Rect raw) {
+        const auto add=[&](const PauseMenu::Pose& pose) {
+            const auto a=PauseMenu::Move(raw.left,raw.top,PauseMenu::DungeonMap,pose);
+            const auto b=PauseMenu::Move(raw.right,raw.bottom,PauseMenu::DungeonMap,pose);
+            boxes[count++]={a[0],a[1],b[0],b[1]};
+        };
+        add(layout[PauseMenu::DungeonMap]);for(const auto& extra:layout.dungeon_parchments)if(extra.enabled && PauseMenu::Valid(extra.pose))add(extra.pose);
+        for(unsigned i=0;i<count;++i) {
+            key[4*i]=boxes[i].left;key[4*i+1]=boxes[i].top;key[4*i+2]=boxes[i].right;key[4*i+3]=boxes[i].bottom;
+        }
+        key[16]=std::isfinite(layout.parchment_blend)?std::clamp(layout.parchment_blend,0.f,80.f):18;
+    }
+    Rect Bounds() const {
+        auto b=Union({boxes.data(),count});
+        b.left-=1;b.top-=1;b.right+=1;b.bottom+=1;
+        return b;
+    }
+    std::shared_ptr<Pixels> Render(const Paper& paper) const {
+        return Compose(paper,{boxes.data(),count},key[16]/PauseMenu::Scale,Bounds());
+    }
+};
+struct Warm {
+    std::array<float,17> key;
+    std::shared_ptr<const std::vector<U32>> atlas;
+    std::shared_ptr<Pixels> pixels;
+};
+inline Common::AtomicSharedPtr<const Warm> warm;
 using Clock=std::chrono::steady_clock;
 inline double Milliseconds(Clock::time_point start) {
     return std::chrono::duration<double,std::milli>(Clock::now()-start).count();
@@ -186,7 +217,7 @@ struct Hook : GuestUI::Hook<Geometry,Width,Height> {
     Timings timings;
     bool ready=false,dirty=false;
     U32 native_model=0;
-    std::vector<U32> compressed;
+    std::vector<U32> compressed,readback;
     std::array<float,8> cached_uv{};
     std::array<float,17> cached_key{};
     Paper paper;
@@ -222,42 +253,40 @@ struct Hook : GuestUI::Hook<Geometry,Width,Height> {
         // a half-million-pixel texture merely because its slide position changed.
         const auto round=[](float f){return std::round(f*1024)/1024;};
         raw={round(raw.left),round(raw.top),round(raw.right),round(raw.bottom)};
-        std::array<Rect,4> boxes{};unsigned count=0;
-        const auto add=[&](const PauseMenu::Pose& pose) {
-            const auto a=PauseMenu::Move(raw.left,raw.top,PauseMenu::DungeonMap,pose);
-            const auto b=PauseMenu::Move(raw.right,raw.bottom,PauseMenu::DungeonMap,pose);
-            boxes[count++]={a[0],a[1],b[0],b[1]};
-        };
-        add(first);for(const auto& extra:layout.dungeon_parchments)if(extra.enabled && PauseMenu::Valid(extra.pose))add(extra.pose);
-        std::array<float,17> key{};for(unsigned i=0;i<count;++i) {
-            key[4*i]=boxes[i].left;key[4*i+1]=boxes[i].top;key[4*i+2]=boxes[i].right;key[4*i+3]=boxes[i].bottom;
-        }
-        key[16]=std::isfinite(layout.parchment_blend)?std::clamp(layout.parchment_blend,0.f,80.f):18;
+        const Recipe recipe(layout,raw);
+        const auto& key=recipe.key;
         const auto read_start=Clock::now();
-        std::vector<U32> readback(131072/4);
+        readback.resize(131072/4);
         if(!GuestUI::ReadTextureWords(m,address,readback))return;
         timings.read_ms+=Milliseconds(read_start);
         const bool texture_changed=compressed!=readback || cached_uv!=uv;
-        if(texture_changed) {
-            Measure decode_time{timings.decode_ms};
+        if(!composed || texture_changed || key!=cached_key) {
+            const auto cached=warm.load();
             float u0=1,u1=0,v0=1,v1=0;
             for(unsigned i=0;i<4;++i){u0=std::min(u0,uv[2*i]);u1=std::max(u1,uv[2*i]);v0=std::min(v0,uv[2*i+1]);v1=std::max(v1,uv[2*i+1]);}
             const int left=std::lround(u0*512),right=std::lround(u1*512),top=std::lround((1-v1)*256),bottom=std::lround((1-v0)*256);
             if(left<0 || right>512 || top<0 || bottom>256 || right-left<16 || bottom-top<16)return;
-            const unsigned w=right-left,h=bottom-top;std::vector<Color> source(w*h);
-            const auto word64=[&](unsigned at){return std::uint64_t(readback[at/4])|(std::uint64_t(readback[at/4+1])<<32);};
-            for(unsigned y=0;y<h;++y)for(unsigned x=0;x<w;++x) {
-                const unsigned tx=left+x,ty=top+y,at=((ty/8)*64+tx/8)*64+((ty%8)/4*2+(tx%8)/4)*16;
-                const auto rgb=decode(word64(at+8),tx%4,ty%4);
-                source[y*w+x]={float(rgb[0]),float(rgb[1]),float(rgb[2]),float(((word64(at)>>(4*(4*(tx%4)+ty%4)))&15)*17)};
+            const bool native_crop=left==256 && right==464 && top==0 && bottom==176;
+            if(cached && cached->key==key && native_crop && *cached->atlas==readback) {
+                composed=cached->pixels;
+                if(texture_changed)paper={};
+            } else {
+                if(texture_changed || paper.original.empty()) {
+                    Measure decode_time{timings.decode_ms};
+                    const unsigned w=right-left,h=bottom-top;std::vector<Color> source(w*h);
+                    const auto word64=[&](unsigned at){return std::uint64_t(readback[at/4])|(std::uint64_t(readback[at/4+1])<<32);};
+                    for(unsigned y=0;y<h;++y)for(unsigned x=0;x<w;++x) {
+                        const unsigned tx=left+x,ty=top+y,at=((ty/8)*64+tx/8)*64+((ty%8)/4*2+(tx%8)/4)*16;
+                        const auto rgb=decode(word64(at+8),tx%4,ty%4);
+                        source[y*w+x]={float(rgb[0]),float(rgb[1]),float(rgb[2]),float(((word64(at)>>(4*(4*(tx%4)+ty%4)))&15)*17)};
+                    }
+                    paper.Set(std::move(source),w,h);
+                }
+                ++timings.rebuilds;Measure compose_time{timings.compose_ms};
+                composed=recipe.Render(paper);
             }
-            paper.Set(std::move(source),w,h);compressed=std::move(readback);cached_uv=uv;
-        }
-        if(!composed || texture_changed || key!=cached_key) {
-            const std::span<const Rect> pieces{boxes.data(),count};bounds=Union(pieces);
-            bounds.left-=1;bounds.top-=1;bounds.right+=1;bounds.bottom+=1;
-            ++timings.rebuilds;Measure compose_time{timings.compose_ms};
-            composed=Compose(paper,pieces,key[16]/PauseMenu::Scale,bounds);
+            if(texture_changed){compressed.swap(readback);cached_uv=uv;}
+            bounds=recipe.Bounds();
             cached_key=key;dirty=true;
         }
         prepared.positions={bounds.left+motion,bounds.top,p[2],bounds.right+motion,bounds.top,p[2],

@@ -7,6 +7,9 @@
 #include "oot3d/actor_draw_distance.h"
 #include "oot3d/native_prompt_diagnostics.h"
 #include "oot3d/save_wait_diagnostics.h"
+#ifdef OOT3D_DEV_AREA_LOAD_TRACE
+#include "oot3d/area_load_trace.h"
+#endif
 #include "core/hle/kernel/thread.h"
 #include "oot3d/randomizer/hooks.h"
 #include "oot3d/room_join_chime.h"
@@ -28,10 +31,13 @@
 #include "oot3d/pause_description.h"
 #include "oot3d/first_person_diagnostics.h"
 #include "oot3d/pause_framerate.h"
+#include "oot3d/game_control_options.h"
 #include "oot3d/ocarina.h"
+#include "oot3d/menu_cursor_draw.h"
 #include "oot3d/pause_header.h"
 #include "oot3d/heap_diagnostics.h"
 #include "oot3d/graphics_memory.h"
+#include "oot3d/frame_lights.h"
 #include "oot3d/graphics_allocation_diagnostics.h"
 #include "oot3d/graphics_memory_diagnostics.h"
 #include "oot3d/music.h"
@@ -218,6 +224,10 @@ static_assert([] {
         {Randomizer::FirstSVC,16},
         {Prices::TextSVC,1},
         {ActorDrawDistance::FirstSVC,ActorDrawDistance::Sites.size()},
+        {FrameLights::FirstSVC,2},
+#ifdef OOT3D_DEV_AREA_LOAD_TRACE
+        {AreaLoadTrace::FirstSVC,AreaLoadTrace::Sites.size()},
+#endif
     });
     for(std::size_t i=0;i<ranges.size();++i) {
         const auto a=ranges[i];
@@ -256,6 +266,13 @@ class DynarmicUserCallbacks final : public Dynarmic::A32::UserCallbacks {
             else for(unsigned i=0;i<words.size();++i)memory.Write32(at+4*i,words[i]);
             return true;
         }
+        bool WriteFloats(u32 at,std::span<const float> values) {
+            if(values.empty() || values.size_bytes()>0x3fffffff || !Mapped(at,unsigned(values.size_bytes())))return false;
+            if constexpr(std::endian::native==std::endian::little)
+                memory.WriteBlock(*process,at,values.data(),values.size_bytes());
+            else for(unsigned i=0;i<values.size();++i)memory.Write32(at+4*i,std::bit_cast<u32>(values[i]));
+            return true;
+        }
         bool Mapped(u32 at,unsigned bytes) {
             if(!process || !OOT3D::TitleScreen::Pointer(at,bytes) || !bytes)return false;
             for(u32 page=at&~0xfffu;page<=((at+bytes-1)&~0xfffu);page+=0x1000)
@@ -276,6 +293,87 @@ class DynarmicUserCallbacks final : public Dynarmic::A32::UserCallbacks {
     OOT3D::DialogueCamera::Hook oot_dialogue_camera;
     OOT3D::DialogueCamera::Trace oot_dialogue_trace;
     OOT3D::CameraTransitionDiagnostics::Trace oot_transition_trace;
+#ifdef OOT3D_DEV_AREA_LOAD_TRACE
+    OOT3D::AreaLoadTrace::Trace oot_area_load;
+    void TraceAreaLoad(unsigned site) {
+        using namespace OOT3D::AreaLoadTrace;
+        auto& r=parent.jit->Regs();
+        const auto process=parent.system.Kernel().GetCurrentProcess();
+        OotMappedMemory guest{memory,process.get()};
+        const auto field=[&](u32 base,u32 offset) {
+            return OOT3D::TitleScreen::Pointer(base,offset+4) && guest.Mapped(base+offset,4)
+                ? guest.Read(base+offset).value_or(~0u) : ~0u;
+        };
+        if(site==OutgoingFade || site<=AlternateExit) {
+            if(site==OutgoingFade)r[6]=0; // MOV r6,#0
+            else r[0]=memory.Read32(0x2e3b9c); // Displaced PC-relative LDR.
+            LOG_INFO(Core_ARM11,"OoT area load: {} scene={} next_entrance={:04X}",
+                site==OutgoingFade?"outgoing fade":"leaving",field(r[5],0x104)&0xffff,field(r[5],0x5c30)>>16);
+            return;
+        }
+        if(site==Initialize) {
+            r[0]=memory.Read32(0x4355dc); // LDR r0,[pc,#0x2dc]
+            oot_area_load={};
+            LOG_INFO(Core_ARM11,"OoT area load: initialize play={:08X} entrance={:08X}",
+                r[5],field(0x587958,0));
+            return;
+        }
+        const bool entering=site==Dispatch;
+        if(entering)r[1]=memory.Read32(r[1]+8); // LDR r1,[r1,#8]; native BLX follows.
+        else parent.jit->SetCpsr(OOT3D::PauseFramerate::Compare(parent.jit->Cpsr(),r[0],1));
+        const u32 queue=r[4],play=field(queue,0);
+        if(!OOT3D::TitleScreen::Pointer(play,0x8038) || queue!=play+0x7fd8)return;
+        const u32 index=field(queue,0x58);
+        if(index>=20)return;
+        const u32 callback=entering?r[1]:field(queue,8+4*index);
+        const auto now=parent.system.CoreTiming().GetGlobalTimeUs().count();
+        const bool first=oot_area_load.Enter(play,index,callback,now);
+        if(entering ? !first : !oot_area_load.Result(r[0],now))return;
+
+        const bool room=callback==0x448c68;
+        const bool file=room || callback==0x448fb4 || callback==0x449048;
+        // A successful stage may have freed its job or installed the next job.
+        const u32 job=file && (entering || r[0]==1)?field(play,room?0x4c30+0x7bc:0x8034):0;
+        LOG_INFO(Core_ARM11,"OoT area load: {} index={} callback={:08X} ({}) result={} elapsed_ms={} play={:08X} entrance={:08X} scene={} job={:08X} asset={} job_done={} job_result={:08X} queue_depth={} room_status={} worker_state={}",
+            entering?"enter":"return",index,callback,StageName(callback),entering?-1:s64(r[0]),
+            (now-oot_area_load.started)/1000,play,field(0x587958,0),field(play,0x104)&0xffff,
+            job,AssetName(job,field),field(job,8)&255,field(job,0),field(0x565510,0x28),
+            (field(play,0x4c30+0x7d0)>>8)&255,field(0x5bdde0,0x488)&255);
+
+        // Use the existing five-second pending-stage report. The SDK starts
+        // the file worker (0x41e61c) at 0x419aec and stores its kernel handle
+        // at 0x50c0d8. Its entry_point can be a shared SDK trampoline.
+        if(entering || r[0]!=1 || now-oot_area_load.started<5000000 ||
+           !(file || callback==0x448e38) || !process)return;
+        const u32 handle=field(0x50c0d8,0);
+        const auto worker=process->handle_table.IsValid(handle)?
+            process->handle_table.Get<Kernel::Thread>(handle):nullptr;
+        constexpr u32 files=0x565510;
+        const u32 depth=field(files,0x28),head=field(files,0x24),capacity=field(files,0x20);
+        const u32 front=depth && depth<=capacity && head<capacity && head<0x100000?
+            field(field(files,0),4*head):0;
+        LOG_INFO(Core_ARM11,"OoT area load worker: handle={:08X} found={} enabled={} front_job={:08X} awaited_job={:08X} consumers={} producers={}",
+            handle,bool(worker),(field(0x50c0cc,0)>>8)&255,front,job,field(files,0x2c),field(files,0x30));
+        if(!worker || worker->owner_process.lock()!=process)return;
+
+        u32 pc=worker->context.GetProgramCounter(),lr=worker->context.GetLinkRegister();
+        for(u32 core=0;core<parent.system.GetNumCores();++core) {
+            if(parent.system.Kernel().GetThreadManager(core).GetCurrentThread()!=worker.get())continue;
+            pc=parent.system.GetCore(core).GetPC();
+            lr=parent.system.GetCore(core).GetReg(14);
+            break;
+        }
+        const bool arb=worker->status==Kernel::ThreadStatus::WaitArb;
+        const u32 address=arb?worker->wait_address:0;
+        LOG_INFO(Core_ARM11,"OoT area load worker thread: id={} entry={:08X} status={} pc={:08X} lr={:08X} arbiter={:08X} arbiter_word={:08X} wait_objects={} priority={}",
+            worker->thread_id,worker->entry_point,static_cast<unsigned>(worker->status),pc,lr,
+            address,arb?field(address,0):0,worker->wait_objects.size(),worker->current_priority);
+        for(const auto& object:worker->wait_objects) {
+            LOG_INFO(Core_ARM11,"OoT area load worker wait: thread={} object_id={} type={}",
+                worker->thread_id,object->GetObjectId(),object->GetTypeName());
+        }
+    }
+#endif
     void TraceOotTransition(OOT3D::CameraTransitionDiagnostics::Stage stage,u32 cam,
                            float lens=0,u32 eye=0,u32 at=0,u32 dispatch=0) {
         if(!OOT3D::CameraTransitionDiagnostics::Recording())return;
@@ -323,6 +421,7 @@ class DynarmicUserCallbacks final : public Dynarmic::A32::UserCallbacks {
     OOT3D::RoomJoinChime::Hook oot_room_join_chime;
     OOT3D::HUDButtons::Hook oot_hud_buttons;
     OOT3D::PauseShadow::Hook oot_panel_shadow,oot_header_shadow;
+    std::optional<OOT3D::PauseShadow::Rect> oot_pause_textbox;
     OOT3D::SaveMenu::QuitBackdrop oot_quit_backdrop;
     OOT3D::GearPanel::Hook oot_gear_panel;
     OOT3D::HeapDiagnostics::Hook oot_heap_diagnostics;
@@ -428,6 +527,19 @@ public:
     std::optional<std::uint32_t> MemoryReadCode(VAddr vaddr) override {
         const auto instruction=memory.Read32OrNullopt(vaddr);
 #ifdef ENABLE_OOT3D_PRESENTATION
+        if (instruction && OOT3D::FrameLights::Instruction(vaddr, *instruction) != *instruction) {
+            const auto process = parent.system.Kernel().GetCurrentProcess();
+            struct CodeMemory {
+                Memory::MemorySystem& memory;
+                std::optional<u32> Read(u32 at) { return memory.Read32OrNullopt(at); }
+            } code{memory};
+            if (process && process->codeset && process->codeset->program_id == OOT3D::TitleScreen::ProgramId) {
+                const auto& data = process->codeset->DataSegment();
+                if (u64(data.addr) + data.size == OOT3D::FrameLights::End &&
+                    OOT3D::FrameLights::CodeMatches(code))
+                    return OOT3D::FrameLights::Instruction(vaddr, *instruction);
+            }
+        }
         if(instruction && OOT3D::GraphicsMemory::Instruction(vaddr,*instruction)!=*instruction) {
             struct CodeMemory {Memory::MemorySystem& memory;
                 std::optional<u32> Read(u32 at) {return memory.Read32OrNullopt(at);}
@@ -470,6 +582,15 @@ public:
                 OOT3D::Randomizer::CodeMatches(code))
                 return OOT3D::Randomizer::Instruction(vaddr,*instruction);
         }
+#ifdef OOT3D_DEV_AREA_LOAD_TRACE
+        if(instruction && OOT3D::AreaLoadTrace::Instruction(vaddr,*instruction)!=*instruction) {
+            const auto process=parent.system.Kernel().GetCurrentProcess();
+            OotMappedMemory guest{memory,process.get()};
+            if(process && process->codeset && process->codeset->program_id==OOT3D::TitleScreen::ProgramId &&
+               OOT3D::AreaLoadTrace::CodeMatches(guest))
+                return OOT3D::AreaLoadTrace::Instruction(vaddr,*instruction);
+        }
+#endif
         if (instruction && OOT3D::HDFont::Instruction(vaddr, *instruction) != *instruction) {
             struct CodeMemory { Memory::MemorySystem& memory;
                 std::optional<u32> Read(u32 at) { return memory.Read32OrNullopt(at); }
@@ -1154,6 +1275,12 @@ public:
 #endif
     void CallSVC(std::uint32_t swi) override {
 #ifdef ENABLE_OOT3D_PRESENTATION
+#ifdef OOT3D_DEV_AREA_LOAD_TRACE
+        if(swi>=OOT3D::AreaLoadTrace::FirstSVC && swi<OOT3D::AreaLoadTrace::FirstSVC+OOT3D::AreaLoadTrace::Sites.size()) {
+            TraceAreaLoad(swi-OOT3D::AreaLoadTrace::FirstSVC);
+            return;
+        }
+#endif
         if(swi>=OOT3D::GraphicsAllocations::FirstSVC &&
            swi<OOT3D::GraphicsAllocations::FirstSVC+OOT3D::GraphicsAllocations::Sites.size()) {
             struct GuestMemory {Memory::MemorySystem& memory;
@@ -1492,7 +1619,8 @@ public:
             const bool supported=Settings::values.render_3d.GetValue()==Settings::StereoRenderOption::Off &&
                 !Settings::values.upright_screen.GetValue();
             if(site==0)OOT3D::Ocarina::input.Update(guest,r);
-            else if(site==1)OOT3D::Ocarina::input.Navigate(guest,r,supported && OOT3D::Ocarina::on_top.load());
+            else if(site==1)OOT3D::Ocarina::input.Navigate(guest,r,supported && OOT3D::Ocarina::on_top.load(),
+                parent.system.CoreTiming().GetGlobalTimeUs().count());
             else if(site==2)OOT3D::Ocarina::input.AfterSound(guest,r);
             else if(site==3)oot_ocarina.Bottom(r);
             else if(site==4 && !oot_ocarina.NativeDrawing()) {r[14]=OOT3D::Ocarina::Sites[4].pc+4;r[15]=r[1];}
@@ -1531,12 +1659,14 @@ public:
         if(swi>=OOT3D::PauseFramerate::FirstSVC &&
            swi<OOT3D::PauseFramerate::FirstSVC+OOT3D::PauseFramerate::Sites.size()) {
             struct GuestMemory { Memory::MemorySystem& memory;
+                void Write8(u32 at,u8 value) {memory.Write8(at,value);}
                 std::optional<u32> Read(u32 at) {return memory.Read32OrNullopt(at);}
                 void Write(u32 at,u32 value) {memory.Write32(at,value);}
             } guest{memory};
             if(swi==OOT3D::PauseFramerate::FirstSVC &&
                parent.jit->Regs()[5]==OOT3D::PauseFramerate::Renderer) {
                 const auto now=parent.system.CoreTiming().GetGlobalTimeUs().count();
+                OOT3D::GameControlOptions::Update(guest);
                 const auto save_page=guest.Read(0x50a508+0x28).value_or(~0u);
                 const auto save_state=guest.Read(0x50a508+0x24).value_or(~0u);
                 if(const auto sample=oot_save_wait.Poll(save_page==2 && save_state==9,now)) {
@@ -1651,6 +1781,7 @@ public:
             } else if(swi==OOT3D::PauseHeader::FirstSVC) {
                 const auto now=parent.system.CoreTiming().GetGlobalTimeUs().count();
                 const auto previous=oot_header.last_time;
+                oot_pause_textbox.reset();
                 oot_header.Update(guest,now,supported);
                 if(OOT3D::PauseHeader::DiagnosticActive()) {
                     const auto& cost=oot_dungeon_sides.parchment.timings;
@@ -1870,7 +2001,7 @@ public:
             }
             if(site==5 && supported && oot_pause.drawing && !oot_pause.background_copy) {
                 oot_panel_shadow.Begin(guest,parent.jit->Regs(),OOT3D::PauseMenu::Sites[5].pc,
-                    OOT3D::PauseShadow::Panels(guest,OOT3D::PauseMenu::GetLayout()));
+                    OOT3D::PauseShadow::Panels(guest,OOT3D::PauseMenu::GetLayout(),oot_header.slide.progress,oot_pause_textbox));
                 if(!oot_panel_shadow.Pending())
                     oot_map_particles.Begin(guest,parent.jit->Regs(),OOT3D::PauseMenu::Sites[5].pc);
             }
@@ -1978,6 +2109,20 @@ public:
         if (swi >= OOT3D::ScreenModels::FirstSVC &&
             swi < OOT3D::ScreenModels::FirstSVC + OOT3D::ScreenModels::Sites.size()) {
             OotMappedMemory guest{memory,parent.system.Kernel().GetCurrentProcess().get()};
+            const auto page=OOT3D::Interpolation::menu_page.load();
+            if(page!=OOT3D::Interpolation::MenuPage::None && OOT3D::Interpolation::Replaying() &&
+               OOT3D::Interpolation::TargetFPS()>60) {
+                const u32 model=parent.jit->Regs()[0];
+                const auto resolve=[&](u32 at){return guest.Mapped(at,12)?memory.GetPointer(at):nullptr;};
+                if(page==OOT3D::Interpolation::MenuPage::FileSelect && oot_file_select.quest.Drawing() &&
+                   model==oot_file_select.quest.model) {
+                    OOT3D::Interpolation::MenuCursor::Record(guest,model,model,oot_file_select.quest_selection,0,resolve);
+                } else {
+                    const u32 source=page==OOT3D::Interpolation::MenuPage::Map?
+                        oot_dungeon_sides.ForegroundSource(model):model;
+                    OOT3D::Interpolation::MenuCursor::Capture(guest,page,model,source,resolve);
+                }
+            }
             oot_playback_note_filter.Restore(guest);
             oot_interpolation.Apply(guest,parent.jit->Regs()[1],parent.system.CoreTiming().GetGlobalTimeUs().count(),
                 Settings::values.render_3d.GetValue()==Settings::StereoRenderOption::Off &&
@@ -1995,6 +2140,8 @@ public:
             }
             if(oot_description.close.Transform(guest,parent.jit->Regs(),
                     parent.system.CoreTiming().GetGlobalTimeUs().count())) {
+                if(OOT3D::PauseMenu::Active(guest))
+                    OOT3D::PauseShadow::ObserveTextbox(guest,parent.jit->Regs()[0],parent.jit->Regs()[1],oot_pause_textbox);
                 OOT3D::TextboxInterpolation::Capture(guest,parent.jit->Regs()[0],parent.jit->Regs()[1]);
                 return;
             }
@@ -2084,7 +2231,7 @@ public:
                 OOT3D::ScreenModels::Apply(guest,regs[1],regs[0],{0,0,x_scale,1,0,0,true});
                 return;
             }
-            if(oot_header.DungeonDrawing()) {
+            if(oot_header.ForegroundGeometryDrawing()) {
                 auto& regs=parent.jit->Regs();regs[2]=regs[0]+0xc;
                 OOT3D::ScreenModels::Apply(guest,regs[1],regs[0],
                     {0,0,oot_header.bottom_projection?.8f:1.f,1,0,0,true});
@@ -2165,6 +2312,7 @@ public:
                     if(auto t=OOT3D::ScreenModels::Select(guest,regs[0],description,{}))
                         OOT3D::ScreenModels::Apply(guest,regs[1],regs[0],*t);
                 }
+                OOT3D::PauseShadow::ObserveTextbox(guest,regs[0],regs[1],oot_pause_textbox);
                 oot_description.close.Capture(guest,regs[0],regs[1],parent.system.CoreTiming().GetGlobalTimeUs().count());
                 OOT3D::TextboxInterpolation::Capture(guest,regs[0],regs[1]);
                 return;
@@ -2234,6 +2382,15 @@ public:
             oot_shop_description.Handle(guest,parent.jit->Regs(),parent.jit->ExtRegs(),flags,fpscr,
                 swi-OOT3D::Shops::FirstSVC);
             parent.jit->SetCpsr(flags);parent.jit->SetFpscr(fpscr);
+            return;
+        }
+        if (swi == OOT3D::FrameLights::FirstSVC || swi == OOT3D::FrameLights::FirstSVC + 1) {
+            struct GuestMemory {
+                Memory::MemorySystem& memory;
+                std::optional<u32> Read(u32 at) { return memory.Read32OrNullopt(at); }
+                void Write(u32 at, u32 value) { memory.Write32(at, value); }
+            } guest{memory};
+            OOT3D::FrameLights::Handle(guest, parent.jit->Regs(), swi - OOT3D::FrameLights::FirstSVC);
             return;
         }
         if(swi>=OOT3D::ActorDrawDistance::FirstSVC &&

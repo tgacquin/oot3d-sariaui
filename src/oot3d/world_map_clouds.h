@@ -13,7 +13,7 @@ struct Clouds {
     std::shared_ptr<Pixels> composed;
     LightingCache lighting;
     std::shared_ptr<const Outline> cached_outline;
-    std::vector<U32> compressed;
+    std::vector<U32> compressed,bytes;
     std::vector<Color> atlas;
     std::vector<float> cached_key;
     U32 native_model=0;
@@ -116,7 +116,7 @@ struct Clouds {
             }
             z=v.p[2];
         }
-        std::vector<U32> bytes(65536/4);
+        bytes.resize(65536/4);
         if(!GuestUI::ReadTextureWords(m,address,bytes))return false;
         const bool changed=bytes!=compressed;
         if(changed || atlas.empty()) {
@@ -127,7 +127,7 @@ struct Clouds {
                 const auto c=decode(word(at+8),x%4,y%4);
                 atlas[y*256+x]={float(c[0]),float(c[1]),float(c[2]),float(((word(at)>>(4*(4*(x%4)+y%4)))&15)*17)};
             }
-            compressed=std::move(bytes);
+            compressed.swap(bytes);
         }
         const auto tint=MapTimeTint::Read(m,layout.world_map_time_tint);
         const float brightness=PauseMenu::MapBrightness(layout.map_darkness);
@@ -172,14 +172,16 @@ struct Clouds {
                     raster[y*width+x]=Over(pixel,raster[y*width+x]);
                 }
             }
+            OutlineRow row;
             for(unsigned y=first;y<last;++y) {
+              if(outline)row.Prepare(boundary,outline->feather,
+                  std::lerp(float(crop.top),float(crop.bottom),(y+.5f)/height));
               const float shade=TopFade(std::lerp(map.top,map.bottom,(y+.5f)/height),fade_top,fade);
               lighting.Row(y,shade,fade.color);
               for(unsigned x=0;x<width;++x) {
                 auto color=raster[y*width+x];
-                if(color[3]>0 && outline)color[3]*=Alpha(boundary,outline->feather,
-                    std::lerp(float(crop.left),float(crop.right),reflected?1-(x+.5f)/width:(x+.5f)/width),
-                    std::lerp(float(crop.top),float(crop.bottom),(y+.5f)/height));
+                if(color[3]>0 && outline)color[3]*=row.At(
+                    std::lerp(float(crop.left),float(crop.right),reflected?1-(x+.5f)/width:(x+.5f)/width));
                 for(unsigned c=0;c<3;++c) {
                     color[c]*=brightness;
                 }

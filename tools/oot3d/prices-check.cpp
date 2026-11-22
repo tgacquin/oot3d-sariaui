@@ -63,7 +63,7 @@ int main(int argc,char**argv) {
     Difficulty::price_text_ready=false;assert(Factor()==1);
     auto original=Load(argv[2]);const auto table_count=Messages::Read32(original,8);
     for(unsigned factor:{2u,3u})for(bool controls:{false,true}) {
-        auto base=original;if(controls)assert(Messages::ApplyAll(base)==90);
+        auto base=original;if(controls)assert(Messages::ApplyAll(base)==234);
         auto bytes=base;assert(ApplyText(bytes,factor)==PriceMessageCount);
         unsigned changed=0;
         for(unsigned i=0;i<table_count;++i)for(unsigned slot=0;slot<10;++slot) {

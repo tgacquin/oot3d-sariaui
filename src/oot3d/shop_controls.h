@@ -9,7 +9,7 @@ constexpr U32 FirstSVC=0xfff2a0, ReturnToKeeper=0x1c2ecc, KeeperMenu=0x19157c;
 constexpr std::array<TitleScreen::Site,19> Sites{{
     {0x103fc0,0xe12fff33,0xe1a00004}, // EnOssan action dispatch.
     {0x191598,0xeb07950e,0xe3500004}, // Keeper menu's message readiness query.
-    {0x34785c,0xebfe2317,0xe28dd024}, // Fresh float rectangle, after unsigned conversion.
+    {0x34785c,0xebfe2317,0xe28dd024}, // Shared float rectangle for shop prompts and area titles.
     {0x16d01c,0xecbd8b02,0xe8bd8070}, // Left pan's unfinished-frame return.
     {0x191560,0xecbd8b02,0xe8bd8070}, // Right pan's unfinished-frame return.
     {0x1ff388,0xeb05dd92,0xe3500005}, // Shelf message readiness queries.
@@ -62,6 +62,9 @@ template<class M> bool CodeMatches(M& m) {
         // Stack frames used below: sprite helper 0x88, integer-to-float helper 0x48.
         m.Read(0x32cecc)==0xe92d40f0 && m.Read(0x32ced0)==0xed2d8b06 &&
         m.Read(0x32ced4)==0xe24dd05c && m.Read(0x32d140)==0xeb006992 &&
+        m.Read(0x4792ac)==0xe1a04001 && m.Read(0x47946c)==0xe1d410f6 &&
+        m.Read(0x479500)==0xebfb38a2 && m.Read(0x479528)==0x50c8e8 &&
+        m.Read(0x479464)==0xe5932054 && m.Read(0x47948c)==0xe2407001 &&
         m.Read(0x347790)==0xe92d43f0 && m.Read(0x3477a0)==0xed2d8b02 &&
         m.Read(0x3477a4)==0xe24dd024 && m.Read(0x347848)==0xe28d3014 &&
         m.Read(0x52d9f0)==0x16cf58 && m.Read(0x52d9f4)==0x19149c &&
@@ -81,6 +84,20 @@ template<class M> bool Actor(M& m,U32 actor) {
 // infer shop input from the game's already-filtered button word.
 struct NavigationInput {
     U32 actor=0,play=0,held=0;
+    U32 directions=0,pending_press=0,tapped=0;
+    std::int64_t press_us=0,poll_us=0,tick_press_us=0;
+    void ClearPress() {
+        directions=pending_press=tapped=0;
+        press_us=poll_us=tick_press_us=0;
+    }
+    void BeginTick() {
+        // A short press can arrive and be released between shelf updates.
+        // Deliver it once. A held direction still uses the native accumulator.
+        const bool recent=press_us>0 && poll_us>=press_us && poll_us-press_us<=50000;
+        tapped=recent?pending_press:0;
+        tick_press_us=recent && pending_press?press_us:0;
+        pending_press=0;
+    }
     template<class M> bool Active(M& m) const {
         if(!Actor(m,actor) || !TitleScreen::Pointer(play,0x20b0) ||
            m.Read(0x5043e0)!=play)return false;
@@ -88,13 +105,20 @@ struct NavigationInput {
         return state==2 || (state>=4 && state<=8);
     }
     template<class M> void Observe(M& m,U32 next_actor,U32 next_play) {
-        if(actor!=next_actor || play!=next_play)held=0;
+        if(actor!=next_actor || play!=next_play){held=0;ClearPress();}
         actor=next_actor;play=next_play;
         if(!Active(m))held=0;
     }
-    template<class M> bool Poll(M& m,U32 raw,bool live) {
+    template<class M> bool Poll(M& m,U32 raw,bool live,U32 stick=0,std::int64_t now=0) {
         const bool active=live && Active(m);
         held=active?raw&0xf0:0;
+        const auto state=active?m.Read(actor+0x2a0).value_or(0)&0xffff:0;
+        if((state==6 || state==7) && !(raw&~0xf00000f0u) && now>0) {
+            if(now<poll_us)ClearPress();
+            const U32 current=held?held:stick;
+            if(current&~directions){press_us=now;pending_press=current;}
+            directions=current;poll_us=now;
+        } else ClearPress();
         return active;
     }
 };
@@ -104,8 +128,14 @@ template<class M> U32 NavigationAxis(M& m,U32 actor,U32 play,unsigned axis) {
     if(!Actor(m,actor) || !TitleScreen::Pointer(play,0x20b0) || m.Read(0x5043e0)!=play)return native;
     const unsigned state=m.Read(actor+0x2a0).value_or(~0u)&0xffff;
     if(state!=2 && (state<4 || state>8))return native;
-    const U32 held=navigation_input.actor==actor && navigation_input.play==play?
-        navigation_input.held:0,positive=axis?0x40:0x10,negative=axis?0x80:0x20;
+    const U32 positive=axis?0x40:0x10,negative=axis?0x80:0x20;
+    const float stick=std::bit_cast<float>(native),magnitude=std::abs(stick);
+    U32 held=0;
+    if(navigation_input.actor==actor && navigation_input.play==play) {
+        held=navigation_input.held;
+        if(!(held&(positive|negative)) && magnitude<=15)
+            held|=navigation_input.tapped&(positive|negative);
+    }
     // Match an ordinary stick deflection. Opposing directions cancel, and
     // only the pressed axis overrides the stick. Shared player input is never
     // written: gameplay shortcuts and purchase buttons retain native behavior.
@@ -120,7 +150,6 @@ template<class M> U32 NavigationAxis(M& m,U32 actor,U32 play,unsigned axis) {
     // The native fresh-press and browsing checks require magnitude >30.
     // Admit smaller deliberate movements (>15) through that same path;
     // preserve larger deflections and their existing repeat speed.
-    const float stick=std::bit_cast<float>(native),magnitude=std::abs(stick);
     if(std::isfinite(stick) && magnitude>15 && magnitude<=30)
         return std::bit_cast<U32>(std::copysign(31.f,stick));
     return native;
@@ -154,10 +183,44 @@ struct DescriptionContext {
         return false;
     }
 };
-template<class M> void MovePromptRect(M& m,U32 sp,U32 rect) {
-    // 347790 is shared by other sprites. Only recognize the native shop call
-    // chain, with its saved actor and freshly generated stack-local rectangle.
-    if(!TitleScreen::Pointer(sp,0xd0) || rect!=sp+0x14 || m.Read(sp+0x44)!=0x32d144)return;
+template<class M> void PlaceAreaTitle(M& m,U32 sp,U32 rect) {
+    // The caller keeps the title descriptor in r4, saved at sp+0x2c.
+    const U32 title=m.Read(sp+0x2c).value_or(0);
+    if(!TitleScreen::Pointer(title,8))return;
+    const auto xy=m.Read(title+4);
+    if(!xy)return;
+    const auto layout=HUD::GetLayout();
+    const int y=static_cast<std::int16_t>(*xy>>16);
+    const int dy=UserHUD::AreaTitleY(y,layout.reposition_area_titles,layout.area_title_y)-y;
+    const float scale=layout.area_title_scale;
+    if((scale==1 && dy==0) || !std::isfinite(scale))return;
+    // The sprite helper converts quarter-pixel coordinates as unsigned.
+    // Recover signed edges from the title draw's saved r5, r6 and r7 so
+    // wide banners may extend offscreen even during their native animation.
+    const auto left=m.Read(sp+0x30), right=m.Read(sp+0x34), bottom=m.Read(sp+0x38);
+    const auto native_y_offset=m.Read(0x50c8e8+0x54);
+    if(!left || !right || !bottom || !native_y_offset)return;
+    const auto pixels=[](U32 edge){return std::bit_cast<std::int32_t>(edge)*.25f;};
+    const float bottom_y=pixels(*bottom);
+    // Native bottom is one quarter-pixel inside the symmetric lower edge.
+    const float top_y=2.f*(y+float(std::bit_cast<std::int32_t>(*native_y_offset)))-bottom_y-.25f;
+    const std::array bounds{top_y,bottom_y,pixels(*left),pixels(*right)};
+    // Resize the fresh animated bounds about their midpoint. Moving the
+    // finished rectangle also lets a negative Y offset cross the screen edge.
+    for(unsigned axis=0;axis<4;axis+=2) {
+        const float center=(bounds[axis]+bounds[axis+1])*.5f;
+        const float radius=(bounds[axis+1]-bounds[axis])*.5f*scale;
+        const float position=center+(axis==0?dy:0);
+        m.Write(rect+4*axis,std::bit_cast<U32>(position-radius));
+        m.Write(rect+4*(axis+1),std::bit_cast<U32>(position+radius));
+    }
+}
+template<class M> void PlaceSpriteRect(M& m,U32 sp,U32 rect) {
+    // 347790 serves multiple callers. Match the stack-local draw rectangle and saved LR.
+    if(!TitleScreen::Pointer(sp,0x48) || rect!=sp+0x14)return;
+    const auto sprite_caller=m.Read(sp+0x44);
+    if(sprite_caller==0x479504) {PlaceAreaTitle(m,sp,rect);return;}
+    if(sprite_caller!=0x32d144 || !TitleScreen::Pointer(sp,0xd0))return;
     const auto caller=m.Read(sp+0xcc);
     unsigned prompt=0;
     while(prompt<PromptSites.size() && caller!=PromptSites[prompt].pc+4)++prompt;
@@ -223,6 +286,7 @@ template<class M> bool BrowseShelf(M& m,U32 actor,U32 play) {
 template<class M,class R,class F> void Handle(M& m,R& r,F& fp,unsigned site) {
     if(site==17 || site==18) {
         navigation_input.Observe(m,r[4],r[6]);
+        if(site==17)navigation_input.BeginTick();
         fp[0]=NavigationAxis(m,r[4],r[6],site-17); // Displaced VLDR s0.
     } else if(site==0) {
         // Keep the native function's prologue/epilogue, slot selection, sound,
@@ -237,7 +301,7 @@ template<class M,class R,class F> void Handle(M& m,R& r,F& fp,unsigned site) {
             r[5]=r[4]+0x200;r[6]=0;r[15]=0x191650;
         } else {r[14]=Sites[1].pc+4;r[15]=0x3769d8;}
     } else if(site==2) {
-        MovePromptRect(m,r[13],r[3]);
+        PlaceSpriteRect(m,r[13],r[3]);
         r[14]=Sites[site].pc+4;r[15]=0x2d04c0;
     } else if(site==3 || site==4) {
         const U32 actor=r[4],play=r[5],sp=r[13];

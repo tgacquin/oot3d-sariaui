@@ -6,7 +6,9 @@
 
 namespace OOT3D::PickupFog {
 using Matrix=std::array<float,12>;
+enum Mode { None, Surface, Torch };
 struct Draw {
+    Mode mode=Surface;
     std::array<Matrix,10> palette{};
     unsigned count{},indices{};
     std::uint64_t frame{};
@@ -20,7 +22,7 @@ inline void Publish(const Draw& draw) {
     std::erase_if(draws,[&](const Draw& d){return d.epoch!=draw.epoch || d.frame>draw.frame || draw.frame-d.frame>1;});
     if(draws.size()<256)draws.push_back(draw);
 }
-inline bool Match(const std::array<Matrix,10>& palette,unsigned indices,std::uint64_t frame,unsigned epoch,unsigned scene,std::int64_t now) {
+inline Mode Match(const std::array<Matrix,10>& palette,unsigned indices,std::uint64_t frame,unsigned epoch,unsigned scene,std::int64_t now) {
     std::scoped_lock lock{mutex};
     for(const auto& d:draws) {
         if(d.indices!=indices || d.epoch!=epoch || d.scene!=scene || d.frame>frame || frame-d.frame>1 || now<d.time || now-d.time>100000)continue;
@@ -28,9 +30,9 @@ inline bool Match(const std::array<Matrix,10>& palette,unsigned indices,std::uin
         for(unsigned b=0;b<d.count;++b)for(unsigned i=0;i<12;++i)
             match &= std::isfinite(palette[b][i]) && std::isfinite(d.palette[b][i]) &&
                 std::abs(palette[b][i]-d.palette[b][i])<=(i%4==3?.03f:1e-5f);
-        if(match)return true;
+        if(match)return d.mode;
     }
-    return false;
+    return None;
 }
 template<class Regs> bool Candidate(const Regs& r) {
     // World depth and exact native model/palette/index count identify pickups.

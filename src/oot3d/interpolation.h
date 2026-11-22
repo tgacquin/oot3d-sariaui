@@ -3,6 +3,7 @@
 #include "oot3d/interpolation_state.h"
 #include "oot3d/camera.h"
 #include "oot3d/qol.h"
+#include "oot3d/game_control_options.h"
 #include "oot3d/widescreen.h"
 #include "oot3d/hud_fade.h"
 #include "oot3d/multiplayer_startup.h"
@@ -128,6 +129,7 @@ struct Hook {
         const auto mode=m.Read(play+0x364+0x18c);
         sample.first_person=active && (*active&0xffff)==0 && mode &&
             FirstPersonMode(*mode&0xffff);
+        if(sample.first_person && GameControlOptions::motion_controls.load())sample.aim_mode=*mode&0xffff;
         sample.projections_valid=true;
         for(unsigned lens=0;lens<3;++lens) {
             std::array<float,16> projection;

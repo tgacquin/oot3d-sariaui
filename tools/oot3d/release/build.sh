@@ -61,6 +61,8 @@ for check in "${checks[@]}"; do
   "$build_dir/bin/Release/$check$suffix"
 done
 if [[ "$platform" == linux-x86_64 ]]; then
+  cmake --build "$build_dir" --target oot3d_randomizer_check --parallel 3
+  "$build_dir/bin/Release/oot3d_randomizer_check" --check-hook-routing
   echo 'Disk usage before AppImage bundling:'
   df -h . /tmp
   du -sh "$build_dir" .ccache 2>/dev/null || true

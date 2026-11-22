@@ -67,13 +67,16 @@ inline std::uint64_t HashWord(std::uint64_t hash, std::uint32_t word) {
     return (hash ^ word) * 1099511628211ULL;
 }
 constexpr std::uint64_t HashStart = 14695981039346656037ULL;
-template<class G> void PublishNumberGeometry(const G& g,NumberKind kind) {
-    if(!g.count)return;
+template<class G> RoutedMesh IdentifyGeometry(const G& g) {
+    if(!g.count)return {};
     auto hash=HashStart;
     const auto add=[&](const auto& a){for(float f:a)hash=HashWord(hash,std::bit_cast<std::uint32_t>(f));};
     // GuestUI uploads its full fixed-capacity arrays, including empty quads.
     add(g.positions);add(g.uvs);const auto geometry=hash;add(g.colors);
-    PublishNumberMesh({hash,unsigned(g.positions.size()/12),false,geometry},kind);
+    return {hash,unsigned(g.positions.size()/12),true,geometry};
+}
+template<class G> void PublishNumberGeometry(const G& g,NumberKind kind) {
+    PublishNumberMesh(IdentifyGeometry(g),kind);
 }
 inline void PublishMesh(RoutedMesh mesh) {
     std::scoped_lock lock{routing_mutex};
@@ -97,11 +100,12 @@ inline bool IsRouted(std::uint64_t hash, unsigned quads) {
 inline bool IsHDCounterMesh(std::uint64_t hash,std::uint64_t geometry_hash,unsigned quads) {
     if(!geometry_hash || !quads || quads>4)return false;
     std::scoped_lock lock{routing_mutex};
+    const auto matches=[](const RoutedMesh& mesh){return mesh.routed && mesh.hd_counter;};
     for(const auto& mesh:routed_meshes)
-        if(mesh.hash==hash && mesh.quads==quads)return mesh.routed && mesh.hd_counter;
+        if(mesh.hash==hash && mesh.quads==quads)return matches(mesh);
     bool found=false;
     for(const auto& mesh:routed_meshes)if(mesh.geometry_hash==geometry_hash && mesh.quads==quads) {
-        if(!mesh.routed || !mesh.hd_counter)return false;
+        if(!matches(mesh))return false;
         found=true;
     }
     return found;

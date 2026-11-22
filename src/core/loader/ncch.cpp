@@ -1,5 +1,6 @@
 #ifdef ENABLE_OOT3D_PRESENTATION
 #include "oot3d/randomizer/hooks.h"
+#include "oot3d/frame_lights.h"
 #endif
 // Copyright 2014-2026 Citra Emulator Project / Azahar Emulator Project
 // Licensed under GPLv2 or any later version
@@ -211,6 +212,11 @@ ResultStatus AppLoader_NCCH::LoadExec(std::shared_ptr<Kernel::Process>& process)
                     data.addr, info.data.code_size, info.bss_size, data.size)) {
                 data.size = OOT3D::Randomizer::GuestEnd - data.addr;
                 code.resize(data.offset + data.size, 0);
+                static_assert(OOT3D::FrameLights::Base == OOT3D::Randomizer::GuestEnd);
+                if (OOT3D::FrameLights::CodeMatches(original)) {
+                    data.size = OOT3D::FrameLights::End - data.addr;
+                    code.resize(data.offset + data.size, 0);
+                }
                 LOG_INFO(Loader, "Reserved OoT3D randomizer memory: {:#x}..{:#x}",
                          OOT3D::Randomizer::GuestBase, OOT3D::Randomizer::GuestEnd);
             } else {

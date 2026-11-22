@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "common/atomic_shared_ptr.h"
-#include "oot3d/user_hud.h"
+#include "oot3d/hud_layout.h"
 #include <array>
 #include <atomic>
 #include <memory>
@@ -26,12 +26,18 @@ struct Layout {
 inline std::mutex layout_mutex;
 inline Layout layout{};
 inline std::atomic<bool> dirty{false};
+inline constexpr float CenterX=36,CenterY=88;
 inline Layout GetLayout() {std::scoped_lock lock{layout_mutex};return layout;}
 inline Layout GetEffectiveLayout() {
-    auto result=GetLayout();const auto a=UserHUD::GetEffectiveOffsets()[UserHUD::DPad];
+    auto result=GetLayout();
+    const auto hud=HUD::GetLayout();
+    const auto personal=hud.PlayerAdjustments();
+    const float overall=hud.overall_scale*personal.overall_scale;
+    const auto a=UserHUD::EffectiveOffsets(personal,overall)[UserHUD::DPad];
     auto& p=result.group;
-    if(a.x!=0)p.x=std::clamp(p.x+a.x,-400.f,400.f);
-    if(a.y!=0)p.y=std::clamp(p.y+a.y,-240.f,240.f);
+    HUD::ScaleAboutHearts(p.x,p.y,CenterX,CenterY,hud[HUD::Hearts],overall);
+    p.x=std::clamp(p.x+a.x,-400.f,400.f);
+    p.y=std::clamp(p.y+a.y,-240.f,240.f);
     if(a.scale!=0) {
         p.scale_x=std::clamp(p.scale_x*UserHUD::Factor(a),.1f,4.f);
         p.scale_y=std::clamp(p.scale_y*UserHUD::Factor(a),.1f,4.f);

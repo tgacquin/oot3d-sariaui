@@ -339,13 +339,28 @@ inline NavigationShadowPixels MakeNavigationShadowTexture(float softness) {
     NavigationShadowPixels pixels{};
     softness=std::isfinite(softness)?std::clamp(softness,.01f,1.f):.7f;
     for(unsigned y=0;y<NavigationShadowSize;++y)for(unsigned x=0;x<NavigationShadowSize;++x) {
-        // Flat against the left edge; the right half of an ellipse fades out.
+        // Navigation uses the right half against the screen edge.
         const float u=(x+.5f)/NavigationShadowSize,v=2*(y+.5f)/NavigationShadowSize-1;
         const float t=std::clamp((1-std::hypot(u,v))/softness,0.f,1.f);
         pixels[NavigationShadowTexel(x,NavigationShadowSize-1-y)]=U32(std::lround(255*t*t*(3-2*t)));
     }
     return pixels;
 }
+// The quad can move and fade every frame while its texture stays resident.
+struct SoftShadowTexture {
+    NavigationShadowPixels pixels{};
+    float softness=-1;
+    template<class M,class Mesh>
+    bool Prepare(M& m,const Mesh& mesh,float requested) {
+        const float value=std::isfinite(requested)?std::clamp(requested,.01f,1.f):.7f;
+        if(value==softness)return true;
+        pixels=MakeNavigationShadowTexture(value);
+        if(mesh.Owned(m) && !GuestUI::WriteTextureWords(m,mesh.texture,pixels)) {
+            softness=-1;return false;
+        }
+        softness=value;return true;
+    }
+};
 inline QuadGeometry<1> MakeNavigationShadow(const Layout& layout,const Assets& assets,Page page) {
     QuadGeometry<1> out;
     const auto& p=layout.prompts[MapToItems];const auto& shadow=layout.map_navigation_shadow;
@@ -397,8 +412,7 @@ struct Hook {
     std::shared_ptr<const Assets> image;
     TextGeometry lettering;
     Geometry buttons;
-    NavigationShadowPixels shadow_pixels{};
-    float cached_softness=-1;
+    SoftShadowTexture shadow_texture;
     U32 entry=0,source=0;
     bool bottom_projection=false,shared_dialog=false;
     NavigationBob navigation;
@@ -468,19 +482,8 @@ struct Hook {
         entry=return_pc;bottom_projection=bottom;lettering=geometry.text;buttons=geometry.icons;
         source=m.Read(0x5066f8+0x20).value_or(0);
         const auto backdrop=MakeNavigationShadow(layout,*image,page);
-        if(backdrop.count) {
-            const float softness=std::isfinite(layout.map_navigation_shadow.softness)?std::clamp(layout.map_navigation_shadow.softness,.01f,1.f):.7f;
-            bool ready=true;
-            if(softness!=cached_softness) {
-                shadow_pixels=MakeNavigationShadowTexture(softness);
-                if(shadow.Owned(m)) {
-                    for(unsigned i=0;i<shadow_pixels.size();++i)if(!m.Read(shadow.texture+4*i)){ready=false;break;}
-                    if(ready)for(unsigned i=0;i<shadow_pixels.size();++i)m.Write(shadow.texture+4*i,shadow_pixels[i]);
-                }
-                if(ready)cached_softness=softness;
-            }
-            if(ready)shadow.Begin(m,r,entry,backdrop,shadow_pixels,source);
-        }
+        if(backdrop.count && shadow_texture.Prepare(m,shadow,layout.map_navigation_shadow.softness))
+            shadow.Begin(m,r,entry,backdrop,shadow_texture.pixels,source);
         if(!shadow.Pending())BeginCorner(m,r);
         if(!Pending())image.reset();
     }

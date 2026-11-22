@@ -233,6 +233,7 @@ struct Hook {
     std::array<U32,16> saved{};
     std::int64_t last_time=0;
     Slide slide;
+    Interpolation::MenuPage last_tab=Interpolation::MenuPage::None;
     bool map_open_entrance=false;
     float location_entry_alpha=1;
     bool presenting=false,bottom_projection=false;
@@ -249,7 +250,7 @@ struct Hook {
     GuestUI::Hook<IconGeometry,1,1,0,true> dungeon_icons;
     bool dungeon_drawn=false;
     unsigned dungeon_index=0;
-    bool DungeonDrawing() const {return dungeon_paper.Drawing() || dungeon_title.Drawing() || dungeon_icons.Drawing();}
+    bool ForegroundGeometryDrawing() const {return dungeon_paper.Drawing() || dungeon_title.Drawing() || dungeon_icons.Drawing();}
     template<class M,class R> void Backdrop(M& m,R& r,bool supported) const {
         r[14]=BackdropSite.pc+4; // Displaced BL to the native fullscreen tint.
         // Controller state 20 prepares a map opening from gameplay. It sets
@@ -332,7 +333,7 @@ struct Hook {
         PauseMenu::floor_growth_animation.Update(time,supported && active && PauseMenu::DungeonPage(m),
             PauseMenu::Closing(m),m.Read(0x506cb0+0x30).value_or(5),PauseMenu::DungeonFloorRows(m),
             PauseMenu::GetLayout().dungeon_floor_growth);
-        if(!supported || !active) {slide={};map_open_entrance=false;location_entry_alpha=1;presenting=false;last_time=time;offset=-Height;PauseMenu::motion_x=0;PauseMenu::motion_y=0;PauseMenu::motion_slots=0;PauseMenu::motion_bottom=0;PauseMenu::world_location_y=0;PauseMenu::world_panel_y=0;PauseMenu::world_location_alpha=1;PauseMenu::world_exit_hold=false;PauseMenu::dungeon_exit_hold=false;return;}
+        if(!supported || !active) {last_tab=Interpolation::MenuPage::None;slide={};map_open_entrance=false;location_entry_alpha=1;presenting=false;last_time=time;offset=-Height;PauseMenu::motion_x=0;PauseMenu::motion_y=0;PauseMenu::motion_slots=0;PauseMenu::motion_bottom=0;PauseMenu::world_location_y=0;PauseMenu::world_panel_y=0;PauseMenu::world_location_alpha=1;PauseMenu::world_exit_hold=false;PauseMenu::dungeon_exit_hold=false;return;}
         // Native menu-open byte changes on the accepted B/Back action, before
         // the brown panel and remaining pause widgets finish closing.
         const bool open=active && (m.Read(0x54ac4c).value_or(0)>>24)!=0;
@@ -345,6 +346,17 @@ struct Hook {
         // Leaving the page cancels it for the rest of this pause session.
         if(!presenting)map_open_entrance=world_page || dungeon_page;
         if(!world_page && !dungeon_page)map_open_entrance=false;
+        const auto tab=PauseMenu::PresentationPage(m);
+        // Both tab controllers can be idle while the next page is being built.
+        // Only count Map as a destination once its controller is active.
+        if(open && tab!=Interpolation::MenuPage::None &&
+           (tab!=Interpolation::MenuPage::Map || m.Read(0x506cb0+0x38).value_or(0))) {
+            if(last_tab!=Interpolation::MenuPage::None && tab!=last_tab) {
+                slide.progress=1;
+                map_open_entrance=false;
+            }
+            last_tab=tab;
+        }
         last_time=time;slide.Advance(open,elapsed,layout.transition_seconds);
         presenting=active || slide.progress>0;
         offset=slide.Y(Travel(layout));

@@ -12,7 +12,7 @@ struct Memory {
 int main(int argc,char** argv) {
     assert(argc==2);std::ifstream f(argv[1],std::ios::binary);assert(f);
     std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(f),{}};
-    assert(Messages::ApplyAll(bytes)==90);const auto original=bytes;
+    assert(Messages::ApplyAll(bytes)==234);const auto original=bytes;
     assert(ControlSwap::PrepareText(bytes));
     const auto v=ControlSwap::variants.load();assert(v && v->entries.size()>10);
     assert(std::equal(original.begin(),original.end(),bytes.begin()));

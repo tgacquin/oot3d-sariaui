@@ -39,9 +39,13 @@ def edits(raw):
 
 def main():
     qm=Path(sys.argv[1]).read_bytes();assert qm[:8]==b'QM\0\0\4\0\0\0'
-    catalog=Path(__file__).parents[2]/'src/oot3d/messages/english.json'
-    control,_=messages.compile(qm,json.loads(catalog.read_text()))
-    control={mid:patches for mid,h,size,patches in control}
+    catalogs=Path(__file__).parents[2]/'src/oot3d/messages'
+    control={}
+    for language in ('english','french','spanish'):
+        catalog=json.loads((catalogs/f'{language}.json').read_text())
+        compiled,_=messages.compile(qm,catalog)
+        for mid,_,_,patches in compiled:
+            control[mid,catalog['language_slot']]=patches
     source={}
     for i in range(struct.unpack_from('<I',qm,8)[0]):
         at=16+i*96;mid=struct.unpack_from('<I',qm,at)[0]
@@ -49,9 +53,9 @@ def main():
         for slot in (1,5,7):
             off,size=struct.unpack_from('<II',qm,at+16+slot*8)
             raw=qm[off:off+size];source[mid,slot]=[raw]
-            if slot==1 and mid in control:
+            if (mid,slot) in control:
                 new=bytearray();cursor=0
-                for start,n,insert in control[mid]:new+=raw[cursor:start]+insert;cursor=start+n
+                for start,n,insert in control[mid,slot]:new+=raw[cursor:start]+insert;cursor=start+n
                 new+=raw[cursor:];source[mid,slot].append(bytes(new))
     assert len(source)==len(IDS)*3
     out=['// SPDX-License-Identifier: GPL-2.0-or-later',

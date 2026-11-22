@@ -3,6 +3,397 @@
 // Only changed byte spans are embedded; the loaded cartridge supplies all other text.
 #pragma once
 namespace OOT3D::Messages {
+inline constexpr Edit FrenchEdits0002[]{
+    {203,5,std::string_view{"",0}},
+    {209,4,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits0003[]{
+    {170,5,std::string_view{"",0}},
+    {176,4,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits0004[]{
+    {251,5,std::string_view{"",0}},
+    {257,4,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits0005[]{
+    {183,5,std::string_view{"",0}},
+    {189,4,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits0008[]{
+    {195,5,std::string_view{"",0}},
+    {201,4,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits0009[]{
+    {175,5,std::string_view{"",0}},
+    {181,4,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits000D[]{
+    {208,5,std::string_view{"",0}},
+    {214,1,std::string_view{"",0}},
+    {216,4,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits000E[]{
+    {188,5,std::string_view{"",0}},
+    {194,4,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits0010[]{
+    {63,3,std::string_view{"\x5a\x4c",2}},
+    {80,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0011[]{
+    {65,3,std::string_view{"\x5a\x4c",2}},
+    {82,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0012[]{
+    {62,3,std::string_view{"\x5a\x4c",2}},
+    {79,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0013[]{
+    {68,3,std::string_view{"\x5a\x4c",2}},
+    {85,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0014[]{
+    {61,3,std::string_view{"\x5a\x4c",2}},
+    {78,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0015[]{
+    {60,3,std::string_view{"\x5a\x4c",2}},
+    {77,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0016[]{
+    {62,3,std::string_view{"\x5a\x4c",2}},
+    {79,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0017[]{
+    {67,3,std::string_view{"\x5a\x4c",2}},
+    {84,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits001C[]{
+    {48,3,std::string_view{"\x5a\x4c",2}},
+    {65,0,std::string_view{"\x5a\x52\x2e",3}},
+    {66,5,std::string_view{"\x1c\x53\x61",3}},
+    {72,0,std::string_view{"\x73",1}},
+    {76,0,std::string_view{"\x2c",1}},
+    {77,0,std::string_view{"\x70\x61\x73\x20\x64\x65\x20\x62\x6f\x6d\x62",11}},
+    {79,32,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits001D[]{
+    {49,3,std::string_view{"\x5a\x4c",2}},
+    {66,0,std::string_view{"\x5a\x52\x2e",3}},
+    {67,5,std::string_view{"\x1c\x53\x61",3}},
+    {73,0,std::string_view{"\x73",1}},
+    {77,0,std::string_view{"\x2c",1}},
+    {78,0,std::string_view{"\x70\x61\x73\x20\x64\x65\x20\x62\x6f\x6d\x62",11}},
+    {80,32,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits0026[]{
+    {326,2,std::string_view{"\x64\x61\x6e\x73",4}},
+    {331,1,std::string_view{"\x65\x20\x6d\x65\x6e\x75\x20",7}},
+    {335,11,std::string_view{"\x51",1}},
+    {509,2,std::string_view{"\x73\x75\x72",3}},
+    {513,1,std::string_view{"\x61\x20",2}},
+    {517,10,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits0030[]{
+    {64,2,std::string_view{"\x41\x70\x70",3}},
+    {67,2,std::string_view{"\x79",1}},
+    {71,4,std::string_view{"",0}},
+    {80,16,std::string_view{"\x53\x45\x4c\x45\x43\x54",6}},
+    {101,0,std::string_view{"\x20\x6f\x75\x76\x72\x69\x72",7}},
+    {103,6,std::string_view{"\x6c",1}},
+    {110,1,std::string_view{"\x73",1}},
+    {112,2,std::string_view{"",0}},
+    {117,5,std::string_view{"\x6f\x62\x6a\x65\x74\x73\x7f\x1d\x00\x2e\x20\x43\x68\x6f\x69\x73\x69\x73\x73\x65\x7a\x20\x75",23}},
+    {123,4,std::string_view{"",0}},
+    {133,1,std::string_view{"",0}},
+    {135,3,std::string_view{"",0}},
+    {159,5,std::string_view{"",0}},
+    {170,0,std::string_view{"\x2c\x20\x5a\x4c",4}},
+    {174,3,std::string_view{"\x5a\x52",2}},
+    {196,3,std::string_view{"\x5a\x4c",2}},
+    {213,3,std::string_view{"\x5a\x52",2}},
+    {245,3,std::string_view{"\x5a\x4c",2}},
+    {261,3,std::string_view{"\x5a\x52",2}},
+    {338,3,std::string_view{"\x5a\x4c",2}},
+    {355,3,std::string_view{"\x5a\x52",2}},
+    {425,3,std::string_view{"\x5a\x4c",2}},
+    {442,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0031[]{
+    {61,3,std::string_view{"\x5a\x4c",2}},
+    {78,3,std::string_view{"\x5a\x52",2}},
+    {131,3,std::string_view{"\x5a\x4c",2}},
+    {148,3,std::string_view{"\x5a\x52",2}},
+    {180,3,std::string_view{"\x5a\x4c",2}},
+    {197,3,std::string_view{"\x5a\x52",2}},
+    {248,3,std::string_view{"\x5a\x4c",2}},
+    {265,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0032[]{
+    {55,3,std::string_view{"\x5a\x4c",2}},
+    {72,3,std::string_view{"\x5a\x52",2}},
+    {123,3,std::string_view{"\x5a\x4c",2}},
+    {140,3,std::string_view{"\x5a\x52",2}},
+    {149,1,std::string_view{"\x73\x6f",2}},
+    {151,3,std::string_view{"\x74",1}},
+    {156,1,std::string_view{"",0}},
+    {159,4,std::string_view{"\x65\x74",2}},
+    {196,3,std::string_view{"\x5a\x4c",2}},
+    {213,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0033[]{
+    {57,3,std::string_view{"\x5a\x4c",2}},
+    {74,3,std::string_view{"\x5a\x52",2}},
+    {125,3,std::string_view{"\x5a\x4c",2}},
+    {142,3,std::string_view{"\x5a\x52",2}},
+    {151,1,std::string_view{"\x73\x6f",2}},
+    {153,3,std::string_view{"\x74",1}},
+    {158,1,std::string_view{"",0}},
+    {161,4,std::string_view{"\x65\x74",2}},
+};
+inline constexpr Edit FrenchEdits0034[]{
+    {45,2,std::string_view{"\x41\x70\x70",3}},
+    {48,2,std::string_view{"\x79",1}},
+    {52,4,std::string_view{"",0}},
+    {61,16,std::string_view{"\x53\x45\x4c\x45\x43\x54",6}},
+    {82,0,std::string_view{"\x20\x6f\x75\x76\x72\x69\x72",7}},
+    {84,6,std::string_view{"\x6c",1}},
+    {91,1,std::string_view{"\x73",1}},
+    {93,2,std::string_view{"",0}},
+    {98,5,std::string_view{"\x6f\x62\x6a\x65\x74\x73\x7f\x1d\x00\x2e\x20\x43\x68\x6f\x69\x73\x69\x73\x73\x65\x7a\x20\x75",23}},
+    {104,4,std::string_view{"",0}},
+    {114,1,std::string_view{"",0}},
+    {116,3,std::string_view{"",0}},
+    {134,1,std::string_view{"",0}},
+    {138,5,std::string_view{"",0}},
+    {152,0,std::string_view{"\x2c\x20\x5a\x4c",4}},
+    {156,3,std::string_view{"\x5a\x52",2}},
+    {176,3,std::string_view{"\x5a\x4c",2}},
+    {193,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0035[]{
+    {58,3,std::string_view{"\x5a\x4c",2}},
+    {75,3,std::string_view{"\x5a\x52",2}},
+    {97,3,std::string_view{"\x5a\x4c",2}},
+    {114,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0036[]{
+    {244,3,std::string_view{"\x5a\x4c",2}},
+    {261,3,std::string_view{"\x5a\x52",2}},
+    {308,3,std::string_view{"\x5a\x4c",2}},
+    {326,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0037[]{
+    {43,2,std::string_view{"\x41\x70\x70",3}},
+    {46,2,std::string_view{"\x79",1}},
+    {50,4,std::string_view{"",0}},
+    {59,16,std::string_view{"\x53\x45\x4c\x45\x43\x54",6}},
+    {80,0,std::string_view{"\x20\x6f\x75\x76\x72\x69\x72",7}},
+    {82,6,std::string_view{"\x6c",1}},
+    {89,1,std::string_view{"\x73",1}},
+    {91,2,std::string_view{"",0}},
+    {96,5,std::string_view{"\x6f\x62\x6a\x65\x74\x73\x7f\x1d\x00\x2e\x20\x43\x68\x6f\x69\x73\x69\x73\x73\x65\x7a\x20\x75",23}},
+    {102,4,std::string_view{"",0}},
+    {112,1,std::string_view{"",0}},
+    {114,3,std::string_view{"",0}},
+    {138,5,std::string_view{"",0}},
+    {149,0,std::string_view{"\x2c\x20\x5a\x4c",4}},
+    {153,3,std::string_view{"\x5a\x52",2}},
+    {173,3,std::string_view{"\x5a\x4c",2}},
+    {190,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0038[]{
+    {59,3,std::string_view{"\x5a\x4c",2}},
+    {76,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0039[]{
+    {60,3,std::string_view{"\x5a\x4c",2}},
+    {77,3,std::string_view{"\x5a\x52",2}},
+    {267,3,std::string_view{"\x5a\x4c",2}},
+    {285,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0042[]{
+    {92,3,std::string_view{"\x5a\x4c",2}},
+    {109,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0043[]{
+    {60,3,std::string_view{"\x5a\x4c",2}},
+    {77,3,std::string_view{"\x5a\x52",2}},
+    {133,3,std::string_view{"\x5a\x4c",2}},
+    {150,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0044[]{
+    {60,3,std::string_view{"\x5a\x4c",2}},
+    {77,3,std::string_view{"\x5a\x52",2}},
+    {133,3,std::string_view{"\x5a\x4c",2}},
+    {150,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0045[]{
+    {59,3,std::string_view{"\x5a\x4c",2}},
+    {76,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0046[]{
+    {68,3,std::string_view{"\x5a\x4c",2}},
+    {86,3,std::string_view{"\x5a\x52",2}},
+    {287,3,std::string_view{"\x5a\x4c",2}},
+    {304,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0047[]{
+    {56,3,std::string_view{"\x5a\x4c",2}},
+    {73,3,std::string_view{"\x5a\x52",2}},
+    {149,3,std::string_view{"\x5a\x4c",2}},
+    {166,3,std::string_view{"\x5a\x52",2}},
+    {222,3,std::string_view{"\x5a\x4c",2}},
+    {239,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0048[]{
+    {87,3,std::string_view{"\x5a\x4c",2}},
+    {104,3,std::string_view{"\x5a\x52",2}},
+    {130,3,std::string_view{"\x5a\x4c",2}},
+    {147,3,std::string_view{"\x5a\x52",2}},
+    {197,3,std::string_view{"\x5a\x4c",2}},
+    {215,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits004A[]{
+    {83,35,std::string_view{"\x50",1}},
+    {121,1,std::string_view{"\x7f\x1c",2}},
+    {130,1,std::string_view{"\x2c\x20\x61\x70\x70\x75\x79\x65\x7a\x20\xc3\xa0\x20\x64\x72\x6f\x69\x74\x65\x7f\x1c\x73\x75\x72\x20\x6c\x61\x20\x63\x72\x6f\x69\x78\x20\x64\x69\x72\x65\x63\x74\x69\x6f\x6e\x6e\x65\x6c\x6c\x65\x2e",49}},
+};
+inline constexpr Edit FrenchEdits004C[]{
+    {45,2,std::string_view{"\x41\x70\x70",3}},
+    {48,2,std::string_view{"\x79",1}},
+    {52,3,std::string_view{"",0}},
+    {60,0,std::string_view{"\x53\x45\x4c\x45\x43\x54\x2c\x20\x70\x75\x69\x73\x20\x73\x75\x72\x20\x7f\x24\x0a\x7f\x1c\x70\x6f\x75\x72\x20\x6f\x75\x76\x72\x69\x72\x20",34}},
+    {61,1,std::string_view{"\x65\x20\x6d\x65\x6e\x75\x20",7}},
+    {65,11,std::string_view{"\x51",1}},
+    {84,0,std::string_view{"\x2e\x7f\x1c\xc3\x89\x71\x75\x69\x70\x65\x7a",11}},
+    {85,0,std::string_view{"\x6c\x65\x20\x62",4}},
+    {87,5,std::string_view{"\x63",1}},
+    {93,0,std::string_view{"\x69",1}},
+    {94,11,std::string_view{"\x72",1}},
+    {113,20,std::string_view{"",0}},
+    {134,22,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits004D[]{
+    {47,1,std::string_view{"\x41\x70\x70\x75\x79\x65\x7a\x20\x73",9}},
+    {51,0,std::string_view{"\x53\x45\x4c\x45\x43\x54\x2c\x20\x70\x75\x69\x73\x20\x73\x75\x72\x20\x7f\x24\x0a\x7f\x1c\x70\x6f\x75\x72\x20\x6f\x75\x76\x72\x69\x72\x20",34}},
+    {52,1,std::string_view{"\x65\x20\x6d\x65\x6e\x75\x20",7}},
+    {56,11,std::string_view{"\x51",1}},
+    {75,4,std::string_view{"\x2e\x7f\x1c\xc3\x89\x71",6}},
+    {80,2,std::string_view{"\x69\x70",2}},
+    {85,1,std::string_view{"\x6c",1}},
+    {87,2,std::string_view{"\x20",1}},
+    {98,4,std::string_view{"\x61\x76\x65\x63",4}},
+    {103,16,std::string_view{"\x7f\x24\x06",3}},
+};
+inline constexpr Edit FrenchEdits0058[]{
+    {194,3,std::string_view{"\x5a\x4c",2}},
+    {211,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits005D[]{
+    {97,3,std::string_view{"\x5a\x4c",2}},
+    {114,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0066[]{
+    {47,2,std::string_view{"\x41\x70\x70",3}},
+    {50,2,std::string_view{"\x79",1}},
+    {54,4,std::string_view{"",0}},
+    {63,5,std::string_view{"\x53\x45\x4c\x45\x43\x54\x2c\x20\x70\x75\x69\x73\x20\x73\x75",15}},
+    {69,2,std::string_view{"",0}},
+    {72,8,std::string_view{"\x7f\x24\x0b\x7f\x1c",5}},
+    {84,2,std::string_view{"\x20\x6f\x75\x76",4}},
+    {87,6,std::string_view{"\x69",1}},
+    {98,0,std::string_view{"\x7f\x1d\x41",3}},
+    {103,11,std::string_view{"\x7f\x1d\x00",3}},
+    {246,1,std::string_view{"\x43\x68",2}},
+    {248,3,std::string_view{"\x69\x73\x69\x73\x73",5}},
+    {253,14,std::string_view{"",0}},
+    {277,2,std::string_view{"\x61\x76",2}},
+    {280,0,std::string_view{"\x63\x20",2}},
+    {281,17,std::string_view{"\x24\x00",2}},
+};
+inline constexpr Edit FrenchEdits0069[]{
+    {71,3,std::string_view{"\x5a\x4c",2}},
+    {88,3,std::string_view{"\x5a\x52",2}},
+    {135,3,std::string_view{"\x5a\x4c",2}},
+    {153,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits007A[]{
+    {95,3,std::string_view{"\x5a\x4c",2}},
+    {112,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0098[]{
+    {90,3,std::string_view{"\x5a\x4c",2}},
+    {107,3,std::string_view{"\x5a\x52",2}},
+    {244,3,std::string_view{"\x5a\x4c",2}},
+    {261,3,std::string_view{"\x5a\x52",2}},
+    {311,3,std::string_view{"\x5a\x4c",2}},
+    {329,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits0099[]{
+    {91,3,std::string_view{"\x5a\x4c",2}},
+    {108,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits009A[]{
+    {109,3,std::string_view{"\x5a\x4c",2}},
+    {126,3,std::string_view{"\x5a\x52",2}},
+    {210,3,std::string_view{"\x5a\x4c",2}},
+    {228,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits00A3[]{
+    {40,3,std::string_view{"\x5a\x4c",2}},
+    {57,3,std::string_view{"\x5a\x52",2}},
+    {73,1,std::string_view{"\x7f\x1c",2}},
+    {82,2,std::string_view{"\x20",1}},
+    {95,1,std::string_view{"\x49\x6c\x20\x76\x6f\x75\x73\x20\x66\x61\x75\x74\x20\x75",14}},
+    {101,1,std::string_view{"\x7f\x1c",2}},
+    {112,11,std::string_view{"",0}},
+    {127,2,std::string_view{"\x20",1}},
+};
+inline constexpr Edit FrenchEdits00A4[]{
+    {46,2,std::string_view{"\x41\x70\x70",3}},
+    {49,2,std::string_view{"\x79",1}},
+    {53,4,std::string_view{"",0}},
+    {62,5,std::string_view{"\x53\x45\x4c\x45\x43\x54\x2c\x20\x70\x75\x69\x73\x20\x73\x75",15}},
+    {68,2,std::string_view{"",0}},
+    {71,8,std::string_view{"\x7f\x24\x0a\x7f\x1c",5}},
+    {83,5,std::string_view{"\x20\x6f\x75\x76\x72",5}},
+    {89,3,std::string_view{"",0}},
+    {95,1,std::string_view{"\x65\x20\x6d\x65\x6e\x75\x20",7}},
+    {99,11,std::string_view{"\x51",1}},
+    {118,6,std::string_view{"\x2e\x7f\x1c\xc3\x89\x71",6}},
+    {125,2,std::string_view{"\x69\x70",2}},
+    {129,4,std::string_view{"\x20\x76\x6f",3}},
+    {134,1,std::string_view{"\x72",1}},
+    {144,4,std::string_view{"\x61\x76\x65\x63",4}},
+    {149,16,std::string_view{"\x7f\x24\x06",3}},
+};
+inline constexpr Edit FrenchEdits00AD[]{
+    {53,3,std::string_view{"\x5a\x4c",2}},
+    {70,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits00AE[]{
+    {63,3,std::string_view{"\x5a\x4c",2}},
+    {80,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits00AF[]{
+    {67,3,std::string_view{"\x5a\x4c",2}},
+    {84,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits00B1[]{
+    {41,3,std::string_view{"\x5a\x4c",2}},
+    {58,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits00CB[]{
+    {40,3,std::string_view{"\x5a\x4c",2}},
+    {57,3,std::string_view{"\x5a\x52",2}},
+    {73,1,std::string_view{"\x7f\x1c",2}},
+    {82,2,std::string_view{"\x20",1}},
+    {95,1,std::string_view{"\x49\x6c\x20\x76\x6f\x75\x73\x20\x66\x61\x75\x74\x20\x75",14}},
+    {101,1,std::string_view{"\x7f\x1c",2}},
+    {112,11,std::string_view{"",0}},
+    {127,2,std::string_view{"\x20",1}},
+};
 inline constexpr Edit FrenchEdits0101[]{
     {24,1,std::string_view{"\x41\x70\x70",3}},
     {26,0,std::string_view{"\x69\x65\x20\x73\x75\x72\x20\x6c\x65\x20\x73\x74\x69\x63\x6b\x20\x64\x72\x6f\x69\x74",21}},
@@ -13,11 +404,178 @@ inline constexpr Edit FrenchEdits0101[]{
     {75,1,std::string_view{"",0}},
     {79,22,std::string_view{"",0}},
 };
+inline constexpr Edit FrenchEdits0103[]{
+    {167,38,std::string_view{"",0}},
+};
 inline constexpr Edit FrenchEdits1017[]{
     {154,0,std::string_view{"\x61\x70\x70\x75\x69\x65\x20\x73\x75\x72\x20\x6c\x65\x20\x68\x61",16}},
     {156,4,std::string_view{"\x7f\x1c\x64",3}},
     {162,6,std::string_view{"\x6c\x61",2}},
     {169,3,std::string_view{"\x63\x72\x6f\x69\x78\x20\x64\x69\x72\x65\x63\x74\x69\x6f\x6e\x6e\x65\x6c\x6c\x65\x20",21}},
+};
+inline constexpr Edit FrenchEdits1025[]{
+    {41,18,std::string_view{"\x56",1}},
+    {62,1,std::string_view{"",0}},
+    {78,3,std::string_view{"\x5a\x4c",2}},
+    {96,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits1035[]{
+    {61,4,std::string_view{"\x62\x6f\x75\x74\x6f",5}},
+    {66,1,std::string_view{"",0}},
+    {69,2,std::string_view{"\x64\x27\x6f\x62\x6a\x65\x74\x73\x7f\x1c\x4c\x65\x20\x62\x6f\x75\x74\x6f\x6e",19}},
+    {73,10,std::string_view{"",0}},
+    {84,8,std::string_view{"",0}},
+    {96,10,std::string_view{"\x6f",1}},
+    {107,25,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits1036[]{
+    {30,1,std::string_view{"",0}},
+    {34,0,std::string_view{"\x20",1}},
+    {36,5,std::string_view{"",0}},
+    {50,0,std::string_view{"\x2c\x7f\x1c\x5a\x4c",5}},
+    {53,6,std::string_view{"",0}},
+    {60,0,std::string_view{"\x5a\x52\x2e\x20\x5a\x4c\x20\x63\x6f\x72\x72\x65",12}},
+    {61,6,std::string_view{"\x70\x6f\x6e\x64",4}},
+    {71,4,std::string_view{"\x49\x20\x65",3}},
+    {76,1,std::string_view{"",0}},
+    {78,2,std::string_view{"\x5a\x52",2}},
+    {81,2,std::string_view{"",0}},
+    {84,5,std::string_view{"\xa0",1}},
+    {90,7,std::string_view{"\x49\x49",2}},
+    {102,2,std::string_view{"\x41\x70\x70\x75\x69\x65\x20\x73",8}},
+    {107,36,std::string_view{"\x53\x45\x4c\x45\x43\x54",6}},
+    {148,5,std::string_view{"\x20\x6f\x75\x76\x72",5}},
+    {154,3,std::string_view{"",0}},
+    {160,1,std::string_view{"\x65\x73\x20",3}},
+    {164,11,std::string_view{"",0}},
+    {185,0,std::string_view{"\x7f\x1c\x43\x68\x6f\x69\x73\x69\x73",9}},
+    {186,2,std::string_view{"",0}},
+    {189,3,std::string_view{"\x6e",1}},
+    {193,2,std::string_view{"",0}},
+    {200,0,std::string_view{"\x20\x61\x76\x65\x63\x20\x7f\x24\x00",9}},
+    {201,2,std::string_view{"\x20",1}},
+    {208,2,std::string_view{"\x61\x70\x70",3}},
+    {211,2,std::string_view{"\x69",1}},
+    {214,1,std::string_view{"",0}},
+    {216,1,std::string_view{"",0}},
+    {218,1,std::string_view{"\x73\x75\x72",3}},
+    {228,0,std::string_view{"\x2c\x20\x5a\x4c",4}},
+    {232,3,std::string_view{"\x5a\x52",2}},
+    {256,1,std::string_view{"\x41\x70\x70\x75\x69\x65\x20\x73\x75\x72\x20\x6c\x65\x20\x62\x6f\x75\x74\x6f\x6e\x20\x63\x68\x6f\x69\x73\x69\x7f\x1c\x70",30}},
+    {270,1,std::string_view{"\x74\x6f",2}},
+    {278,30,std::string_view{"",0}},
+    {313,6,std::string_view{"\x47\x61\x72\x64",4}},
+    {321,1,std::string_view{"\x74",1}},
+    {332,4,std::string_view{"",0}},
+    {337,9,std::string_view{"\x72\xc3\xa9\x66\xc3\xa9\x72\xc3\xa9",9}},
+    {351,3,std::string_view{"\x70\x6f\x72\x74\xc3\xa9\x65",7}},
+    {355,2,std::string_view{"\x64\x65",2}},
+    {358,3,std::string_view{"\x6d\x61\x69\x6e",4}},
+    {363,3,std::string_view{"\x67",1}},
+    {367,0,std::string_view{"\xc3\xa2\x63\x65",4}},
+    {368,7,std::string_view{"\xc3\xa0",2}},
+    {376,1,std::string_view{"\x63",1}},
+    {380,0,std::string_view{"\x71",1}},
+    {381,0,std::string_view{"\x61",1}},
+    {382,4,std::string_view{"\x72",1}},
+    {387,1,std::string_view{"",0}},
+    {389,21,std::string_view{"",0}},
+    {417,16,std::string_view{"\x21",1}},
+};
+inline constexpr Edit FrenchEdits1037[]{
+    {9,4,std::string_view{"\x64\x75",2}},
+    {14,0,std::string_view{"\x62\x6f",2}},
+    {15,0,std::string_view{"\x74\x6f",2}},
+    {18,49,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits1039[]{
+    {0,3,std::string_view{"\x4c\x61",2}},
+    {7,0,std::string_view{"\x6d\x69\x6e\x69\x2d",5}},
+    {16,0,std::string_view{"\x6d\x6f\x6e\x74\x72\x65\x20\x6c",8}},
+    {18,11,std::string_view{"",0}},
+    {32,3,std::string_view{"\x76\x69\x72\x6f\x6e",5}},
+    {36,34,std::string_view{"",0}},
+    {234,2,std::string_view{"\x41\x70\x70\x75",4}},
+    {237,1,std::string_view{"\x65\x20\x73\x75\x72\x20\x6c\x65\x20\x73",10}},
+    {240,0,std::string_view{"\x63\x6b\x20\x67\x61\x75\x63\x68",8}},
+    {241,2,std::string_view{"",0}},
+    {244,12,std::string_view{"\x28\x4c\x33\x29",4}},
+    {261,1,std::string_view{"\x7f\x1c",2}},
+    {270,0,std::string_view{"\x6f\x75\x20\x61\x66\x66\x69\x63\x68\x65\x72\x20",12}},
+    {273,0,std::string_view{"\x6d\x69\x6e\x69\x2d",5}},
+    {278,0,std::string_view{"\x2e\x7f\x01\x7f\x1c\x54\x75\x20\x70\x65\x75\x78\x20\x63\x68\x61\x6e\x67\x65\x72\x20\x63\x65\x20\x72\x61\x63\x63\x6f\x75\x72\x63\x69\x20\x64\x61\x6e\x73\x7f\x1c\x6c\x65\x73\x20\x70\x61\x72\x61\x6d\xc3\xa8\x74\x72\x65\x73\x20\x64\x65\x73\x20\x63\x6f\x6d\x6d\x61\x6e\x64\x65\x73\x2e\x7f\x01\x7f\x1c\x41\x70\x70\x75\x69\x65\x20\x73\x75\x72\x20\x53\x45\x4c\x45\x43\x54\x2c\x20\x70\x75\x69\x73\x20\x73\x75\x72\x20\x7f\x24\x0b\x20\x70\x6f\x75\x72\x20\x76\x6f\x69\x72\x7f\x1c\x6c\x65\x73\x20\x6e\x6f\x6d\x73\x20\x64\x65\x73\x20\x6c\x69\x65\x75\x78\x20\x73\x75\x72\x20\x6c\x61\x20\x7f\x1d\x41\x63\x61\x72\x74\x65\x7f\x1d\x00",154}},
+    {294,175,std::string_view{"\x0a",1}},
+    {475,0,std::string_view{"\x72\x65\x76\x65\x6e\x69\x72\x20",8}},
+    {476,24,std::string_view{"",0}},
+    {502,0,std::string_view{"\x20\x6f\x62\x6a\x65\x74\x73",7}},
+};
+inline constexpr Edit FrenchEdits103A[]{
+    {237,1,std::string_view{"\x54\x75\x20\x70\x65\x75\x78\x20\x61\x73\x73\x69\x67\x6e\x65\x72\x20\x74",18}},
+    {248,37,std::string_view{"",0}},
+    {287,5,std::string_view{"",0}},
+    {301,25,std::string_view{"",0}},
+    {329,16,std::string_view{"\x5a\x4c",2}},
+    {348,0,std::string_view{"\x20\x5a\x52\x2e\x20\x41\x70\x70\x75\x69\x65\x20\x73\x75\x72",15}},
+    {360,0,std::string_view{"\x68",1}},
+    {361,3,std::string_view{"\x69",1}},
+    {365,0,std::string_view{"\x69\x7f\x1c",3}},
+    {367,0,std::string_view{"\x75\x72\x20\x75\x74\x69\x6c\x69\x73\x65\x72\x20\x74\x6f",14}},
+    {368,3,std::string_view{"\x20\x6f\x62\x6a\x65",5}},
+    {372,1,std::string_view{"\x2e",1}},
+    {485,24,std::string_view{"\x41\x70\x70",3}},
+    {511,13,std::string_view{"",0}},
+    {526,5,std::string_view{"",0}},
+    {535,5,std::string_view{"\x53\x45\x4c\x45\x43\x54\x2c\x20\x70\x75\x69\x73\x20\x73\x75",15}},
+    {541,2,std::string_view{"",0}},
+    {544,7,std::string_view{"\x7f\x24\x0a",3}},
+    {556,4,std::string_view{"\x7f\x1c\x6f\x75\x76\x72",6}},
+    {561,3,std::string_view{"",0}},
+    {567,1,std::string_view{"\x65\x20\x6d\x65\x6e\x75\x20",7}},
+    {571,12,std::string_view{"\x51",1}},
+    {592,0,std::string_view{"\x20\x41\x70\x70\x75\x69\x65\x20\x73\x75\x72\x20\x7f\x24\x0b\x7f\x1c\x70\x6f\x75\x72\x20\x72\x65\x76\x65\x6e\x69\x72\x20\x61\x75\x78\x20\x6f\x62\x6a\x65\x74\x73\x2e",41}},
+    {596,1,std::string_view{"\x43\x68",2}},
+    {598,7,std::string_view{"",0}},
+    {607,2,std::string_view{"\x69\x73",2}},
+    {610,1,std::string_view{"\x74\x6f",2}},
+    {624,0,std::string_view{"\x20\x61\x76\x65\x63\x20\x7f\x24\x00",9}},
+    {626,1,std::string_view{"\x70\x75\x69\x73\x7f\x1c\x61\x70\x70\x75\x69\x65\x20\x73\x75\x72\x20\x7f\x24\x06\x20\x70",22}},
+    {629,6,std::string_view{"\x72",1}},
+    {637,12,std::string_view{"\x27",1}},
+    {651,1,std::string_view{"\x20\xc3\xa9\x71\x75\x69\x70\x65\x72",9}},
+    {657,1,std::string_view{"\x44\x61\x6e\x73\x20\x6c\x65\x20\x6d\x65\x6e\x75\x20\x64\x65\x73\x20\x7f\x1d\x43",20}},
+    {659,2,std::string_view{"\x62\x6a\x65\x74\x73\x7f\x1d\x00\x2c",9}},
+    {662,2,std::string_view{"\x63\x68\x6f\x69",4}},
+    {666,4,std::string_view{"\x73",1}},
+    {679,17,std::string_view{"",0}},
+    {698,65,std::string_view{"",0}},
+    {766,0,std::string_view{"\x61\x73\x73\x69\x67\x6e",6}},
+    {767,22,std::string_view{"\x2d\x6c",2}},
+    {791,6,std::string_view{"\xc3\xa0\x20",3}},
+    {805,0,std::string_view{"\x2c\x20\x5a\x4c",4}},
+    {809,0,std::string_view{"\x5a\x52\x2e",3}},
+    {810,2,std::string_view{"\x1c\x5a\x4c",3}},
+    {813,0,std::string_view{"\x63\x6f\x72\x72\x65\x73",6}},
+    {815,2,std::string_view{"\x6e\x64",2}},
+    {818,8,std::string_view{"\xc3\xa0\x20\x49\x20",5}},
+    {827,1,std::string_view{"\x74\x20\x5a\x52\x20\xc3\xa0\x20\x49\x49",10}},
+};
+inline constexpr Edit FrenchEdits103D[]{
+    {154,0,std::string_view{"\x6c\x65\x20\x62\x6f\x75\x63\x6c\x69\x65\x72\x20",12}},
+    {163,2,std::string_view{"\x61\x70\x70",3}},
+    {166,2,std::string_view{"\x69",1}},
+    {169,0,std::string_view{"\x20\x73\x75\x72\x7f\x1c\x53\x45\x4c\x45\x43\x54\x2c\x20\x70\x75\x69\x73\x20\x73\x75\x72",22}},
+    {172,1,std::string_view{"\x0a",1}},
+    {179,3,std::string_view{"\x6f\x75\x76\x72",4}},
+    {183,2,std::string_view{"\x72\x20\x6c",3}},
+    {186,1,std::string_view{"",0}},
+    {189,2,std::string_view{"\x6d\x65\x6e\x75\x20",5}},
+    {194,11,std::string_view{"\x51",1}},
+    {214,17,std::string_view{"\x7f\x01\x7f\x1c\x43",5}},
+    {241,2,std::string_view{"\x20",1}},
+    {249,50,std::string_view{"",0}},
+    {322,1,std::string_view{"\x69",1}},
+    {324,1,std::string_view{"",0}},
+    {333,0,std::string_view{"\x20\x70\x6f\x75\x72\x20\x74\x27\x65\x6e\x20\xc3\xa9\x71\x75\x69\x70\x65\x72",19}},
 };
 inline constexpr Edit FrenchEdits103E[]{
     {23,0,std::string_view{"\x72\x65\x67\x61\x72\x64\x65\x72\x7f\x1c\x61",11}},
@@ -45,6 +603,25 @@ inline constexpr Edit FrenchEdits103F[]{
     {239,3,std::string_view{"\x6e\x6e\x65\x6c\x6c",5}},
     {244,11,std::string_view{"",0}},
 };
+inline constexpr Edit FrenchEdits10C5[]{
+    {0,1,std::string_view{"\x41\x70\x70\x75",4}},
+    {2,0,std::string_view{"\x65",1}},
+    {3,0,std::string_view{"\xc3\xa0\x20\x64\x72\x6f\x69",7}},
+    {4,0,std::string_view{"\x65\x20\x73",3}},
+    {5,0,std::string_view{"\x72\x20\x6c\x61\x20\x63\x72\x6f\x69\x78\x20\x64\x69\x72\x65\x63\x74\x69\x6f\x6e\x6e\x65\x6c\x6c\x65\x7f\x1c\x70\x6f\x75\x72",31}},
+    {9,1,std::string_view{"\x74\x69\x72",3}},
+    {22,0,std::string_view{"\x2e",1}},
+    {23,10,std::string_view{"\x41",1}},
+    {38,2,std::string_view{"\x20",1}},
+    {48,1,std::string_view{"\x7f\x1c",2}},
+    {63,1,std::string_view{"",0}},
+    {67,0,std::string_view{"\x20",1}},
+};
+inline constexpr Edit FrenchEdits10C7[]{
+    {48,5,std::string_view{"\x70\x70\x75\x69",4}},
+    {54,58,std::string_view{"",0}},
+    {122,0,std::string_view{"\x20\x73\x75\x72\x20\x6c\x61\x20\x63\x72\x6f\x69\x78\x20\x64\x69\x72\x65\x63\x74\x69\x6f\x6e\x6e\x65\x6c\x6c\x65\x7f\x1c\x70\x6f\x75\x72\x20\x73\x6f\x72\x74\x69\x72\x20\x74\x6f\x6e\x20\x6f\x63\x61\x72\x69\x6e\x61\x2c\x20\x70\x75\x69\x73\x20\x73\x75\x72\x20\x53\x54\x41\x52\x54",69}},
+};
 inline constexpr Edit FrenchEdits10D8[]{
     {25,1,std::string_view{"\x41\x70\x70",3}},
     {27,0,std::string_view{"\x69\x65",2}},
@@ -57,6 +634,55 @@ inline constexpr Edit FrenchEdits10D8[]{
     {65,1,std::string_view{"",0}},
     {73,1,std::string_view{"",0}},
 };
+inline constexpr Edit FrenchEdits2044[]{
+    {60,3,std::string_view{"\x5a\x4c",2}},
+    {77,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits2065[]{
+    {240,0,std::string_view{"\x41\x70\x70\x75\x69\x65\x20\x73\x75\x72\x20\x53\x45\x4c\x45\x43",16}},
+    {241,1,std::string_view{"\x2c\x7f\x1c\x70",4}},
+    {243,3,std::string_view{"\x69\x73\x20\x73\x75\x72",6}},
+    {249,1,std::string_view{"\x0b",1}},
+    {256,3,std::string_view{"\x6f\x75\x76\x72",4}},
+    {260,3,std::string_view{"",0}},
+    {266,1,std::string_view{"\x61\x20",2}},
+    {270,11,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits2071[]{
+    {210,0,std::string_view{"\x6f\x69\x72\x20\x6f",5}},
+    {211,1,std::string_view{"\xb9\x20\x69\x6c\x20\x73\x65\x20\x74",9}},
+    {213,2,std::string_view{"\x6f\x75\x76\x65\x2c\x20\x61\x70\x70\x75",10}},
+    {217,1,std::string_view{"",0}},
+    {220,1,std::string_view{"\x75\x72\x7f\x1c\x53\x45\x4c\x45\x43\x54\x2c",11}},
+    {223,1,std::string_view{"\x75\x69",2}},
+    {225,5,std::string_view{"",0}},
+    {235,18,std::string_view{"",0}},
+    {255,1,std::string_view{"\x0b",1}},
+    {262,3,std::string_view{"\x6f\x75\x76\x72",4}},
+    {266,3,std::string_view{"",0}},
+    {272,1,std::string_view{"\x61\x20",2}},
+    {276,10,std::string_view{"",0}},
+    {295,0,std::string_view{"\x7f\x1c\x54\x75",4}},
+    {296,3,std::string_view{"\x79\x20\x76\x65\x72\x72\x61",7}},
+    {304,2,std::string_view{"\x20",1}},
+    {315,0,std::string_view{"\x64\xc3\xa9\x6a\xc3\xa0\x20",7}},
+    {323,28,std::string_view{"",0}},
+};
+inline constexpr Edit FrenchEdits4003[]{
+    {85,17,std::string_view{"\x43",1}},
+    {109,1,std::string_view{"",0}},
+    {112,1,std::string_view{"\x61\x20",2}},
+    {116,10,std::string_view{"",0}},
+    {134,2,std::string_view{"\x20",1}},
+    {154,0,std::string_view{"\x7f\x1c\x41\x70\x70\x75\x69\x65",8}},
+    {155,0,std::string_view{"\x73\x75\x72\x20\x53\x45\x4c\x45\x43\x54\x2c\x20\x70\x75\x69\x73\x20\x73\x75\x72\x20\x7f\x24\x0b\x2e\x7f\x1c",27}},
+};
+inline constexpr Edit FrenchEdits406A[]{
+    {22,3,std::string_view{"\x5a\x4c",2}},
+    {39,0,std::string_view{"\x5a\x52",2}},
+    {40,3,std::string_view{"\x1c",1}},
+    {45,2,std::string_view{"\x20",1}},
+};
 inline constexpr Edit FrenchEdits5056[]{
     {27,2,std::string_view{"\x61\x70\x70",3}},
     {30,2,std::string_view{"\x69",1}},
@@ -64,12 +690,98 @@ inline constexpr Edit FrenchEdits5056[]{
     {42,0,std::string_view{"\x6c\x65\x20\x73\x74\x69\x63\x6b\x20\x64\x72\x6f\x69\x74\x2c\x20\x70\x75\x69\x73\x20",21}},
     {56,1,std::string_view{"\x7f\x1c",2}},
 };
+inline constexpr Edit FrenchEdits700C[]{
+    {18,1,std::string_view{"\x7f\x1c",2}},
+    {24,3,std::string_view{"\x5a\x4c",2}},
+    {41,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits70A3[]{
+    {63,3,std::string_view{"\x5a\x4c",2}},
+    {80,3,std::string_view{"\x5a\x52",2}},
+};
+inline constexpr Edit FrenchEdits70ED[]{
+    {18,1,std::string_view{"\x7f\x1c",2}},
+    {24,3,std::string_view{"\x5a\x4c",2}},
+    {41,3,std::string_view{"\x5a\x52",2}},
+};
 inline constexpr Message French[]{
+    {0x0002,0xD65C8A9F688B6754ULL,275,FrenchEdits0002,Dependency::None},
+    {0x0003,0x87BFA7E583E508B3ULL,219,FrenchEdits0003,Dependency::None},
+    {0x0004,0x6EF440BABCF5DDEFULL,270,FrenchEdits0004,Dependency::None},
+    {0x0005,0x7CFB62B3301692B2ULL,236,FrenchEdits0005,Dependency::None},
+    {0x0008,0x96886FBBD04C0C1EULL,214,FrenchEdits0008,Dependency::None},
+    {0x0009,0x810FCD42D7E90E42ULL,194,FrenchEdits0009,Dependency::None},
+    {0x000D,0x42B5B38242DA4A26ULL,228,FrenchEdits000D,Dependency::None},
+    {0x000E,0x1F1ED59F42FD4DA7ULL,207,FrenchEdits000E,Dependency::None},
+    {0x0010,0x21895667962E6194ULL,123,FrenchEdits0010,Dependency::None},
+    {0x0011,0x31F5E1BF061C6314ULL,124,FrenchEdits0011,Dependency::None},
+    {0x0012,0x828CD304CE32BF7AULL,138,FrenchEdits0012,Dependency::None},
+    {0x0013,0x50C74335810D2306ULL,159,FrenchEdits0013,Dependency::None},
+    {0x0014,0x635CC720F7FB3DB2ULL,113,FrenchEdits0014,Dependency::None},
+    {0x0015,0x41A98BDE847C457AULL,116,FrenchEdits0015,Dependency::None},
+    {0x0016,0x62E974237AEB8C33ULL,118,FrenchEdits0016,Dependency::None},
+    {0x0017,0x1B28EB1A81F662C2ULL,122,FrenchEdits0017,Dependency::None},
+    {0x001C,0xEBB75830BC3BA73BULL,119,FrenchEdits001C,Dependency::None},
+    {0x001D,0x37BD3B2E95F7719DULL,120,FrenchEdits001D,Dependency::None},
+    {0x0026,0xAE95EB4B893EE94DULL,591,FrenchEdits0026,Dependency::None},
+    {0x0030,0x5502FC9BC9B3CC35ULL,494,FrenchEdits0030,Dependency::None},
+    {0x0031,0x403F82CF05458E9EULL,305,FrenchEdits0031,Dependency::None},
+    {0x0032,0xB7E1C87660FDA1EFULL,332,FrenchEdits0032,Dependency::None},
+    {0x0033,0xB8EFC0396F569819ULL,255,FrenchEdits0033,Dependency::None},
+    {0x0034,0x078EF4CA5C52E7C5ULL,262,FrenchEdits0034,Dependency::None},
+    {0x0035,0xEC5D249BB212BA74ULL,173,FrenchEdits0035,Dependency::None},
+    {0x0036,0x61D7ADA7B417FF59ULL,332,FrenchEdits0036,Dependency::None},
+    {0x0037,0x4E064C66BA48D46EULL,355,FrenchEdits0037,Dependency::None},
+    {0x0038,0xF9BCAC4362B7B7F3ULL,152,FrenchEdits0038,Dependency::None},
+    {0x0039,0xDCE4D4917B494EF7ULL,306,FrenchEdits0039,Dependency::None},
+    {0x0042,0xCF19F4378C64A7CDULL,142,FrenchEdits0042,Dependency::None},
+    {0x0043,0x565E700049BB39F5ULL,230,FrenchEdits0043,Dependency::None},
+    {0x0044,0x56E3ED89BD7EFF42ULL,229,FrenchEdits0044,Dependency::None},
+    {0x0045,0x881664033B13DB24ULL,116,FrenchEdits0045,Dependency::None},
+    {0x0046,0xEBD45DB4199250E6ULL,359,FrenchEdits0046,Dependency::None},
+    {0x0047,0x9950FC47FE12062FULL,245,FrenchEdits0047,Dependency::None},
+    {0x0048,0x69C76C5EE0504469ULL,237,FrenchEdits0048,Dependency::None},
+    {0x004A,0x3BF182CE3415F815ULL,246,FrenchEdits004A,Dependency::None},
+    {0x004C,0xAE3D901B8359C16FULL,324,FrenchEdits004C,Dependency::None},
+    {0x004D,0x2BDD97AA1502392DULL,122,FrenchEdits004D,Dependency::None},
+    {0x0058,0xDBD7254F793DF5DDULL,240,FrenchEdits0058,Dependency::None},
+    {0x005D,0xD463959D7B98C7D6ULL,120,FrenchEdits005D,Dependency::None},
+    {0x0066,0x731A6A81A35D2E29ULL,301,FrenchEdits0066,Dependency::None},
+    {0x0069,0x88D134F69B5F8A23ULL,175,FrenchEdits0069,Dependency::None},
+    {0x007A,0x199B03FEDF8219C8ULL,174,FrenchEdits007A,Dependency::None},
+    {0x0098,0xEFA6DC5727412B86ULL,346,FrenchEdits0098,Dependency::None},
+    {0x0099,0x3AECE2AB73936CC4ULL,142,FrenchEdits0099,Dependency::None},
+    {0x009A,0x6BBD72B5A6F1F7C4ULL,234,FrenchEdits009A,Dependency::None},
+    {0x00A3,0x656CAD4FD3ACE3C7ULL,147,FrenchEdits00A3,Dependency::None},
+    {0x00A4,0xC2148425DBF0ADB7ULL,290,FrenchEdits00A4,Dependency::None},
+    {0x00AD,0x62E1FE504BBAF4F9ULL,130,FrenchEdits00AD,Dependency::None},
+    {0x00AE,0xA8D8B691944FFA9FULL,310,FrenchEdits00AE,Dependency::None},
+    {0x00AF,0x73F0E876BA0B1F6CULL,142,FrenchEdits00AF,Dependency::None},
+    {0x00B1,0x5F79923D0E03DA9BULL,148,FrenchEdits00B1,Dependency::None},
+    {0x00CB,0xD59CEA0BBEFDCF60ULL,147,FrenchEdits00CB,Dependency::None},
     {0x0101,0xC1AE2BCE936E22B9ULL,107,FrenchEdits0101,Dependency::None},
+    {0x0103,0xEE76DFCB81D2DC80ULL,211,FrenchEdits0103,Dependency::None},
     {0x1017,0x68C9DD5461D22C28ULL,212,FrenchEdits1017,Dependency::NaviUp},
+    {0x1025,0xF88AB5ADB5B40BE1ULL,297,FrenchEdits1025,Dependency::None},
+    {0x1035,0x44E218483D40494DULL,174,FrenchEdits1035,Dependency::None},
+    {0x1036,0xFE54A3B783B1CC0AULL,435,FrenchEdits1036,Dependency::None},
+    {0x1037,0x6EC9B399904489E2ULL,259,FrenchEdits1037,Dependency::None},
+    {0x1039,0x247F67BF5BC3EA6FULL,505,FrenchEdits1039,Dependency::None},
+    {0x103A,0x4CDB11160A403923ULL,901,FrenchEdits103A,Dependency::None},
+    {0x103D,0x312132D4E4B8B4C3ULL,442,FrenchEdits103D,Dependency::None},
     {0x103E,0xF63222129B7A0216ULL,62,FrenchEdits103E,Dependency::None},
     {0x103F,0x85B591ACB2E969A3ULL,273,FrenchEdits103F,Dependency::NaviUp},
+    {0x10C5,0x735735B1727429B7ULL,256,FrenchEdits10C5,Dependency::None},
+    {0x10C7,0xC336E84915B033F3ULL,257,FrenchEdits10C7,Dependency::SongListStart},
     {0x10D8,0x998786964E400C55ULL,97,FrenchEdits10D8,Dependency::None},
+    {0x2044,0xFB8097A36830D5D3ULL,151,FrenchEdits2044,Dependency::None},
+    {0x2065,0xEEF95B98CD75592CULL,412,FrenchEdits2065,Dependency::None},
+    {0x2071,0x0F1FE2A5C41D7AD7ULL,374,FrenchEdits2071,Dependency::None},
+    {0x4003,0xA3D64E26AC550692ULL,706,FrenchEdits4003,Dependency::None},
+    {0x406A,0xA98B51B67901B236ULL,83,FrenchEdits406A,Dependency::None},
     {0x5056,0x9122F8CB14C5650CULL,75,FrenchEdits5056,Dependency::None},
+    {0x700C,0x196E3B588C7B4F3CULL,92,FrenchEdits700C,Dependency::None},
+    {0x70A3,0xD6C7F35BDDDC03A3ULL,419,FrenchEdits70A3,Dependency::None},
+    {0x70ED,0x3663E0164EACC19BULL,98,FrenchEdits70ED,Dependency::None},
 };
 }

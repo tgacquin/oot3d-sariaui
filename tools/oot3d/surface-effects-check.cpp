@@ -62,7 +62,7 @@ Batch CapturedEffect(const QJsonObject& d) {
         return b;
     }
     const auto outputs=d["output_vertices"].toArray(),u=d["uniforms_f"].toArray();
-    assert(outputs.size()==12);
+    assert(outputs.size()==12 || outputs.size()==30);
     double inverse[3][6]{};
     for(unsigned r=0;r<3;++r)for(unsigned c=0;c<6;++c)
         inverse[r][c]=c<3?u[20+r].toArray()[c].toDouble():double(c-3==r);
@@ -75,7 +75,12 @@ Batch CapturedEffect(const QJsonObject& d) {
     }
     // Legacy fixtures use across-quad corners from the first output triangles.
     // The native input order may instead run down the quad (outputs 0,1,2,5).
-    for(unsigned index:{0u,2u,1u,5u,8u,11u}) {
+    // Two quads produce ten strip triangles. Retain the down-then-across
+    // order of each quad and the connector to the next one.
+    std::vector<unsigned> corners;
+    if(outputs.size()==30)corners={0,1,2,5,8,11,18,19,20,23,26,29};
+    else corners={0,2,1,5,8,11};
+    for(unsigned index:corners) {
         const auto v=outputs[index].toObject();const auto clip=v["clip_position"].toArray();
         double eye[]{clip[1].toDouble()/u[1].toArray()[0].toDouble(),
                      clip[0].toDouble()/u[0].toArray()[1].toDouble(),-clip[3].toDouble()};
@@ -169,10 +174,8 @@ Pica::RegsInternal Regs(const QJsonObject& d) {
     m.alpha_blending.blend_equation_rgb.Assign(Pica::FramebufferRegs::BlendEquation(blend[5].toInt()));
     return r;
 }
-// This legacy capture stores only 33 output vertices: two complete halo
-// quads and one corner of the third. Reconstruct the two measured quads;
-// the full three-quad/connector path is covered separately below.
-Batch CapturedHalo(const QJsonObject& d) {
+// Legacy captures retain 33 output vertices, enough for two complete quads.
+Batch CapturedFirstTwoQuads(const QJsonObject& d) {
     if(!d["effect_inputs"].toArray().empty())return CapturedEffect(d);
     const auto outputs=d["output_vertices"].toArray();assert(outputs.size()==33);
     Batch b;
@@ -186,6 +189,51 @@ Batch CapturedHalo(const QJsonObject& d) {
     }
     End(b);return NonIndexed(b);
 }
+void PondRingCheck(const char* path) {
+    QFile file(path);assert(file.open(QIODevice::ReadOnly));
+    const auto draws=QJsonDocument::fromJson(file.readAll()).object()["draws"].toArray();
+    for(float phase:{.25f,.5f,.75f}) {
+        OOT3D::Interpolation::sample_fraction=phase;
+        E::History history;
+        Batch previous;
+        unsigned seen=0,paired=0,regular=0;
+        qint64 last=-1;
+        for(const auto value:draws) {
+            const auto d=value.toObject();const auto r=Regs(d);
+            const auto kind=E::Candidate(r,d["shader"].toString().toULongLong(nullptr,16),
+                                           d["swizzle"].toString().toULongLong(nullptr,16));
+            if(kind!=E::PondRings && kind!=2)continue;
+            const auto b=kind==E::PondRings?CapturedFirstTwoQuads(d):CapturedEffect(d);
+            const auto frame=d["frame"].toInteger();
+            history.Context(d["generation"].toInt(),d["scene"].toInt());
+            const auto result=OOT3D::Interpolation::ReplayEffectStrip<E::Vertex>(b.inputs,b.order,
+                [&](const auto& v,const auto& order) {
+                    assert(E::Rings(v,order,kind==E::PondRings));
+                    return history.Apply(kind,frame,r.texturing.texture0.GetPhysicalAddress(),v,order);
+                });
+            if(kind==2) {++regular;continue;}
+            ++seen;
+            if(result) {
+                assert(last+1==frame);
+                for(unsigned k=0;k<12;++k) {
+                    const auto& v=(*result)[b.order[k]];
+                    const auto& old=previous.inputs[previous.order[k]];
+                    const auto& now=b.inputs[b.order[k]];
+                    assert(v[2]==now[2]);
+                    if(k==11)continue; // Last connector is outside the reconstructed ring.
+                    for(unsigned a=0;a<2;++a)for(unsigned c=0;c<4;++c)
+                        assert(std::abs(v[a][c]-std::lerp(old[a][c],now[a][c],phase))<.00025f);
+                }
+                assert((*result)[b.order[0]][1][3]>b.inputs[b.order[0]][1][3]);
+                ++paired;
+            }
+            last=frame;previous=b;
+        }
+        assert(seen==88 && regular==10 && paired==41);
+        std::cout<<"Pond ripple capture at "<<phase<<": "<<seen<<" batches, "<<paired
+                 <<" matched first-ring transitions, "<<regular<<" ordinary ripple draws\n";
+    }
+}
 void HaloCheck(const char* path) {
     QFile f(path);assert(f.open(QIODevice::ReadOnly));
     const auto draws=QJsonDocument::fromJson(f.readAll()).object()["draws"].toArray();
@@ -195,7 +243,7 @@ void HaloCheck(const char* path) {
         for(const auto value:draws) {
             const auto d=value.toObject();const auto r=Regs(d);
             if(E::Candidate(r,0x6352a3be33cb99c6ULL,0xba817d0ef27276d0ULL)!=15)continue;
-            ++seen;const auto b=CapturedHalo(d);const auto frame=d["frame"].toInteger();
+            ++seen;const auto b=CapturedFirstTwoQuads(d);const auto frame=d["frame"].toInteger();
             history.Context(d["generation"].toInt(),d["scene"].toInt());
             const auto result=OOT3D::Interpolation::ReplayEffectStrip<E::Vertex>(b.inputs,b.order,
                 [&](const auto& v,const auto& order){return history.Apply(15,frame,r.texturing.texture0.GetPhysicalAddress(),v,order);});
@@ -285,8 +333,104 @@ void LakeFogFixture() {
     other=r;other.texturing.tev_stage1.ops_raw=1;assert(!W::FogCandidate(other,0x57));
     std::cout<<"Lake Hylia waterfall fog material, scene and neighboring-mesh guards passed\n";
 }
+void WellDripCheck(const char* path) {
+    QFile file(path); assert(file.open(QIODevice::ReadOnly));
+    const auto draws = QJsonDocument::fromJson(file.readAll()).object()["draws"].toArray();
+    for (float phase : {0.f, .25f, .5f, .75f, 1.f}) {
+        OOT3D::Interpolation::sample_fraction = phase;
+        W::History history;
+        std::map<std::array<unsigned,2>,std::pair<unsigned,float>> previous;
+        unsigned paired=0, moved=0, held=0;
+        for (const auto value : draws) {
+            const auto d=value.toObject();
+            const auto regs=Regs(d);
+            const unsigned scene=d["scene"].toInt(), frame=d["frame"].toInt();
+            if (!W::WellDripCandidate(regs,scene)) continue;
+            assert(W::Candidate(regs,scene) && !W::WellDripCandidate(regs,1));
+            auto unrelated=regs;
+            unrelated.framebuffer.output_merger.depth_write_enable.Assign(1);
+            assert(!W::WellDripCandidate(unrelated,scene));
+            const auto u=d["uniforms_f"].toArray(); W::UV uv{};
+            for(unsigned r=0;r<W::Rows.size();++r)for(unsigned c=0;c<4;++c)
+                uv[r][c]=u[W::Rows[r]].toArray()[c].toDouble();
+            auto& old=previous[{unsigned(regs.pipeline.num_vertices),regs.texturing.tev_stage1.sources_raw}];
+            const auto sample=history.ApplyDraw(frame,regs,d["indexed"].toBool(),d["generation"].toInt(),scene,uv);
+            assert(bool(sample)==(old.first+1==frame));
+            if(sample) {
+                const float end=uv[1][3];
+                float delta=end-old.second;
+                delta-=std::round(delta);
+                assert(std::abs((*sample)[1][3]-(end-delta*(1-phase)))<1e-6f);
+                for(unsigned r=0;r<W::Rows.size();++r)if(r!=1)assert((*sample)[r]==uv[r]);
+                if (std::abs(delta)>1e-5f) ++moved; else ++held;
+                ++paired;
+            }
+            old={frame,uv[1][3]};
+        }
+        assert(previous.size()==5 && paired==300 && moved>0 && held>0);
+        std::cout<<"Well drips at phase "<<phase<<": "<<moved<<" moving + "<<held<<" stationary layer pairs"<<std::endl;
+    }
+}
+void GroundFlakeCheck(const char* path, bool stalchild) {
+    QFile file(path);
+    assert(file.open(QIODevice::ReadOnly));
+    const auto draws = QJsonDocument::fromJson(file.readAll()).object()["draws"].toArray();
+    for (float phase : {.25f, .5f, .75f}) {
+        OOT3D::Interpolation::sample_fraction = phase;
+        D::History flakes;
+        E::History dust;
+        unsigned flake_batches = 0, moved_flakes = 0, dust_pairs = 0;
+        for (const auto value : draws) {
+            const auto d = value.toObject();
+            const auto regs = Regs(d);
+            const auto kind = E::Candidate(regs, d["shader"].toString().toULongLong(nullptr,16),
+                                           d["swizzle"].toString().toULongLong(nullptr,16));
+            const auto frame = d["frame"].toInteger();
+            const auto texture = regs.texturing.texture0.GetPhysicalAddress();
+            if (kind == 3) {
+                const auto b = CapturedDebris(d);
+                flakes.Context(d["generation"].toInt(), d["scene"].toInt());
+                auto sampled = OOT3D::Interpolation::ReplayEffectStrip<D::Vertex>(b.inputs,b.order,
+                    [&](const auto& v,const auto& order) { return flakes.Apply(frame,texture,v,order); });
+                if (!sampled) continue;
+                ++flake_batches;
+                for (unsigned i=0; i<b.order.size(); i+=6) {
+                    const unsigned k=b.order[i], next=b.order[i+1];
+                    assert((*sampled)[b.order[i+3]]==(*sampled)[b.order[i+4]]);
+                    if (i+6<b.order.size()) assert((*sampled)[b.order[i+5]]==(*sampled)[b.order[i+6]]);
+                    if ((*sampled)[k][0]==b.inputs[k][0]) continue;
+                    ++moved_flakes;
+                    float before=0, after=0;
+                    for (unsigned c=0;c<3;++c) {
+                        before+=std::pow(b.inputs[next][0][c]-b.inputs[k][0][c],2);
+                        after+=std::pow((*sampled)[next][0][c]-(*sampled)[k][0][c],2);
+                    }
+                    assert(std::abs(std::sqrt(before)-std::sqrt(after))<.015f);
+                    assert((*sampled)[k][2]==b.inputs[k][2] && (*sampled)[k][3]==b.inputs[k][3]);
+                }
+            } else if (kind==14) {
+                const auto b=CapturedEffect(d);
+                dust.Context(d["generation"].toInt(), d["scene"].toInt());
+                const auto sampled=OOT3D::Interpolation::ReplayEffectStrip<E::Vertex>(b.inputs,b.order,
+                    [&](const auto& v,const auto& order){ return dust.Apply(kind,frame,texture,v,order); });
+                if(sampled && *sampled!=b.inputs) ++dust_pairs;
+            }
+        }
+        std::cout<<(stalchild ? "Stalchild" : "Peahat")<<" phase "<<phase<<": "<<moved_flakes
+                 <<" moving flakes in "<<flake_batches<<" batches; "<<dust_pairs<<" dust batches changed"<<std::endl;
+        if (stalchild) {
+            assert(flake_batches == 44 && moved_flakes == 598);
+        } else {
+            assert(flake_batches == 60 && moved_flakes >= 2700 && dust_pairs == 120);
+        }
+    }
+}
 int main(int argc,char** argv) {
     LakeFogFixture();
+    if(argc==3 && std::string_view(argv[1])=="--pond-ripples") {PondRingCheck(argv[2]);return 0;}
+    if(argc==3 && std::string_view(argv[1])=="--peahat-ground") {GroundFlakeCheck(argv[2],false);return 0;}
+    if(argc==3 && std::string_view(argv[1])=="--stalchild-ground") {GroundFlakeCheck(argv[2],true);return 0;}
+    if(argc==3 && std::string_view(argv[1])=="--well-drips") {WellDripCheck(argv[2]);return 0;}
     if(argc==3 && std::string_view(argv[1])=="--halo-only") {HaloCheck(argv[2]);return 0;}
     {
         const auto batch=[](float offset,bool birth=false,std::array<float,4> color={55.f/255,0,1,1}) {
@@ -397,6 +541,44 @@ int main(int argc,char** argv) {
         for(unsigned k=0;k<4;++k)quad[k]={{{float(k%2)-.5f,.5f-float(k/2),0,1},{float(k%2)*2,float(1-k/2)*2,0,1}}};
         assert(G::Geometry(quad));quad[3]=quad[0];assert(!G::Geometry(quad));
     }
+    // Two independent 27-droplet bursts share a texture. Move the centers,
+    // expand the clouds and reverse both draw order and droplet order.
+    {
+        namespace Blood=OOT3D::Interpolation::GreenParticles;
+        const auto burst=[](unsigned age,float origin,bool reverse) {
+            Batch b;
+            for(unsigned n=0;n<27;++n) {
+                const int i=reverse?26-int(n):int(n);
+                auto quad=Star(origin+float(i-13)*age,.1f*age,1.f-age/24.f);
+                for(auto& v:quad)v[0][1]+=float(i%3-1)*age;
+                Add(b,quad);
+            }
+            End(b);return b;
+        };
+        for(float phase:{.25f,.5f,.75f}) {
+            OOT3D::Interpolation::sample_fraction=phase;
+            Blood::History history;
+            const auto apply=[&](unsigned frame,unsigned age,float x,bool reverse) {
+                const auto b=burst(age,x,reverse);
+                return history.Apply(frame,42,b.inputs,b.order);
+            };
+            assert(!apply(10,2,0,false));assert(!apply(10,3,24,false));
+            const auto check=[&](unsigned age,float old_x,float x) {
+                const auto out=apply(11,age,x,true);assert(out);
+                for(unsigned n=0;n<27;++n) {
+                    float cx=0;
+                    for(unsigned k=0;k<4;++k)cx+=(*out)[4*n+k][0][0]*.25f;
+                    const float dx=13.f-float(n);
+                    assert(std::abs(cx-std::lerp(old_x+dx*(age-1),x+dx*age,phase))<.001f);
+                }
+            };
+            check(4,24,29);check(3,0,5);
+            assert(!apply(11,1,0,true)); // Overlapping newborn.
+            assert(!apply(13,4,10,true)); // Missing native frame.
+            history.Context(2,82);assert(!apply(14,5,15,true));
+        }
+        OOT3D::Interpolation::sample_fraction=.5f;
+    }
     // Blood sprites retain corner-specific lighting for every tint, including
     // dim green and neutral colors. Keep matching independent of tint while
     // still rejecting incompatible geometry, births and invalid colors.
@@ -470,6 +652,25 @@ int main(int argc,char** argv) {
         assert(!apply(first,13)); // Invalid geometry cleared history.
         assert(!apply(first,15)); // No pairing across a missing update.
         assert(!apply(Wave(10,1,down),16)); // A new wave cannot inherit the old one.
+        // The explosive's ring persists when the enemy's ring joins the same draw.
+        const auto together=[&](const Batch& first_wave,const Batch& next_wave) {
+            Batch batch;
+            for(const auto* source:{&first_wave,&next_wave}) {
+                std::array<E::Vertex,4> q;
+                for(unsigned i=0;i<4;++i)q[i]=source->inputs[source->order[i]];
+                Add(batch,q);
+            }
+            End(batch);return nonindexed?NonIndexed(batch):batch;
+        };
+        history.Reset();assert(!apply(first,20));
+        const auto pair=together(Wave(20,1,down),second);
+        const auto born=apply(pair,21);assert(born);
+        for(unsigned i=0;i<4;++i) {
+            assert((*born)[pair.order[i]]==pair.inputs[pair.order[i]]);
+            assert((*born)[pair.order[6+i]]==(*half)[second.order[i]]);
+        }
+        const auto remaining=Wave(40,.9f,down);
+        assert(apply(remaining,22));
     }
     Batch a,b;for(unsigned i=0;i<32;++i) {Add(a,Star(i*10,0));Add(b,Star(i*10+.5f,.2f,.48f));}End(a);End(b);
     {
@@ -500,14 +701,20 @@ int main(int argc,char** argv) {
     // Real puddle strips run down each half, with shared connector indices.
     // Check both strip directions and duplicated-input replay, including
     // simultaneous rings whose halves/connectors must not become crossed.
-    for(bool down:{false,true})for(bool nonindexed:{false,true}) {
+    for(bool pond:{false,true})for(bool down:{false,true})for(bool nonindexed:{false,true}) {
         const auto batch=[&](float radius,float alpha) {
             Batch b;
-            for(unsigned ring=0;ring<2;++ring) {
+            for(unsigned ring=0;ring<(pond?30u:2u);++ring) {
                 const auto source=Ring(radius+ring*5,alpha);
                 for(unsigned half=0;half<2;++half) {
                     std::array<E::Vertex,4> q{};
-                    for(unsigned k=0;k<4;++k)q[k]=source.inputs[half*4+k];
+                    for(unsigned k=0;k<4;++k) {
+                        q[k]=source.inputs[(pond?(half^1u):half)*4+k];
+                        if(pond) {
+                            q[k][0][0]+=ring*18;
+                            q[k][1]={alpha*.2f,.1f,.08f,alpha};
+                        }
+                    }
                     if(down)std::swap(q[1],q[2]);
                     Add(b,q);
                 }
@@ -518,7 +725,7 @@ int main(int argc,char** argv) {
         E::History history;history.Context(1,85);
         const auto apply=[&](const Batch& b,unsigned frame) {
             return OOT3D::Interpolation::ReplayEffectStrip<E::Vertex>(b.inputs,b.order,[&](const auto& vertices,const auto& order) {
-                return history.Apply(2,frame,42,vertices,order);
+                return history.Apply(pond?E::PondRings:2,frame,42,vertices,order);
             });
         };
         assert(!apply(first,10));const auto half=apply(second,11);assert(half);
@@ -786,7 +993,7 @@ int main(int argc,char** argv) {
                 const auto b=CapturedEffect(d);
                 const auto frame=d["frame"].toInteger();
                 const auto half=OOT3D::Interpolation::ReplayEffectStrip<E::Vertex>(b.inputs,b.order,[&](const auto& inputs,const auto& order) {
-                    const auto wave=E::Shockwave(inputs,order);
+                    const auto wave=E::Shockwaves(inputs,order);
                     if(!d["effect_inputs"].toArray().empty())assert(wave);
                     if(!wave)return std::optional<std::vector<E::Vertex>>{};
                     ++shock;
@@ -794,6 +1001,13 @@ int main(int argc,char** argv) {
                 });
                 if(half) {
                     ++shock_pairs;
+                    if(b.order.size()==12) {
+                        for(unsigned base:{0u,6u}) {
+                            assert((*half)[b.order[base]][1][3]>b.inputs[b.order[base]][1][3]);
+                            assert((*half)[b.order[base]][0][0]>b.inputs[b.order[base]][0][0]);
+                        }
+                        assert((*half)[b.order[5]]==(*half)[b.order[6]]);
+                    }
                     if(d["cpu"].toBool())assert((*half)[b.order[3]]==(*half)[b.order[4]]);
                     assert((*half)[0][1][3]>b.inputs[0][1][3]);
                     assert((*half)[0][0][0]>b.inputs[0][0][0]);
@@ -802,7 +1016,7 @@ int main(int argc,char** argv) {
                 // borrow the old expansion/fade, even on adjacent frames.
                 if(d["cpu"].toBool())continue;
                 E::History newborn;newborn.Apply(4,10,42,b.inputs,b.order);
-                auto small=b;const auto center=E::F::Center(*E::Shockwave(b.inputs,b.order));
+                auto small=b;const auto center=E::F::Center(E::Shockwaves(b.inputs,b.order)->front());
                 for(unsigned i=0;i<4;++i) {
                     small.inputs[i][0][0]=center[0]+(i%2?1.f:-1.f);
                     small.inputs[i][0][2]=center[2]+(i/2?1.f:-1.f);
@@ -871,7 +1085,7 @@ int main(int argc,char** argv) {
                 std::uint32_t(d["index_offset"].toInteger()),r.texturing.texture0.GetPhysicalAddress(),
                 r.texturing.texture1.GetPhysicalAddress(),r.texturing.main_config.texture2_enable?
                     r.texturing.texture2.GetPhysicalAddress():0,
-                unsigned(d["generation"].toInt()),unsigned(d["scene"].toInt())};
+                unsigned(d["generation"].toInt()),unsigned(d["scene"].toInt()),unsigned(r.pipeline.num_vertices)};
             const auto result=recorded.Apply(d["frame"].toInteger(),captured_key,sample);
             if(result) {
                 ++water_pairs;const bool fountain=r.pipeline.num_vertices==564;
@@ -898,6 +1112,28 @@ int main(int argc,char** argv) {
                         assert(W::JabuWallCandidate(colored,scene) && W::Candidate(colored,scene));
                         s.ops_raw=0;assert(!W::JabuWallCandidate(colored,scene));
                     }
+                    continue;
+                }
+                if(W::CavernOrPondFlow(r,scene)) {
+                    assert(!W::CavernOrPondFlow(r,0x57));
+                    const unsigned n=r.pipeline.num_vertices;
+                    const float speed0=n==531?.01f:n==123?.02f:n==177?7.f/300:n==204?1.f/120:0;
+                    const float speed1=n==531?1.f/150:n==123?2.f/75:n==177?1.f/60:n==204?0:-1.f/600;
+                    for(unsigned row=0;row<W::Rows.size();++row)for(unsigned c=0;c<4;++c) {
+                        const float speed=row==1?speed0:row==3?speed1:0;
+                        const float expected=sample[row][c]-(c==3?speed*(1-capture_phase):0);
+                        assert(std::abs((*result)[row][c]-expected)<.00001f);
+                    }
+                    continue;
+                }
+                if(W::GerudoWaterfallCandidate(r,scene)) {
+                    assert(!W::GerudoWaterfallCandidate(r,0x55));
+                    const unsigned count=r.pipeline.num_vertices;
+                    const bool second=r.texturing.main_config.texture1_enable;
+                    const std::array<float,5> per_tick{0,count!=312?.025f:second?.02f:1.f/120,
+                        second && count!=312?-1.f/300:0,second?(count==192?.02f:1.f/60):0,0};
+                    for(unsigned row=0;row<W::Rows.size();++row)for(unsigned c=0;c<4;++c)
+                        assert(std::abs((*result)[row][c]-sample[row][c]+(c==3?per_tick[row]*(1-capture_phase):0))<.00001f);
                     continue;
                 }
                 if(W::ZoraWaterfallCandidate(r)) {

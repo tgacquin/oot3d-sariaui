@@ -27,7 +27,9 @@ template<class M,class R> void Capture(M& m,const R& r,std::int64_t now) {
         "drop_gi_bomb_1","drop_gi_hearts_","drop_gi_arrow_0","drop_gi_arrow_1",
         "drop_gi_arrow_2","drop_gi_nuts","drop_gi_stick","drop_gi_seed","drop_gi_key",
         "drop_gi_magicpo","drop_gi_ocarina"};
-    if(std::find(names.begin(),names.end(),std::string_view(name.data()))==names.end())return;
+    const std::string_view model{name.data()};
+    const bool torch=model=="torch4_modelT" || model=="torch4_modelT_1";
+    if(!torch && std::find(names.begin(),names.end(),model)==names.end())return;
     const auto primitive=r[11];
     if(m.Read(primitive)!=0x736d7270 || m.Read(primitive+8)!=1)return;
     const auto prm=primitive+m.Read(primitive+20).value_or(0);
@@ -38,6 +40,10 @@ template<class M,class R> void Capture(M& m,const R& r,std::int64_t now) {
     draw.count=m.Read(primitive+12).value_or(0)>>16;
     draw.indices=m.Read(prm+20).value_or(0)&65535;
     if(!draw.count || draw.count>10 || !draw.indices)return;
+    if(torch) {
+        if(draw.count!=1 || draw.indices!=6)return;
+        draw.mode=Torch;
+    }
     for(unsigned i=0;i<draw.count;++i)
         if(!TitleScreen::ReadFloats(m,renderer+0x90+48*i,draw.palette[i]))return;
     draw.frame=Interpolation::guest_frames.load();draw.epoch=Interpolation::generation.load();draw.time=now;

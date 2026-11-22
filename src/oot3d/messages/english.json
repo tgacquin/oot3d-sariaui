@@ -2,7 +2,7 @@
   "language": "English",
   "language_slot": 1,
   "notes": [
-    "Matching Navi and View tutorials are maintained in the separate French (slot 5) and Spanish (slot 7) catalogs.",
+    "Matching controller instructions are maintained in the separate French (slot 5) and Spanish (slot 7) catalogs.",
     "Only the audited message IDs are changed. Controls use hexadecimal QM markup.",
     "L/R in these menu instructions do not alter native targeting, shielding or music controls.",
     "NaviUp and SongListStart tutorials are active alongside their implemented controls."

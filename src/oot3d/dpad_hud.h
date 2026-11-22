@@ -23,8 +23,8 @@ struct Geometry {
     void Add(const Pose& group,const Pose& local,float x,float y,float size,
              float tx,float ty,float extent,float opacity) {
         if(count==5 || opacity<0 || !Valid(group) || !Valid(local))return;
-        const float cx=36+group.x+(x+local.x)*group.scale_x;
-        const float cy=88+group.y+(y+local.y)*group.scale_y;
+        const float cx=CenterX+group.x+(x+local.x)*group.scale_x;
+        const float cy=CenterY+group.y+(y+local.y)*group.scale_y;
         const float w=size*group.scale_x*local.scale_x/2,h=size*group.scale_y*local.scale_y/2;
         const std::array<float,12> v{cx-w,cy+h,0,cx-w,cy-h,0,cx+w,cy+h,0,cx+w,cy-h,0};
         const float u0=(tx+.5f)/TextureWidth,u1=(tx+extent-.5f)/TextureWidth;

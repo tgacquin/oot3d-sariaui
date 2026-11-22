@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "oot3d/master_quest.h"
 #include "oot3d/randomizer/ui.h"
+#include "oot3d/player_defaults_draft.h"
 #include "oot3d/randomizer/service.h"
 #include "oot3d/randomizer/presets.h"
 #include "oot3d/multiplayer_startup.h"
@@ -277,7 +278,7 @@ bool Control(Config& c,const Setting& s,std::uint64_t atlas,bool tile) {
     return false;
 }
 }
-static bool DrawPresets(Config& config) {
+static bool DrawPresets(Config& config,bool authoring) {
     static std::string selected="Beginner",message,delete_name;
     static bool error=false;
     static std::array<char,97> name{};
@@ -303,14 +304,14 @@ static bool DrawPresets(Config& config) {
     }
     it=std::find_if(entries.begin(),entries.end(),[&](const auto& e){return e.name==selected;});
     ImGui::TextWrapped("%s",it->description.c_str());
-    ImGui::BeginDisabled(busy.load());
+    ImGui::BeginDisabled(!authoring && busy.load());
     if(ImGui::Button("Apply preset")) {
         config=Presets::Apply(*it,config);changed=true;message="Preset applied to new-file settings.";error=false;
     }
     ImGui::EndDisabled();
     if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip("Applies randomizer rules for new files. Seed text, Difficulty settings and multiplayer choices stay as set.");
-    if(ImGui::TreeNode("Manage custom presets")) {
+    if(!authoring && ImGui::TreeNode("Manage custom presets")) {
         ImGui::SetNextItemWidth(-1);
         ImGui::InputTextWithHint("##Preset name","Name for current settings",name.data(),name.size());
         if(ImGui::Button("Save new preset")) {
@@ -348,8 +349,69 @@ static bool DrawPresets(Config& config) {
     return changed;
 }
 
-void DrawSettings(std::uint64_t icons) {
-    auto config=GetConfig();bool changed=false;
+static Config ReadDefaults(const PlayerDefaultsDraft& defaults) {
+    auto config=NewFileConfig();
+    config.enabled=defaults.value("Randomizer/enabled",false).toBool();
+    config.seed=defaults.value("Randomizer/seed").toString().toStdString();
+    for(unsigned i=0;i<Specs.size();++i)
+        config.options[i]=defaults.value(QStringLiteral("Randomizer/")+Specs[i].key,Specs[i].initial).toInt();
+    for(const auto& option:AdvancedOptions()) {
+        const auto key=QStringLiteral("Randomizer/advanced/")+QString::fromStdString(option.key);
+        if(defaults.contains(key)) config.advanced[option.key]=defaults.value(key).toInt();
+    }
+    return Sanitize(config);
+}
+
+static void WriteDefaults(PlayerDefaultsDraft& defaults,const Config& before,const Config& after) {
+    if(after.enabled!=before.enabled) defaults.setValue("Randomizer/enabled",after.enabled);
+    if(after.seed!=before.seed) defaults.setValue("Randomizer/seed",QString::fromStdString(after.seed));
+    for(unsigned i=0;i<Specs.size();++i)
+        if(after.options[i]!=before.options[i])
+            defaults.setValue(QStringLiteral("Randomizer/")+Specs[i].key,after.options[i]);
+    for(const auto& option:AdvancedOptions()) {
+        const auto value=[&](const Config& config) {
+            const auto it=config.advanced.find(option.key);
+            return it==config.advanced.end()?option.initial:it->second;
+        };
+        if(value(after)!=value(before))
+            defaults.setValue(QStringLiteral("Randomizer/advanced/")+QString::fromStdString(option.key),value(after));
+    }
+}
+
+static void DrawMultiplayerDefaults(PlayerDefaultsDraft& draft) {
+    const auto toggle=[&](const char* label,const char* key,bool fallback) {
+        bool v=draft.value(key,fallback).toBool();
+        if(ImGui::Checkbox(label,&v)) draft.setValue(key,v);
+    };
+    toggle("Use player tunic color","Randomizer/player_color_enabled",false);
+    const unsigned color=draft.value("Randomizer/player_color",0x64ff64u).toUInt();
+    float rgb[]{float((color>>16)&255)/255,float((color>>8)&255)/255,float(color&255)/255};
+    if(ImGui::ColorEdit3("Tunic color",rgb,ImGuiColorEditFlags_NoOptions)) {
+        const auto byte=[](float v){return unsigned(std::clamp(v,0.f,1.f)*255+.5f);};
+        draft.setValue("Randomizer/player_color",(byte(rgb[0])<<16)|(byte(rgb[1])<<8)|byte(rgb[2]));
+        draft.setValue("Randomizer/player_color_enabled",true);
+    }
+    toggle("Show activity log","Multiplayer/activity_log",true);
+    toggle("Show multiplayer names","Multiplayer/player_names/enabled",true);
+    if(ImGui::CollapsingHeader("Advanced connection settings")) {
+        int maximum=draft.value("UI/Multiplayer/max_player",8).toInt();
+        if(ImGui::SliderInt("Maximum players",&maximum,2,16))
+            draft.setValue("UI/Multiplayer/max_player",maximum);
+        const auto port=[&](const char* label,const char* key,int fallback) {
+            int v=draft.value(key,fallback).toInt();
+            if(ImGui::InputInt(label,&v,0)) draft.setValue(key,std::clamp(v,1,65535));
+        };
+        port("Room port","UI/Multiplayer/room_port",24872);
+        toggle("Search local network","UI/Multiplayer/oot_search_lan",true);
+        port("Discovery port","UI/Multiplayer/oot_discovery_port",24873);
+    }
+}
+
+void DrawSettings(std::uint64_t icons,PlayerDefaultsDraft* defaults) {
+    static std::optional<Config> author_config;
+    if(defaults && !author_config) author_config=ReadDefaults(*defaults);
+    auto config=defaults ? *author_config : GetConfig();
+    bool changed=false;
     static int page=General;
     static int previous_page=-1;
     static ImGuiTextFilter filter;
@@ -410,14 +472,14 @@ void DrawSettings(std::uint64_t icons) {
         ImGui::SeparatorText(PageNames[page]);
         if(page==General && !searching) {
             ImGui::TextWrapped("Choose your settings, then create a file normally. Selecting Original or Master Quest sets the dungeon layout for that entire file.");
-            changed|=DrawPresets(config);
+            changed|=DrawPresets(config,defaults!=nullptr);
             ImGui::Spacing();ImGui::SeparatorText("Seed");
             std::array<char,129> seed{};
             std::memcpy(seed.data(),config.seed.data(),std::min(config.seed.size(),seed.size()-1));
             ImGui::SetNextItemWidth(-1);
             if(ImGui::InputTextWithHint("##Seed","Blank = random seed for each new file",seed.data(),seed.size())) {config.seed=seed.data();changed=true;}
             ImGui::TextWrapped("Use the same seed and settings to generate the same randomizer. Glitchless logic is the default.");
-            if(const auto playing=CurrentConfig()) {
+            if(const auto playing=defaults ? std::nullopt : CurrentConfig()) {
                 ImGui::Spacing();ImGui::SeparatorText("Current file");
                 ImGui::TextWrapped("Seed: %s",playing->seed.c_str());
                 if(ImGui::TreeNode("View saved rules (read only)")) {
@@ -447,7 +509,8 @@ void DrawSettings(std::uint64_t icons) {
             if(page==Enemies) ImGui::TextWrapped("Master Quest logic supports boss-only souls, but not Enemizer or all-enemy souls.");
             if(page==Dungeons) ImGui::TextWrapped("Original or Master Quest is chosen when creating the file. Dungeon layouts are never mixed.");
             if(page==Multiplayer) {
-                OOT3D::MultiplayerSettings::Draw();
+                if(defaults) DrawMultiplayerDefaults(*defaults);
+                else OOT3D::MultiplayerSettings::Draw();
                 ImGui::Spacing();ImGui::SeparatorText("New-file sharing rules");
             }
             std::vector<std::string> sections;
@@ -514,6 +577,9 @@ void DrawSettings(std::uint64_t icons) {
         }
     }
     ImGui::EndChild();ImGui::PopID();
-    if(changed) SetConfig(config);
+    if(changed && defaults) {
+        WriteDefaults(*defaults,*author_config,config);
+        author_config=std::move(config);
+    } else if(changed) SetConfig(config);
 }
 }

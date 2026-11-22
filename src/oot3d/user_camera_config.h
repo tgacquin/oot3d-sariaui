@@ -4,7 +4,7 @@
 #include <QSettings>
 
 namespace OOT3D::UserCamera {
-inline void LoadConfig(QSettings& config) {
+inline Values ReadValues(const auto& config) {
     Values value;
     // Older shared Camera/ and Graphics/ keys remain the F1 baseline.
     // Loading an old file must neither rewrite it nor invent player overrides.
@@ -18,13 +18,16 @@ inline void LoadConfig(QSettings& config) {
         const int v=config.value(QStringLiteral("UserCamera/")+QString::fromLatin1(ToggleNames[i]),-1).toInt(&ok);
         value.toggles[i]=ok?SanitizeToggle(v):-1;
     }
-    Set(value,false);
+    return value;
 }
-inline void SaveConfig(QSettings& config) {
-    const auto value=Get();
+inline void LoadConfig(QSettings& config) {
+    Set(ReadValues(config),false);
+}
+inline void WriteValues(auto& config, const Values& value) {
     for(unsigned i=0;i<ScaleCount;++i)
         config.setValue(QStringLiteral("UserCamera/")+QString::fromLatin1(ScaleNames[i]),value.scales[i]);
     for(unsigned i=0;i<ToggleCount;++i)
         config.setValue(QStringLiteral("UserCamera/")+QString::fromLatin1(ToggleNames[i]),value.toggles[i]);
 }
+inline void SaveConfig(QSettings& config) { WriteValues(config,Get()); }
 } // namespace OOT3D::UserCamera

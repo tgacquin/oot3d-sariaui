@@ -543,6 +543,10 @@ if ("x86_64" IN_LIST ARCHITECTURE OR "arm64" IN_LIST ARCHITECTURE)
         arm/dynarmic/arm_tick_counts.cpp
         arm/dynarmic/arm_tick_counts.h
     )
+    if(ENABLE_OOT3D_PRESENTATION AND NOT ENABLE_OOT3D_PLAYER_MODE)
+        set_property(SOURCE arm/dynarmic/arm_dynarmic.cpp APPEND PROPERTY
+            COMPILE_DEFINITIONS OOT3D_DEV_AREA_LOAD_TRACE)
+    endif()
     target_link_libraries(citra_core PRIVATE dynarmic)
 endif()
 

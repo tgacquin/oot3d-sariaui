@@ -43,7 +43,115 @@ void FullHitBatch(float fraction) {
     for(unsigned i=0;i<5;++i)invalid.inputs[i][2][0]+=.01f;
     history.Reset();assert(!apply(1,a) && !apply(2,invalid)); // Valid rectangle, misaligned cell.
 }
+void FullStreakFanCheck() {
+    namespace C=OOT3D::Interpolation::CombatSprites;
+    const auto fan=[](float radius, float angle) {
+        Batch b;
+        for(unsigned i=0;i<16;++i) {
+            const float theta=angle+i*2*3.14159265f/16;
+            std::array<E::Vertex,4> q{};
+            for(unsigned k=0;k<4;++k) {
+                const float x=radius+10.f*float(k/2),y=float(k%2);
+                q[k][0]={x*std::cos(theta)-y*std::sin(theta),x*std::sin(theta)+y*std::cos(theta),0,1};
+                q[k][1]={.25f,0,0,1};q[k][2]={float(k/2),float(1-k%2),0,1};
+            }
+            Add(b,q);
+        }
+        End(b);return NonIndexed(b);
+    };
+    E::History history;
+    const auto apply=[&](unsigned frame,const Batch& b) {
+        return OOT3D::Interpolation::ReplayEffectStrip<E::Vertex>(b.inputs,b.order,[&](const auto& v,const auto& order) {
+            return history.Apply(C::Streaks,frame,1,v,order);
+        });
+    };
+    const auto a=fan(10,0), b=fan(20,.37f), next_b=fan(30,.37f), next_a=fan(20,0);
+    assert(!apply(1,a) && !apply(1,b));
+    const auto check=[&](const Batch& old,const Batch& now) {
+        const auto sample=apply(2,now); assert(sample);
+        for(unsigned i=0;i<now.inputs.size();++i)for(unsigned c=0;c<3;++c)
+            assert(std::abs((*sample)[i][0][c]-std::lerp(old.inputs[i][0][c],now.inputs[i][0][c],
+                OOT3D::Interpolation::sample_fraction))<1e-4f);
+    };
+    check(b,next_b); check(a,next_a);
+    assert(!apply(4,a));
+    history.Reset(); assert(!apply(1,a) && !apply(1,a) && !apply(2,next_a));
+}
+// The first capture predates retaining streak inputs. Its first two rays
+// are recoverable from output triangles. Charge and atlas inputs are exact.
+void BeamosCheck(const char* path, unsigned charge_draws) {
+    namespace C = OOT3D::Interpolation::CombatSprites;
+    QFile file(path); assert(file.open(QIODevice::ReadOnly));
+    const auto draws=QJsonDocument::fromJson(file.readAll()).object()["draws"].toArray();
+    for(float phase:{.25f,.5f,.75f,1.f}) {
+        OOT3D::Interpolation::sample_fraction=phase;
+        FullStreakFanCheck();
+        E::History history;
+        std::map<unsigned,unsigned> seen,paired,moved;
+        std::optional<Batch> previous_charge;
+        std::uint64_t last_charge=0;
+        for(const auto value:draws) {
+            const auto d=value.toObject();const auto regs=Regs(d);
+            const unsigned kind=E::Candidate(regs,d["shader"].toString().toULongLong(nullptr,16),
+                                            d["swizzle"].toString().toULongLong(nullptr,16));
+            if(kind!=C::Streaks && kind!=C::Charge && kind!=13)continue;
+            ++seen[kind];
+            Batch batch;
+            if(kind==C::Streaks && d["effect_inputs"].toArray().empty()) {
+                const auto prefix=CapturedHalo(d);
+                for(unsigned base:{0u,6u}) {
+                    std::array<E::Vertex,4> q;
+                    std::copy_n(prefix.inputs.begin()+base,4,q.begin());
+                    std::swap(q[1],q[2]); // recover the native down-quad UV order
+                    Add(batch,q);
+                }
+                End(batch);
+            } else {
+                batch=CapturedEffect(d);
+                if(kind==C::Streaks)for(auto& v:batch.inputs) {
+                    v[2]=v[1];
+                    for(unsigned c=0;c<4;++c)v[1][c]=d["uniforms_f"].toArray()[8].toArray()[c].toDouble();
+                }
+            }
+            C::Color constant;
+            for(unsigned c=0;c<4;++c)constant[c]=float((regs.texturing.tev_stage1.const_color>>(8*c))&255)/255.f;
+            const auto frame=d["frame"].toInteger();
+            history.Context(d["generation"].toInt(),d["scene"].toInt());
+            const auto sample=OOT3D::Interpolation::ReplayEffectStrip<E::Vertex>(batch.inputs,batch.order,
+                [&](const auto& v,const auto& order) {
+                    return history.Apply(kind,frame,regs.texturing.texture0.GetPhysicalAddress(),v,order,constant);
+                });
+            if(kind==C::Charge) {
+                assert(bool(sample)==(last_charge+1==frame));
+                if(sample)for(unsigned k=0;k<4;++k)for(unsigned a=0;a<2;++a)for(unsigned c=0;c<4;++c) {
+                    const auto x=previous_charge->inputs[previous_charge->order[k]][a][c];
+                    const auto y=batch.inputs[batch.order[k]][a][c];
+                    assert(std::abs((*sample)[batch.order[k]][a][c]-std::lerp(x,y,phase))<.00025f);
+                }
+                previous_charge=batch; last_charge=frame;
+            }
+            if(sample) {
+                ++paired[kind];
+                if(phase==1 && kind!=13)assert(*sample==batch.inputs);
+                else if(phase<1 && *sample!=batch.inputs)++moved[kind];
+                if(kind==13 && phase<1)assert(!history.OldSpriteInputs().empty());
+            }
+        }
+        for(auto k:{C::Charge,C::Streaks,13u})if(seen[k])
+            std::cout<<"phase "<<phase<<" kind "<<k<<" draws "<<seen[k]<<" paired "<<paired[k]<<" changed "<<moved[k]<<std::endl;
+        if(charge_draws)assert(seen[C::Charge]==charge_draws && paired[C::Charge]==(charge_draws==19 ? 11u : 15u) &&
+                               (phase==1 || moved[C::Charge]>=5));
+        else assert(seen[C::Streaks]==59 && paired[C::Streaks]>=25 && seen[13]==29 && paired[13]>=15 &&
+                    (phase==1 || (moved[C::Streaks]>=25 && moved[13]>=15)));
+    }
+}
 int main(int argc,char** argv) {
+    if(argc==4 && std::string_view(argv[1])=="--beamos") {
+        BeamosCheck(argv[2],0); BeamosCheck(argv[3],23); return 0;
+    }
+    if(argc==3 && std::string_view(argv[1])=="--shadow-beamos") {
+        BeamosCheck(argv[2],19); return 0;
+    }
     assert(argc==3);
     QFile capture(argv[1]);assert(capture.open(QIODevice::ReadOnly));
     const auto draws=QJsonDocument::fromJson(capture.readAll()).object()["draws"].toArray();

@@ -34,6 +34,34 @@ int main(int argc,char** argv) {
     Matrix lens{};lens[0][1]=2; lens[1][0]=-1.2; lens[2][2]=1.001; lens[2][3]=5; lens[3][2]=-1;
     auto camera=Math::Identity();
     CameraSample sample{Math::InverseRigid(camera),1,2,1,100000,true};
+    {
+        auto& gyro=OOT3D::GyroAim::history;
+        using OOT3D::GyroAim::enabled;
+        const auto check_turn=[&](bool preview,unsigned mode) {
+            enabled=preview;
+            ReplayCamera trial;
+            auto first=sample;first.first_person=true;first.aim_mode=mode;
+            auto second=first;second.time+=32000;
+            auto turned=Math::Identity();
+            turned[0][0]=turned[2][2]=std::cos(.12);
+            turned[0][2]=std::sin(.12);turned[2][0]=-turned[0][2];
+            second.view=Math::InverseRigid(turned);
+            assert(!trial.Observe(1,first,camera,lens,first.time));
+            const auto result=trial.Observe(2,second,turned,lens,second.time);
+            assert(result);return *result;
+        };
+        for(int i=0;i<=8;++i)gyro.Add(1,100000+i*4000,{0,45,0});
+        const auto phase=gyro.RotationPhase(1,100000,132000,.5f);
+        assert(phase>.6f && phase<.65f);
+        assert(!Math::Near(check_turn(true,7),check_turn(false,7),1e-6));
+        assert(Math::Near(check_turn(true,0),check_turn(false,0),1e-9));
+        assert(gyro.RotationPhase(2,100000,132000,.25f)==.25f);
+        assert(gyro.RotationPhase(1,100000,132000,1)==1);
+        assert(gyro.RotationPhase(1,150000,182000,.5f)==.5f);
+        gyro.Reset();
+        assert(Math::Near(check_turn(true,7),check_turn(false,7),1e-9));
+        enabled=false;
+    }
     ReplayCamera history;
     assert(!history.Observe(0,sample,camera,lens,100000));
     camera[0][3]=20;sample.view=Math::InverseRigid(camera);sample.time=133333;

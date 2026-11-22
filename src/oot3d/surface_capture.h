@@ -34,6 +34,8 @@ struct TextboxSample {
     std::array<Vec4,3> matrix{};
 };
 struct Draw {
+    struct MagicFill { Vec4 left, right, replay_start; float alpha; bool moving; };
+    std::optional<MagicFill> magic_fill;
     std::uint64_t frame{}, shader{}, swizzle{};
     std::int64_t time_us{}, elapsed_ms{};
     U32 ordinal{}, generation{}, scene{}, target{}, vertices{}, vertex_base{}, index_offset{};

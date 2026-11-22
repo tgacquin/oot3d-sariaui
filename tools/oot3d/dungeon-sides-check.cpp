@@ -9,6 +9,10 @@ struct Memory {
     std::map<U32,U32> words;
     std::optional<U32> Read(U32 a) {auto i=words.find(a);return i==words.end()?std::nullopt:std::optional<U32>{i->second};}
     void Write(U32 a,U32 v) {assert(words.contains(a));words[a]=v;}
+    bool WriteFloats(U32 a,std::span<const float> values) {
+        for(unsigned i=0;i<values.size();++i)if(!words.contains(a+4*i))return false;
+        Put(a,values);return true;
+    }
     template<class T> void Put(U32 a,const T& v) {for(unsigned i=0;i<v.size();++i)words[a+i*4]=std::bit_cast<U32>(v[i]);}
 };
 constexpr std::array<float,12> identity{1,0,0,0,0,1,0,0,0,0,1,0};
@@ -156,6 +160,21 @@ int main() {
     hook.Finish(m,r,PauseMenu::Sites[1].pc);hook.Finish(m,r,PauseMenu::Sites[1].pc);hook.Finish(m,r,PauseMenu::Sites[1].pc);
     assert(hook.Drawing() && !hook.NativeDraw(m,r,true));
     hook.Finish(m,r,PauseMenu::Sites[1].pc);assert(!hook.Pending() && r==finish_regs);
+    // A reused layer can shrink then grow on alternate native vertex buffers.
+    // The board renderer submits the index count from model +0x174 at 0x3fb968.
+    auto& front=hook.fronts[0];
+    auto sample=front.geometry;
+    for(unsigned count:{1u,25u}) {
+        sample.count=count;
+        const auto bank=m.words[front_block+0x124];
+        front.Begin(m,r,PauseMenu::Sites[1].pc,sample,{},model);
+        assert(front.stage==Layer::Stage::Positions && r[1]==count*48);
+        front.Resume(m,r);assert(r[1]==count*32);
+        front.Resume(m,r);assert(r[1]==count*64);
+        front.Resume(m,r);assert(front.Drawing() && m.words[front_block+0x124]!=bank);
+        assert(m.words[front_model+0x174]==count*6);
+        front.Resume(m,r);assert(!front.Pending());
+    }
     hook.Reset();assert(!hook.backgrounds && !hook.used && !hook.Finishing());
     // Actual default backgrounds meet in the middle underneath the parchment.
     // Background panels must never subtract wells or floor selectors.

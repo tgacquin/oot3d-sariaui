@@ -109,7 +109,7 @@ template<class V> struct History {
             }
         }
     }
-    void Append(std::vector<V>& out,std::int64_t now,const HUD::CarrotShadow& shadow={},float configured_opacity=1) const {
+    void Append(std::vector<V>& out,std::int64_t now,const HUD::DropShadow& shadow={},float configured_opacity=1) const {
         if(!shadow.enabled) {AppendSprites(out,now,configured_opacity);return;}
         const auto finite=[](float v,float fallback,float lo,float hi) {
             return std::isfinite(v)?std::clamp(v,lo,hi):fallback;
