@@ -7,6 +7,7 @@
 #include "oot3d/randomizer/wire_validation.h"
 #include "oot3d/randomizer/generation_progress.h"
 #include <QElapsedTimer>
+#include <exception>
 #include <future>
 #include <mutex>
 #include <cstring>
@@ -122,7 +123,10 @@ bool SpawnGenerator(const QString& program,const QString& input,bool mq,const QS
     if(!WIFEXITED(status) || WEXITSTATUS(status)!=0) {
         QFile file(errors);QByteArray detail;
         if(file.open(QIODevice::ReadOnly)) {file.seek(std::max<qint64>(0,file.size()-1000));detail=file.read(1000);}
-        SetError(FileStatus::GeneratorError(detail.toStdString()),"Generation failed: "+detail.toStdString());return false;
+        const auto reason = WIFSIGNALED(status) ? "signal " + std::to_string(WTERMSIG(status))
+                                                : "exit status " + std::to_string(WEXITSTATUS(status));
+        SetError(FileStatus::GeneratorError(detail.toStdString()), "Seed generator stopped (" + reason + "). " + detail.toStdString());
+        return false;
     }
     return true;
 }
@@ -346,7 +350,14 @@ int PrepareNew(unsigned slot, bool mq) {
     if (preparing_slot == slot && preparing_mq == mq && prepared) return 1;
     if (generation.valid()) {
         if (generation.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return 0;
-        auto result = generation.get(); busy = false;
+        std::optional<Package> result;
+        try {
+            result = generation.get();
+        } catch (const std::exception& error) {
+            if (preparing_slot == slot && preparing_mq == mq)
+                SetError(FileStatus::Error::Generation, "Seed preparation failed: " + std::string(error.what()));
+        }
+        busy = false;
         if (preparing_slot != slot || preparing_mq != mq) return 0;
         prepared = std::move(result);
         generation_failed = !prepared;
@@ -389,7 +400,9 @@ int PrepareNew(unsigned slot, bool mq) {
         if (cancelled->load()) return {};
         if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
             const auto detail=process.readAllStandardError().right(1000).toStdString();
-            SetError(FileStatus::GeneratorError(detail),"Generation failed: " + detail);
+            const std::string reason = process.exitStatus() == QProcess::CrashExit ? "crash" : "exit";
+            SetError(FileStatus::GeneratorError(detail), "Seed generator stopped (" + reason + " code " +
+                     std::to_string(process.exitCode()) + "). " + detail);
             return {};
         }
 #endif
