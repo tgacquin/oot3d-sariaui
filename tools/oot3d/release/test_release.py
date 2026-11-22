@@ -214,8 +214,8 @@ class ReleaseChecks(unittest.TestCase):
 
     def test_dirty_checkout_not_silently_packaged(self):
         with patch('preflight.git', return_value='?? src/oot3d/example.h\n'):
-            with self.assertRaisesRegex(ValueError, 'clean and committed'):
-                    check()
+            with self.assertRaisesRegex(ValueError, r'(?s)clean and committed.*\?\? src/oot3d/example\.h'):
+                check()
 
     def test_windows_requires_helper_and_only_copies_runtime(self):
         with tempfile.TemporaryDirectory() as tmp:

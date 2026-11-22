@@ -90,6 +90,14 @@ jobs:
           df -h /
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
           df -h /
+      - name: Set Windows checkout line endings and remember its Git
+        if: matrix.platform == 'windows-x64'
+        shell: pwsh
+        run: |
+          $gitExe = (Get-Command git.exe).Source
+          & $gitExe config --global core.autocrlf false
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "CHECKOUT_GIT_DIR=$(Split-Path -Parent $gitExe)" >> $env:GITHUB_ENV
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
@@ -129,6 +137,7 @@ jobs:
         shell: 'msys2 {0}'
         run: |
           set -euo pipefail
+          export PATH="$(cygpath -u "$CHECKOUT_GIT_DIR"):$PATH"
           bash tools/oot3d/release/build.sh "$RELEASE_PLATFORM" "$RELEASE_VERSION" 2>&1 | tee release-build.log
       - name: Build, check and package macOS
         if: matrix.platform == 'macos-arm64'

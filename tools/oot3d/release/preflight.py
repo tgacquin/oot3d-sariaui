@@ -25,8 +25,9 @@ def git(*args):
 
 def check(expected=None):
     selected_version = release_version(expected)
-    if git('status', '--porcelain', '--untracked-files=normal').strip():
-        raise ValueError('Release checkout must be clean and committed; do not discard local work.')
+    changes = git('status', '--porcelain', '--untracked-files=normal').rstrip()
+    if changes:
+        raise ValueError(f'Release checkout must be clean and committed. Git reports:\n{changes}')
     status = git('submodule', 'status', '--recursive')
     if any(line.startswith(('-', '+', 'U')) for line in status.splitlines()):
         raise ValueError('Initialize submodules at their recorded revisions.')
