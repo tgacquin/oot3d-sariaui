@@ -47,15 +47,17 @@ with tempfile.TemporaryDirectory() as tmp:
             def window(hwnd,unused):
                 pid=wintypes.DWORD()
                 ui.GetWindowThreadProcessId(wintypes.HWND(hwnd),ctypes.byref(pid))
-                if pid.value==proc.pid or ui.IsWindowVisible(wintypes.HWND(hwnd)):
+                if pid.value==proc.pid:
                     print('Window:',pid.value,title(wintypes.HWND(hwnd)),flush=True)
                     ui.EnumChildWindows(wintypes.HWND(hwnd),child,0)
                 return 1
             ui.EnumWindows(window,0)
             if gdb:
-                subprocess.run([gdb,'-nx','-batch','-iex','set auto-load off','-p',str(proc.pid),
+                try:
+                    subprocess.run([gdb,'-nx','-batch','-iex','set auto-load off','-p',str(proc.pid),
                                 '-ex','info threads','-ex','thread apply all bt 16','-ex','detach'],
-                               cwd=work,timeout=90)
+                                   cwd=work,timeout=90)
+                except subprocess.TimeoutExpired: print("Debugger attachment timed out",flush=True)
         finally:
             if proc.poll() is None: proc.kill()
             proc.wait()
