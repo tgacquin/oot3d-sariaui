@@ -770,7 +770,7 @@ static void RandomizeDungeonRewards() {
             // start. This is done mainly because players are already familiar with seeing their dungeon
             // reward before opening up their file
             if (locKey == LINKS_POCKET && rewardId != INVALID_DUNGEON_REWARD) {
-                LinksPocketRewardBitMask = bitMaskTable[rewardId];
+                LinksPocketRewardBitMask = bitMaskTable.at(rewardId);
             }
         }
     } else if (LinksPocketItem.Is(LINKSPOCKETITEM_DUNGEON_REWARD)) {
@@ -784,7 +784,7 @@ static void RandomizeDungeonRewards() {
         }
         ItemKey startingReward = RandomElement(rewards, true);
 
-        LinksPocketRewardBitMask = bitMaskTable[ItemTable(startingReward).GetItemID() - baseOffset];
+        LinksPocketRewardBitMask = bitMaskTable.at(ItemTable(startingReward).GetItemID() - baseOffset);
         PlaceItemInLocation(LINKS_POCKET, startingReward);
         // erase the stone/medallion from the Item Pool
         FilterAndEraseFromPool(ItemPool, [startingReward](const ItemKey i) { return i == startingReward; });
