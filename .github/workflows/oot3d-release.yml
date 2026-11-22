@@ -145,6 +145,24 @@ jobs:
         run: |
           set -euo pipefail
           bash tools/oot3d/release/build.sh "$RELEASE_PLATFORM" "$RELEASE_VERSION" 2>&1 | tee release-build.log
+      - name: Inspect timed-out Windows package startup
+        if: failure() && matrix.platform == 'windows-x64'
+        shell: 'msys2 {0}'
+        run: |
+          set -eu
+          pacman -S --needed --noconfirm mingw-w64-ucrt-x86_64-gdb
+          python3 tools/oot3d/release/diagnose_windows_startup.py
+      - name: Retain Windows startup reproduction
+        if: failure() && matrix.platform == 'windows-x64'
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-startup-reproduction
+          path: |
+            build-release-windows-x64/bundle/*.exe
+            build-release-windows-x64/bundle/*.dll
+            build-release-windows-x64/bundle/qt.conf
+            build-release-windows-x64/bundle/plugins/**/*.dll
+          retention-days: 1
       - name: Build, check and package Linux in the existing toolchain image
         if: matrix.platform == 'linux-x86_64'
         shell: bash
