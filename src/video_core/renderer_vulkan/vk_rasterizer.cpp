@@ -1793,8 +1793,8 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed, bool hud_colors, [
             n.color=fb.GetColorBufferPhysicalAddress();n.depth=fb.GetDepthBufferPhysicalAddress();
             n.compare=(compare==CF::GreaterThan || compare==CF::GreaterThanOrEqual)?vk::CompareOp::eGreaterOrEqual:vk::CompareOp::eLessOrEqual;
             const auto v=fb_helper.Viewport();const auto r=fb_helper.DrawRect();
-            n.viewport={float(v.x),float(v.y),float(v.width),float(v.height),0,1};
-            n.scissor={{s32(r.left),s32(r.bottom)},{r.GetWidth(),r.GetHeight()}};
+            n.viewport = vk::Viewport{float(v.x), float(v.y), float(v.width), float(v.height), 0, 1};
+            n.scissor = vk::Rect2D{{s32(r.left), s32(r.bottom)}, {r.GetWidth(), r.GetHeight()}};
         }
         if(const auto hud=OotHudMesh();hud && hud->first==92 && hud->second)
             oot_name_hud=true;

@@ -206,7 +206,7 @@ inline void CheckRoomImport(const char* code_path, R::Package package) {
         const auto file=request->file.load();
         assert(file && file->native_save==raw && file->package.config==package.config &&
                file->package.extended_save==package.extended_save);
-        cpu.Reset();cpu.SetCpsr(0x10);
+        e.ResetGuestRegisters();
         for(unsigned i=0;i<16;++i)cpu.Regs()[i]=0x12340000+i;
         cpu.Regs()[13]=Env::SP;cpu.Regs()[15]=R::RoomImport::Dispatch+4;
         return request;

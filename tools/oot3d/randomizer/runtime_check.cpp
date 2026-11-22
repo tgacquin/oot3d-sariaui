@@ -98,8 +98,17 @@ struct Env : Dynarmic::A32::UserCallbacks {
         if(svc==0x2a) {r[0]=0;r[1]=1;r[2]=0;return;} // svcGetSystemInfo: emulator.
         std::cerr<<"unexpected svc "<<std::hex<<svc<<" pc="<<r[15]<<'\n';std::abort();
     }
+    void ResetGuestRegisters() {
+        // Jit::Reset also drops pending code-cache invalidations on x86-64.
+        // Preserve them when starting a new guest call after changing hooks.
+        cpu->Regs().fill(0);
+        cpu->ExtRegs().fill(0);
+        cpu->SetCpsr(0x10);
+        cpu->SetFpscr(0);
+        cpu->ClearExclusiveState();
+    }
     void Run(U32 pc,U32 a=0,U32 b=0,U32 c=0) {
-        cpu->Reset();cpu->SetCpsr(0x10);
+        ResetGuestRegisters();
         auto& r=cpu->Regs();r[0]=a;r[1]=b;r[2]=c;r[13]=SP;r[14]=Stop;r[15]=pc;
         if(setup) {auto prepare=std::move(setup);setup={};prepare();}
         remaining=10000000;stopped=false;cpu->Run();
