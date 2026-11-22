@@ -159,7 +159,8 @@ class ReleaseChecks(unittest.TestCase):
             root = Path(tmp)
             editor, runtime = root / 'editor.ini', root / 'runtime.ini'
             editor.write_text('[HUD]\nhearts\\x=-12\n[Interpolation]\ntarget_fps=120\n'
-                'match_refresh_rate=true\n[Randomizer]\nseed=private-seed\n'
+                'match_refresh_rate=true\n[HDNumbers]\ntimers\\shadow\\enabled=true\n'
+                'timers\\backdrop\\opacity=1\ntimers\\spacing=2\n[Randomizer]\nseed=private-seed\n'
                 '[Graphics]\nfxaa=true\nbloom=true\nactor_draw_distance=1\n'
                 '[UserHUD]\nhearts\\x=20\n[Multiplayer]\nroom=private-room\n'
                 'player_names\\scale=0.8\n')
@@ -181,6 +182,7 @@ class ReleaseChecks(unittest.TestCase):
                 export(editor, runtime, root / 'incomplete')
             presentation = read(root / 'out/presentation.ini')
             frontend = read(root / 'out/runtime.ini')
+            self.assertEqual(dict(presentation['HDNumbers']), {'timers\\spacing': '2'})
             self.assertEqual(presentation['HUD']['hearts\\x'], '-12')
             self.assertEqual(presentation['Multiplayer']['player_names\\scale'], '0.8')
             self.assertEqual(presentation['Interpolation']['target_fps'], '60')

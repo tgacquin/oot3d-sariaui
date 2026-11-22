@@ -589,83 +589,20 @@ int main(int argc,char** argv) {
     }
     e.Write(B::Owner+0x3ec,0xffffffff);assert(!B::InBattle(e));
     {
-        // One native timer backdrop must cover all digits after the exact same
-        // placement/spacing transform, precede pane 210, and inherit visibility.
         const auto previous_bytes=e.bytes;
-        B::Hook draw;draw.active=true;draw.stage=B::Hook::Stage::Native;draw.pane=99;
-        draw.frame_layout[B::Timer]={10,20,2};draw.timer_opacity=.5f;
-        auto hd=OOT3D::HUD::GetLayout();const auto original_hd=hd;
-        hd.hd_timer_text={3,4,1.5f};hd.hd_timer_spacing=2;
-        hd.hd_timer_backdrop={true,2,-3,1.5f,2,.75f,.6f};
-        OOT3D::HUD::SetLayout(hd,false);
-        const auto f=[&](U32 at,float v){e.Write(at,std::bit_cast<U32>(v));};
-        constexpr U32 first=0x8c0000;
-        for(unsigned i=0;i<8;++i) {
-            const U32 p=first+i*0x1000,model=p+0x100,mesh=p+0x400,desc=p+0x600,verts=p+0x800;
-            e.Write(B::NativeLayout+0x418+4*(210+i),p);e.Write(p+4,B::NativeLayout+0x18);
-            e.Write(p+0x6c,0x100);e.Write(p+0xb0,3);e.Write(p+0x78,256);
-            e.Write(p+0x64,model);e.Write(p+0x68,0);e.Write(p+0xc,0);
-            f(p+0x80,14+12*i);f(p+0x84,18);
-            e.Write(model+4,mesh);f(model+0xfc,.8f);
-            const std::array<float,12> matrix{1,0,0,14.f+12*i,0,1,0,18,0,0,1,0};
-            for(unsigned j=0;j<12;++j)f(model+0xc+4*j,matrix[j]);
-            e.Write(mesh,desc);e.Write(desc+0xc,4);e.Write(mesh+0x124,0);e.Write(mesh+0x1a0,verts);
-            const std::array<float,12> corners{0,0,0,12,0,0,0,21,0,12,21,0};
-            for(unsigned j=0;j<12;++j)f(verts+4*j,corners[j]);
+        const auto original_hd=OOT3D::HUD::GetLayout();
+        B::Hook draw;draw.active=true;draw.stage=B::Hook::Stage::Native;draw.pane=210;draw.timer_opacity=.5f;
+        constexpr U32 p=0x8c0000,foreground=p+0x100,shadow=p+0x500,renderer=0x8d0000,alpha=0x8d0400;
+        e.Write(B::NativeLayout+0x418+4*210,p);e.Write(p+0x64,foreground);e.Write(p+0x68,shadow);
+        for(bool enabled:{false,true})for(bool timer:{false,true}) {
+            auto hd=original_hd;hd.hd_numbers=enabled;hd.hd_timer_numbers=timer;
+            OOT3D::HUD::SetLayout(hd,false);
+            for(auto model:{foreground,shadow}) {
+                e.Write(renderer+0x354,model);e.Write(alpha,std::bit_cast<U32>(.8f));
+                draw.DrawMaterial(e,renderer,alpha);
+                assert(std::bit_cast<float>(*e.Read(alpha))==(enabled && timer && model==shadow?0.f:.4f));
+            }
         }
-        auto [g,source]=draw.MakeTimerBackdrop(e);
-        assert(source==first+0x100 && g.count==256 && draw.pane==99);
-        float left=INFINITY,top=INFINITY,right=-INFINITY,bottom=-INFINITY,max_alpha=0;
-        for(unsigned i=0;i<g.count*4;++i) {
-            left=std::min(left,g.positions[3*i]);right=std::max(right,g.positions[3*i]);
-            top=std::min(top,g.positions[3*i+1]);bottom=std::max(bottom,g.positions[3*i+1]);
-            max_alpha=std::max(max_alpha,g.colors[4*i+3]);
-        }
-        // First digit starts at (27,42); total width 96*3 + 7*2*3, height 21*3.
-        assert(std::abs((left+right)*.5f-(27+330*.5f+2))<.001f);
-        assert(std::abs((top+bottom)*.5f-(42+63*.5f-3))<.001f);
-        assert(std::abs(right-left-330*1.5f)<.001f && std::abs(bottom-top-63*2)<.001f);
-        assert(std::abs(max_alpha-.8f*.5f*.6f)<.0001f);
-        for(unsigned q=32;q<256;++q) {
-            const auto* p=g.positions.data()+q*12;
-            // Same winding as native TL,BL,TR triangles.
-            assert((p[6]-p[0])*(p[4]-p[1])-(p[7]-p[1])*(p[3]-p[0])<0);
-        }
-        // The generated draw finishes (or fails allocation) before the first
-        // native digit. Re-entering Top must neither skip nor duplicate it.
-        e.Write(first+0x100,0x4ebd60);e.Write(first+0x100+0x1dc,0x8d2000);
-        for(bool completed:{false,true}) {
-            B::Hook sequence;sequence.active=true;sequence.stage=B::Hook::Stage::Native;
-            sequence.pane=209;sequence.next=210;sequence.timer_opacity=.5f;
-            std::array<U32,16> regs{};sequence.saved[13]=0x980000;
-            sequence.Top(e,regs,true);
-            assert(sequence.stage==B::Hook::Stage::TimerBackdrop && sequence.next==210);
-            assert(sequence.timer_backdrop.Pending() && regs[15]!=0x2f1280);
-            if(completed)sequence.timer_backdrop.stage=decltype(sequence.timer_backdrop)::Stage::Draw;
-            else regs[0]=0;
-            sequence.Top(e,regs,true);
-            assert(sequence.stage==B::Hook::Stage::Native && sequence.pane==210 && sequence.next==211);
-            assert(regs[15]==0x2f1280 && regs[0]==first && regs[13]==0x980000);
-            assert(!sequence.timer_backdrop.Pending());
-        }
-        constexpr U32 renderer=0x8d0000,alpha=0x8d0400;
-        draw.stage=B::Hook::Stage::TimerBackdrop;
-        draw.timer_backdrop.stage=decltype(draw.timer_backdrop)::Stage::Draw;
-        draw.timer_backdrop.model=0x8d0800;e.Write(renderer+0x354,draw.timer_backdrop.model);
-        f(alpha,.8f);draw.DrawMaterial(e,renderer,alpha);
-        assert(std::bit_cast<float>(*e.Read(alpha))==1); // No second native fade multiplication.
-        draw.timer_backdrop.stage=decltype(draw.timer_backdrop)::Stage::Idle;
-        draw.stage=B::Hook::Stage::Native;draw.timer_opacity=0;
-        assert(draw.MakeTimerBackdrop(e).first.count==0);
-        draw.results=true;constexpr U32 label=0x8d1000;
-        e.Write(B::NativeLayout+0x418+220*4,label);e.Write(label+4,B::NativeLayout+0x18);
-        e.Write(label+0x6c,0);e.Write(label+0xb0,3);e.Write(label+0x78,256);
-        assert(draw.MakeTimerBackdrop(e).first.count==0);
-        e.Write(label+0x6c,0x100);assert(draw.MakeTimerBackdrop(e).first.count==256);
-        for(unsigned i=0;i<8;++i)f(first+i*0x1000+0x100+0xfc,0);
-        assert(draw.MakeTimerBackdrop(e).first.count==0);
-        hd.hd_timer_backdrop.enabled=false;OOT3D::HUD::SetLayout(hd,false);
-        assert(draw.MakeTimerBackdrop(e).first.count==0);
         OOT3D::HUD::SetLayout(original_hd,false);e.bytes=previous_bytes;
     }
     std::cout<<"Death Save/Continue: immediate native callbacks, sound continuation and ABI passed. Boss Challenge: native selection equals selection+Battle for all nine choices; Cancel/B, ABI, code guards, routing, both grids and touch mapping passed\n";

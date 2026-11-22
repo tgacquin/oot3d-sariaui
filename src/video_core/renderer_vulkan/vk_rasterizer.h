@@ -352,7 +352,7 @@ private:
     void UploadUniforms(bool accelerate_draw);
 
     /// Generic draw function for DrawTriangles and AccelerateDrawBatch
-    bool Draw(bool accelerate, bool is_indexed, bool hud_colors = false, bool outline_rupees = false);
+    bool Draw(bool accelerate, bool is_indexed, bool hud_colors = false);
 
     /// Internal implementation for AccelerateDrawBatch
     bool AccelerateDrawBatchInternal(bool is_indexed);

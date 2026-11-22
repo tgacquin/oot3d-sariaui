@@ -42,7 +42,9 @@ int main(int argc, char** argv) {
     Check(editor.value("FileSelect/name_entry/custom/enabled").toBool());
     Check(editor.value("PauseScreen/horizontal").toBool());
     Check(editor.value("HDNumbers/enabled").toBool());
-    Check(editor.value("HDNumbers/timers/backdrop/enabled").toBool());
+    Check(!editor.contains("HDNumbers/timers/backdrop/enabled"));
+    Check(!editor.contains("HDNumbers/timers/shadow/enabled"));
+    Check(editor.contains("HUD/magic/one_row_y") && editor.contains("HUD/magic/two_row_y"));
     for (const auto& key : editor.allKeys()) {
         Check(!key.startsWith("Randomizer/") && !key.startsWith("UserHUD/") &&
               !key.startsWith("UserCamera/"));

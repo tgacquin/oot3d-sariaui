@@ -144,7 +144,21 @@ int main() {
         layout.rupee_digit_outline.enabled=enabled;
         assert(layout.OutlineHDRupees()==(global && rupee && enabled));
     }
-    for(unsigned count=1;count<=4;++count) {
+    for(bool global:{false,true})for(bool timer:{false,true})for(bool enabled:{false,true}) {
+        layout.hd_numbers=global;
+        layout.hd_timer_numbers=timer;
+        layout.hd_rupee_numbers=false;
+        layout.rupee_digit_outline.enabled=enabled;
+        assert(layout.OutlineHDTimer()==(global && timer && enabled));
+    }
+    for(bool global:{false,true})for(bool skulltula:{false,true})for(bool enabled:{false,true}) {
+        layout.hd_numbers=global;
+        layout.hd_skulltula_numbers=skulltula;
+        layout.hd_rupee_numbers=layout.hd_timer_numbers=false;
+        layout.rupee_digit_outline.enabled=enabled;
+        assert(layout.OutlineHDSkulltula()==(global && skulltula && enabled));
+    }
+    for(unsigned count=1;count<=8;++count) {
         auto batch=digit(-.6f,.3f); // Already-prepended backdrop.
         for(unsigned i=0;i<count;++i) {
             auto face=digit(i*.07f,i==3?0.f:.5f);
@@ -193,11 +207,7 @@ int main() {
     HUD::Layout l;l.hd_ammo_backdrop.enabled=true;assert(AmmoBackdrop::Enabled(l));
     l.hd_numbers=false;assert(!AmmoBackdrop::Enabled(l));
     l.hd_numbers=true;l.hd_ammo_numbers=false;assert(!AmmoBackdrop::Enabled(l));
-    l={};l.hd_timer_backdrop.enabled=true;
-    assert(AmmoBackdrop::TimerEnabled(l) && !AmmoBackdrop::Enabled(l) && !AmmoBackdrop::Enabled(l,true));
-    l.hd_timer_numbers=false;assert(!AmmoBackdrop::TimerEnabled(l));
-    l.hd_timer_numbers=true;l.hd_numbers=false;assert(!AmmoBackdrop::TimerEnabled(l));
-    // Full eight-quad timer, including punctuation, gets one oval and unchanged digits.
+    // Check the maximum supported batch size for a number backdrop.
     native.clear();for(unsigned i=0;i<8;++i) {
         const auto q=digit(-.4f+i*.07f,.35f);native.insert(native.end(),q.begin(),q.end());
     }

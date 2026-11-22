@@ -633,7 +633,7 @@ static void WriteNewGsLocations(tinyxml2::XMLDocument& spoilerLog, const bool co
 static void WritePlaythrough(tinyxml2::XMLDocument& spoilerLog, const bool collapsible = false) {
     auto playthroughNode = spoilerLog.NewElement("playthrough");
 
-    for (uint i = 0; i < playthroughLocations.size(); ++i) {
+    for (unsigned int i = 0; i < playthroughLocations.size(); ++i) {
         if (collapsible) {
             playthroughNode->InsertEndChild(CreateCollapseCheckbox(spoilerLog));
         }
@@ -659,7 +659,7 @@ static void WriteShuffledEntrances(tinyxml2::XMLDocument& spoilerLog, const bool
 
     auto playthroughNode = spoilerLog.NewElement("entrance-playthrough");
 
-    for (uint i = 0; i < playthroughEntrances.size(); ++i) {
+    for (unsigned int i = 0; i < playthroughEntrances.size(); ++i) {
         if (collapsible) {
             playthroughNode->InsertEndChild(CreateCollapseCheckbox(spoilerLog));
         }

@@ -576,8 +576,15 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
             if (ImGui::BeginTabBar(player ? "Player settings tabs" : "Settings tabs")) {
                 if (ImGui::BeginTabItem("General")) {
                     int language=-1;
-                    for(unsigned i=0;i<GameLanguage::Languages.size();++i)
-                        if(defaults ? defaults->value("General/initial_game_language",1).toInt() : GameLanguage::game_language.load()==GameLanguage::Languages[i])language=int(i);
+                    const int selected_language = defaults
+                        ? defaults->value("General/initial_game_language", 1).toInt()
+                        : GameLanguage::game_language.load();
+                    for (unsigned i = 0; i < GameLanguage::Languages.size(); ++i) {
+                        if (selected_language == GameLanguage::Languages[i]) {
+                            language = int(i);
+                            break;
+                        }
+                    }
                     if(ImGui::Combo("Game language",&language,"English\0Français\0Español\0")) {
                         if(defaults) defaults->setValue("General/initial_game_language",GameLanguage::Languages[language]);
                         else {
@@ -1803,7 +1810,7 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                                 layout.hd_numbers_bold=number_font==1;changed=true;
                             }
                             if(ImGui::TreeNode("Shadow")) {
-                                ImGui::TextDisabled("Timers have separate shadow controls below.");
+                                ImGui::TextDisabled("Applies to counters other than timers.");
                                 auto& s=layout.hd_rupee_shadow;
                                 changed|=ImGui::Checkbox("Enable shadow",&s.enabled);
                                 changed|=ImGui::DragFloat("Horizontal offset",&s.x,.05f,-3,3,"%.2f px",ImGuiSliderFlags_AlwaysClamp);
@@ -1822,17 +1829,6 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                                 if(!ImGui::TreeNode(section.label))continue;
                                 changed|=ImGui::Checkbox("HD font",section.enabled);
                                 ImGui::BeginDisabled(!*section.enabled);
-                                if(section.pose==&layout.hd_timer_text && ImGui::TreeNode("Shadow")) {
-                                    auto& s=layout.hd_timer_shadow;
-                                    ImGui::TextDisabled("Gameplay and Boss Challenge timers.");
-                                    changed|=ImGui::Checkbox("Enable shadow",&s.enabled);
-                                    changed|=ImGui::DragFloat("Horizontal offset",&s.x,.05f,-3,3,"%.2f px",ImGuiSliderFlags_AlwaysClamp);
-                                    changed|=ImGui::DragFloat("Vertical offset",&s.y,.05f,-3,3,"%.2f px",ImGuiSliderFlags_AlwaysClamp);
-                                    changed|=ImGui::SliderFloat("Blur",&s.blur,0,2,"%.2f px",ImGuiSliderFlags_AlwaysClamp);
-                                    changed|=ImGui::SliderFloat("Opacity",&s.strength,0,1,"%.2f",ImGuiSliderFlags_AlwaysClamp);
-                                    if(ImGui::Button("Reset shadow")){s={};changed=true;}
-                                    ImGui::TreePop();
-                                }
                                 auto& p=*section.pose;
                                 if(section.pose==&layout.hd_ammo_text)ImGui::TextDisabled("Gameplay placement");
                                 changed|=ImGui::DragFloat("X",&p.x,.1f,-100,100,"%+.1f px",ImGuiSliderFlags_AlwaysClamp);
@@ -1848,9 +1844,8 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                                     if(ImGui::Button("Reset placement")){pose={};changed=true;}
                                     ImGui::TreePop();
                                 }
-                                if((section.pose==&layout.hd_ammo_text || section.pose==&layout.hd_rupee_text || section.pose==&layout.hd_timer_text) && ImGui::TreeNode("Soft backdrop")) {
-                                    auto& b=section.pose==&layout.hd_timer_text?layout.hd_timer_backdrop:
-                                        section.pose==&layout.hd_rupee_text?layout.hd_rupee_backdrop:layout.hd_ammo_backdrop;
+                                if((section.pose==&layout.hd_ammo_text || section.pose==&layout.hd_rupee_text) && ImGui::TreeNode("Soft backdrop")) {
+                                    auto& b=section.pose==&layout.hd_rupee_text?layout.hd_rupee_backdrop:layout.hd_ammo_backdrop;
                                     if(section.pose==&layout.hd_rupee_text)ImGui::TextDisabled("Shared by rupee and small-key numbers.");
                                     changed|=DrawSoftBackdrop(b);
                                     ImGui::TreePop();
@@ -1901,7 +1896,7 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                                 changed |= DrawSpriteContour("Rupee icon contour",layout.rupee_contour);
                                 auto& outline=layout.rupee_digit_outline;
                                 changed |= ImGui::Checkbox("Outline counter numbers",&outline.enabled);
-                                if(ImGui::IsItemHovered())ImGui::SetTooltip("Applies to HD rupee and small-key numbers.");
+                                if(ImGui::IsItemHovered())ImGui::SetTooltip("Applies to HD rupee, small-key, timer and Skulltula digits.");
                                 if(outline.enabled) {
                                     changed |= ImGui::SliderFloat("Outline thickness",&outline.thickness,
                                         outline.MinThickness,outline.MaxThickness,"%.2fx",ImGuiSliderFlags_AlwaysClamp);
@@ -1927,6 +1922,8 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                                 }
                             }
                             if (i == HUD::Magic) {
+                                changed |= ImGui::DragFloat("One heart row Y offset",&layout.magic_one_row_y,.1f,-240,240,"%+.1f px",ImGuiSliderFlags_AlwaysClamp);
+                                changed |= ImGui::DragFloat("Two heart rows Y offset",&layout.magic_two_row_y,.1f,-240,240,"%+.1f px",ImGuiSliderFlags_AlwaysClamp);
                                 changed |= ImGui::DragFloat("Height scale",&layout.magic_height,.01f,1,8,"%.2fx",ImGuiSliderFlags_AlwaysClamp);
                                 changed |= ImGui::DragFloat("Fill padding",&layout.magic_border,.01f,0,4,"%.2fx",ImGuiSliderFlags_AlwaysClamp);
                                 changed |= ImGui::SliderFloat("Black background opacity",&layout.magic_background_opacity,0,1,"%.2f",ImGuiSliderFlags_AlwaysClamp);
@@ -1953,6 +1950,8 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                                 if (i == HUD::Rupees) {layout.counter_distance=HUD::Layout{}.counter_distance;layout.rupee_number_gap=0;layout.rupee_contour={};layout.rupee_digit_outline={};}
                                 if (i == HUD::Carrots) {layout.carrot_opacity = 1;layout.carrot_spacing = 0;layout.carrot_animation_delay = 0;layout.carrot_shadow={};}
                                 if (i == HUD::Magic) {
+                                    layout.magic_one_row_y=HUD::Layout{}.magic_one_row_y;
+                                    layout.magic_two_row_y=HUD::Layout{}.magic_two_row_y;
                                     layout.magic_height=layout.magic_border=layout.magic_background_opacity=1;
                                     layout.magic_fill_color=HUD::NativeMagicFill;
                                     layout.magic_contour={};layout.magic_border_roundness=0;layout.magic_shadow={};

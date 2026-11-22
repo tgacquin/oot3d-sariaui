@@ -52,16 +52,24 @@ int main(int argc,char** argv) {
             }
             assert(coverage>20 && antialias>10); // Includes both punctuation marks.
         }
-        RupeeShadow shadow;shadow.enabled=false;
-        const auto plain=StyledBossTimerAtlas(source->hash,shadow);
-        assert(plain && plain->rgba!=out && plain->variant!=atlas->variant);
+        OOT3D::HUD::RupeeDigitOutline outline{.enabled=true,.thickness=.75f,.color={1,0,0}};
+        const auto outlined=StyledBossTimerAtlas(source->hash,outline);
+        assert(outlined && outlined->rgba!=out && StyledBossTimerAtlas(source->hash,outline)==outlined);
+        bool colored_edge=false;
+        for(std::size_t p=0;p<out.size();p+=4)if(out[p+3]==0 && outlined->rgba[p+3]>=128) {
+            // The original ink can round to zero alpha at the antialiased edge.
+            assert(outlined->rgba[p]>=254 && outlined->rgba[p+1]<=1 && outlined->rgba[p+2]<=1);
+            colored_edge=true;
+        }
+        assert(colored_edge);
+        outline.thickness=2;
+        assert(StyledBossTimerAtlas(source->hash,outline)->rgba!=outlined->rgba);
         assert(!StyledBossTimerAtlas(0,{}));
-        shadow.blur=3;assert(MakeBossTimerAtlas(source->native,shadow).empty());
         assert(MakeBossTimerAtlas({}).empty());
         if(argc==3 && language==1) {
             std::ofstream image(argv[2],std::ios::binary);
             image.write(reinterpret_cast<const char*>(out.data()),out.size());assert(image);
         }
     }
-    std::cout<<"HD boss timer: all languages, digits/punctuation, untouched art, shadows, hash isolation and invalid assets passed\n";
+    std::cout<<"HD boss timer: all languages, digits/punctuation, untouched art, shared outline, hash isolation and invalid assets passed\n";
 }

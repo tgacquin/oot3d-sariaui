@@ -6,7 +6,7 @@
 #include <mutex>
 
 namespace OOT3D::HDFont {
-std::shared_ptr<const RupeeAtlas> StyledBossTimerAtlas(std::uint64_t hash,RupeeShadow shadow,bool bold) {
+std::shared_ptr<const RupeeAtlas> StyledBossTimerAtlas(std::uint64_t hash,const HUD::RupeeDigitOutline& outline,bool bold) {
     std::shared_ptr<const RupeeAtlas> source;
     for(const auto& entry:boss_timer_atlases) {
         auto candidate=entry.load();
@@ -15,24 +15,23 @@ std::shared_ptr<const RupeeAtlas> StyledBossTimerAtlas(std::uint64_t hash,RupeeS
     if(!source)return {};
     static std::mutex mutex;
     static std::shared_ptr<const RupeeAtlas> previous,result;
-    static RupeeShadow style;
+    static HUD::RupeeDigitOutline style;
     static bool weight=false;
     static std::uint64_t variant=0;
     std::scoped_lock lock{mutex};
-    if(previous==source && style==shadow && weight==bold)return result;
+    if(previous==source && style==outline && weight==bold)return result;
     auto next=std::make_shared<RupeeAtlas>();
-    next->rgba=MakeBossTimerAtlas(source->native,shadow,bold);
+    next->rgba=MakeBossTimerAtlas(source->native,outline,bold);
     if(next->rgba.empty())return {};
     next->hash=hash;next->variant=++variant;
-    previous=source;style=shadow;weight=bold;result=std::move(next);
+    previous=source;style=outline;weight=bold;result=std::move(next);
     return result;
 }
-std::vector<std::uint8_t> MakeBossTimerAtlas(std::span<const std::uint8_t> native,RupeeShadow style,bool bold) {
+std::vector<std::uint8_t> MakeBossTimerAtlas(std::span<const std::uint8_t> native,const HUD::RupeeDigitOutline& outline,bool bold) {
     constexpr unsigned W=512,H=256,S=4;
-    if(native.size()!=W*H*4 || !std::isfinite(style.x) || !std::isfinite(style.y) ||
-       !std::isfinite(style.blur) || !std::isfinite(style.strength) ||
-       std::abs(style.x)>3 || std::abs(style.y)>3 || style.blur<0 || style.blur>2 ||
-       style.strength<0 || style.strength>1)return {};
+    if(native.size()!=W*H*4 || !std::isfinite(outline.thickness) ||
+       !std::all_of(outline.color.begin(),outline.color.end(),[](float c){return std::isfinite(c) && c>=0 && c<=1;}))return {};
+    const float thickness=std::clamp(outline.thickness,outline.MinThickness,outline.MaxThickness);
     std::array<std::array<unsigned char,4096>,12> glyphs{};
     int gx0=64,gy0=64,gx1=0,gy1=0;
     for(unsigned d=0;d<12;++d) {
@@ -71,20 +70,23 @@ std::vector<std::uint8_t> MakeBossTimerAtlas(std::span<const std::uint8_t> nativ
                 std::lerp(sample(ix,iy+1),sample(ix+1,iy+1),sx-ix),sy-iy)/255.f;
         };
         for(unsigned y=0;y<21*S;++y)for(unsigned x=0;x<12*S;++x) {
-            const float a=alpha(x+.5f,y+.5f);float shadow=0;
-            if(style.enabled && style.strength>0) {
-                const float sx=x+.5f-S*style.x,sy=y+.5f-S*style.y;
-                if(style.blur==0)shadow=alpha(sx,sy);
-                else {
-                    constexpr std::array weights{1.f,2.f,1.f};
-                    for(int by=-1;by<=1;++by)for(int bx=-1;bx<=1;++bx)
-                        shadow+=alpha(sx+bx*S*style.blur,sy+by*S*style.blur)*weights[bx+1]*weights[by+1]/16;
+            const float a=alpha(x+.5f,y+.5f);
+            // Same eight samples per ring and straight-alpha composition as
+            // the rupee outline shader, in this atlas's native pixel units.
+            float uncovered=1.f;
+            if(outline.enabled && a<1.f) {
+                const float brightness=float(std::max({color[0],color[1],color[2]}))/255.f;
+                for(int ring=1;ring<=int(std::ceil(thickness));++ring) {
+                    const float radius=std::min(float(ring),thickness)*S;
+                    for(int dy=-1;dy<=1;++dy)for(int dx=-1;dx<=1;++dx) {
+                        if(dx || dy)uncovered*=1.f-brightness*alpha(x+.5f+dx*radius,y+.5f+dy*radius);
+                    }
                 }
-                shadow*=style.strength;
             }
-            const float combined=a+shadow*(1-a);
+            const float rim=(1-a)*(1-uncovered);
+            const float combined=a+rim;
             const auto p=((H*S-1-(cell_y*S+y))*W*S+cell_x*S+x)*4;
-            for(unsigned c=0;c<3;++c)out[p+c]=std::uint8_t(combined?color[c]*a/combined+.5f:0);
+            for(unsigned c=0;c<3;++c)out[p+c]=std::uint8_t(combined?(color[c]*a+255*outline.color[c]*rim)/combined+.5f:0);
             out[p+3]=std::uint8_t(combined*255+.5f);
         }
     }

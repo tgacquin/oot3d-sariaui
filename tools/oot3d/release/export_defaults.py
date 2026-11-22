@@ -52,6 +52,9 @@ def export(editor, runtime, output):
     for group in list(presentation.sections()):
         if group not in PRESENTATION_GROUPS and group != 'Multiplayer':
             presentation.remove_section(group)
+    for key in list(presentation['HDNumbers'] if 'HDNumbers' in presentation else ()):
+        if key.startswith(('timers\\shadow\\', 'timers\\backdrop\\')):
+            presentation.remove_option('HDNumbers', key)
     if 'Multiplayer' in presentation:
         for key in list(presentation['Multiplayer']):
             if not key.startswith('player_names\\'):

@@ -20,12 +20,6 @@ inline void LoadHDNumbers(QSettings& config,Layout& l) {
     s.enabled=config.value(QStringLiteral("shadow_enabled"),s.enabled).toBool();
     s.x=read("shadow_x",s.x,-3,3);s.y=read("shadow_y",s.y,-3,3);
     s.blur=read("shadow_blur",s.blur,0,2);s.strength=read("shadow_strength",s.strength,0,1);
-    config.beginGroup(QStringLiteral("timers/shadow"));
-    auto& ts=l.hd_timer_shadow;
-    ts.enabled=config.value(QStringLiteral("enabled"),s.enabled).toBool();
-    ts.x=read("x",s.x,-3,3);ts.y=read("y",s.y,-3,3);
-    ts.blur=read("blur",s.blur,0,2);ts.strength=read("strength",s.strength,0,1);
-    config.endGroup();
     struct Section {const char* name;bool* enabled;Pose* pose;float* spacing;};
     for(const auto section:{Section{"rupees",&l.hd_rupee_numbers,&l.hd_rupee_text,&l.hd_rupee_spacing},
         Section{"timers",&l.hd_timer_numbers,&l.hd_timer_text,&l.hd_timer_spacing},
@@ -44,7 +38,7 @@ inline void LoadHDNumbers(QSettings& config,Layout& l) {
         read("y",l.hd_ammo_text.y,-100,100),read("scale",l.hd_ammo_text.scale,.1f,3)};
     config.endGroup();
     for(const auto& section:{std::pair{"ammo/backdrop",&l.hd_ammo_backdrop},
-        std::pair{"rupees/backdrop",&l.hd_rupee_backdrop},std::pair{"timers/backdrop",&l.hd_timer_backdrop}}) {
+        std::pair{"rupees/backdrop",&l.hd_rupee_backdrop}}) {
         config.beginGroup(QString::fromLatin1(section.first));
         auto& b=*section.second;
         b.enabled=config.value(QStringLiteral("enabled"),b.enabled).toBool();
@@ -63,12 +57,6 @@ inline void SaveHDNumbers(QSettings& config,const Layout& l) {
     config.setValue(QStringLiteral("shadow_enabled"),s.enabled);
     config.setValue(QStringLiteral("shadow_x"),s.x);config.setValue(QStringLiteral("shadow_y"),s.y);
     config.setValue(QStringLiteral("shadow_blur"),s.blur);config.setValue(QStringLiteral("shadow_strength"),s.strength);
-    config.beginGroup(QStringLiteral("timers/shadow"));
-    const auto& ts=l.hd_timer_shadow;
-    config.setValue(QStringLiteral("enabled"),ts.enabled);
-    config.setValue(QStringLiteral("x"),ts.x);config.setValue(QStringLiteral("y"),ts.y);
-    config.setValue(QStringLiteral("blur"),ts.blur);config.setValue(QStringLiteral("strength"),ts.strength);
-    config.endGroup();
     struct Section {const char* name;bool enabled;Pose pose;float spacing;};
     for(const auto section:{Section{"rupees",l.hd_rupee_numbers,l.hd_rupee_text,l.hd_rupee_spacing},
         Section{"timers",l.hd_timer_numbers,l.hd_timer_text,l.hd_timer_spacing},
@@ -82,7 +70,7 @@ inline void SaveHDNumbers(QSettings& config,const Layout& l) {
         config.setValue(QStringLiteral("spacing"),section.spacing);config.endGroup();
     }
     for(const auto& section:{std::pair{"ammo/backdrop",&l.hd_ammo_backdrop},
-        std::pair{"rupees/backdrop",&l.hd_rupee_backdrop},std::pair{"timers/backdrop",&l.hd_timer_backdrop}}) {
+        std::pair{"rupees/backdrop",&l.hd_rupee_backdrop}}) {
         config.beginGroup(QString::fromLatin1(section.first));
         const auto& b=*section.second;
         config.setValue(QStringLiteral("enabled"),b.enabled);

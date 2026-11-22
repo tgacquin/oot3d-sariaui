@@ -11,7 +11,6 @@
 #include "oot3d/boss_rounding.h"
 #include "oot3d/hud_fade.h"
 #include "oot3d/hud_layout.h"
-#include "oot3d/ammo_backdrop.h"
 #include <unordered_map>
 
 namespace OOT3D::BossChallenge {
@@ -145,7 +144,7 @@ inline std::optional<std::array<float,2>> MapPointer(float u,float v,float width
     return {};
 }
 struct Hook {
-    enum class Stage {Idle,Background,Vignette,Particles,Shadow,TimerBackdrop,Native,Border,Panes,Hints,Icons,Text,Name,Fade};
+    enum class Stage {Idle,Background,Vignette,Particles,Shadow,Native,Border,Panes,Hints,Icons,Text,Name,Fade};
     Stage stage=Stage::Idle;
     std::array<U32,16> saved{};
     std::array<U32,256> routed{};
@@ -154,8 +153,6 @@ struct Hook {
     U32 selected=0xffffffff;
     GuestUI::Hook<FileSelect::BackgroundGeometry,FileBackground::Width,FileBackground::Height,FileBackground::Format> background;
     GuestUI::Hook<ShadowGeometry,8,8> shadow;
-    using TimerBackdropGeometry=PausePrompts::QuadGeometry<32*8>;
-    GuestUI::Hook<TimerBackdropGeometry,8,8> timer_backdrop;
     GuestUI::Hook<FileSelect::VignetteGeometry,8,8> vignette;
     GuestUI::Hook<FileParticles::Geometry,FileParticles::Width,FileParticles::Height> particles;
     GuestUI::Hook<HintGeometry,PausePrompts::IconWidth,PausePrompts::IconHeight,4> hints;
@@ -287,7 +284,7 @@ struct Hook {
         if(!in_battle || !HUDFade::GameplayReady(m,play) || !std::isfinite(hud))return 0;
         return std::clamp(hud,0.f,1.f);
     }
-    bool Drawing() const {return active && (timer_backdrop.Drawing() || border.Drawing() || background.Drawing() || shadow.Drawing() || vignette.Drawing() || particles.Drawing() ||
+    bool Drawing() const {return active && (border.Drawing() || background.Drawing() || shadow.Drawing() || vignette.Drawing() || particles.Drawing() ||
         hints.Drawing() || icons.Drawing() || text.Drawing() || name.Drawing() || title.Drawing() ||
         ((stage==Stage::Native || stage==Stage::Panes || stage==Stage::Fade) && pane<256));}
     template<class M> void PreviewMaterial(M& m,U32 rgb) const {
@@ -359,11 +356,6 @@ struct Hook {
         }
     }
     template<class M> void DrawMaterial(M& m,U32 renderer,U32 alpha) {
-        if(active && stage==Stage::TimerBackdrop && timer_backdrop.Drawing() &&
-           m.Read(renderer+0x354)==std::optional<U32>{timer_backdrop.model}) {
-            // Geometry already contains the native timer fade envelope.
-            m.Write(alpha,std::bit_cast<U32>(1.f));return;
-        }
         if(!active || stage!=Stage::Native || (!(pane>=6 && pane<=8) && pane!=12 && pane!=220 && !TimerDraw()))return;
         const U32 native=m.Read(NativeLayout+0x418+4*pane).value_or(0);
         const U32 model=m.Read(renderer+0x354).value_or(0);
@@ -384,6 +376,13 @@ struct Hook {
             }
         }
         if(TimerDraw()) {
+            if (m.Read(native+0x68)==model && m.Read(native+0x64)!=model) {
+                const auto layout=HUD::GetEffectiveLayout();
+                if (layout.hd_numbers && layout.hd_timer_numbers) {
+                    m.Write(alpha,0);
+                    return;
+                }
+            }
             const float a=std::bit_cast<float>(m.Read(alpha).value_or(0));
             m.Write(alpha,std::bit_cast<U32>(TimerAlpha(m,native,a)));
         }
@@ -434,65 +433,6 @@ struct Hook {
             t.sx*=p.scale;t.sy*=p.scale;t.ax=t.ay=0;t.anchored=true;
         }
         return t;
-    }
-    // Pane animations and model matrices are evaluated before the native pane
-    // draw loop (2f1280 only checks visibility and submits the existing models).
-    // Measure all eight current foregrounds, then draw one oval before any digit.
-    template<class M> std::pair<TimerBackdropGeometry,U32> MakeTimerBackdrop(M& m) {
-        TimerBackdropGeometry g;U32 source=0;
-        const auto hd=HUD::GetEffectiveLayout();
-        if(stage!=Stage::Native || !AmmoBackdrop::TimerEnabled(hd))return {g,0};
-        const unsigned previous_pane=pane;
-        float left=INFINITY,top=INFINITY,right=-INFINITY,bottom=-INFINITY,alpha=0;
-        for(pane=210;pane<=217;++pane) {
-            const U32 p=m.Read(NativeLayout+0x418+4*pane).value_or(0);
-            if(!VisiblePane(m,p))continue;
-            const U32 model=m.Read(p+0x64).value_or(0);
-            if(!TitleScreen::Pointer(model,0x1e4))continue;
-            const float a=TimerAlpha(m,p,std::bit_cast<float>(m.Read(model+0xfc).value_or(0)));
-            if(a<=0)continue;
-            const U32 mesh=m.Read(model+4).value_or(0),desc=m.Read(mesh).value_or(0);
-            const unsigned count=m.Read(desc+0xc).value_or(0),current=m.Read(mesh+0x124).value_or(2);
-            const U32 vertices=current<2?m.Read(mesh+0x1a0+4*current).value_or(0):0;
-            std::array<float,12> matrix;
-            if(count!=4 || !TitleScreen::Pointer(vertices,48) || !TitleScreen::ReadFloats(m,model+0xc,matrix))continue;
-            const auto t=DrawTransform(m,model);
-            const float ax=t.anchored?t.ax:matrix[3],ay=t.anchored?t.ay:matrix[7];
-            std::array<std::array<float,3>,4> corners;
-            bool valid=true;
-            for(unsigned v=0;v<4;++v)valid &= TitleScreen::ReadFloats(m,vertices+12*v,corners[v]);
-            if(!valid)continue;
-            float l=INFINITY,u=INFINITY,r=-INFINITY,d=-INFINITY;
-            for(const auto& v:corners) {
-                const float x=(matrix[0]*v[0]+matrix[1]*v[1]+matrix[2]*v[2]+matrix[3])*t.sx+t.x+ax*(1-t.sx);
-                const float y=(matrix[4]*v[0]+matrix[5]*v[1]+matrix[6]*v[2]+matrix[7])*t.sy+t.y+ay*(1-t.sy);
-                l=std::min(l,x);r=std::max(r,x);u=std::min(u,y);d=std::max(d,y);
-            }
-            if(!(r>l && d>u) || !std::isfinite(l+r+u+d))continue;
-            left=std::min(left,l);right=std::max(right,r);top=std::min(top,u);bottom=std::max(bottom,d);
-            alpha=std::max(alpha,a);if(!source)source=model;
-        }
-        pane=previous_pane;
-        if(!source)return {g,0};
-        const auto& b=hd.hd_timer_backdrop;
-        const auto clean=[](float x,float fallback,float lo,float hi) {
-            return std::isfinite(x)?std::clamp(x,lo,hi):fallback;
-        };
-        const float cx=(left+right)*.5f+clean(b.x,0,-20,20),cy=(top+bottom)*.5f+clean(b.y,1,-20,20);
-        const float rx=(right-left)*.5f*clean(b.width,1.25f,.25f,4),ry=(bottom-top)*.5f*clean(b.height,1.25f,.25f,4);
-        const float softness=clean(b.softness,.75f,0,1),opacity=alpha*clean(b.opacity,0,0,1);
-        for(unsigned ring=0;ring<8;++ring)for(unsigned angle=0;angle<32;++angle) {
-            const unsigned q=g.count;g.Add(0,0,1,1,.5f,.5f,.5f,.5f);
-            for(unsigned v=0;v<4;++v) {
-                const float radius=(ring+(v%2))/8.f;
-                const float theta=(angle+(v/2))*2*std::numbers::pi_v<float>/32;
-                g.positions[q*12+v*3]=cx+rx*radius*std::cos(theta);
-                g.positions[q*12+v*3+1]=cy+ry*radius*std::sin(theta);
-                const float f=softness>0?std::clamp((1-radius)/softness,0.f,1.f):1;
-                g.colors[q*16+v*4+3]=opacity*f*f*(3-2*f);
-            }
-        }
-        return {g,source};
     }
     ScreenModels::Transform ModelTransform() const {
         if(stage!=Stage::Native && stage!=Stage::Panes && stage!=Stage::Fade)return {}; // Already in top-screen coordinates.
@@ -568,11 +508,6 @@ struct Hook {
             shadow.Resume(m,r);if(shadow.Pending())return;
             stage=Stage::Native;
         }
-        if(stage==Stage::TimerBackdrop) {
-            timer_backdrop.Resume(m,r);if(timer_backdrop.Pending())return;
-            stage=Stage::Native;
-            // The original pane remains next, so no timer digit is skipped.
-        }
         // After the background, use the native pane renderer in its original order, then draw the
         // relocated bottom controls. Defer the top fade until both are drawn.
         // This avoids adding a hook to every other menu's per-pane draw loop.
@@ -588,14 +523,6 @@ struct Hook {
             while(next<256) {
                 const unsigned index=next++;
                 const bool bottom=stage==Stage::Panes;
-                if(!bottom && index==210 && pane!=210) {
-                    auto [geometry,source]=MakeTimerBackdrop(m);
-                    if(source && geometry.count) {
-                        pane=210;r=saved;
-                        timer_backdrop.Begin(m,r,Sites[0].pc,geometry,ShadowPixels,source);
-                        if(timer_backdrop.Pending()) {stage=Stage::TimerBackdrop;--next;return;}
-                    }
-                }
                 if(bottom?!RoutedPane(index):index==250)continue;
                 const U32 p=m.Read(NativeLayout+(bottom?0x818:0x418)+4*index).value_or(0);
                 if(!TitleScreen::Pointer(p,0xb4) || m.Read(p+4)!=NativeLayout+0x18)continue;

@@ -1072,7 +1072,7 @@ void CreateGossipStoneHints() {
         }
 
         // Set DungeonImportance array for each dungeon
-        for (uint i = 0; i < dungeonImportance.size(); i++) {
+        for (unsigned int i = 0; i < dungeonImportance.size(); i++) {
             std::string dungeonName = dungeonNames[i];
             if (std::find(barrenDungeons.begin(), barrenDungeons.end(), dungeonName) != barrenDungeons.end()) {
                 dungeonImportance[i] = DungeonImportance::DUNGEON_BARREN;

@@ -679,13 +679,17 @@ bool RasterizerVulkan::AccelerateDrawBatch(bool is_indexed) {
         bool counter=false;
         if(const auto mesh=OotHudMesh(&counter);mesh && mesh->second && counter)return false;
     }
-    if(is_indexed && OOT3D::AmmoBackdrop::Enabled(layout))
-        if(const auto mesh=OotUIMeshHash(32);mesh &&
-           OOT3D::HUD::FindNumberMesh(mesh->first,mesh->second/4)==OOT3D::HUD::NumberKind::Ammo)
-            return false;
-    if(is_indexed && OOT3D::AmmoBackdrop::TimerEnabled(layout))
-        if(const auto mesh=OotUIMeshHash(32);mesh && OOT3D::HUD::IsTimerMesh(mesh->first,mesh->second/4))
-            return false;
+    const bool ammo_backdrop = OOT3D::AmmoBackdrop::Enabled(layout);
+    if (is_indexed && (ammo_backdrop || layout.OutlineHDTimer() || layout.OutlineHDSkulltula())) {
+        if (const auto mesh = OotUIMeshHash(32)) {
+            const auto [hash, vertices] = *mesh;
+            const unsigned quads = vertices / 4;
+            if (layout.OutlineHDTimer() && OOT3D::HUD::IsTimerMesh(hash, quads)) return false;
+            const auto kind = OOT3D::HUD::FindNumberMesh(hash, quads);
+            if ((ammo_backdrop && kind == OOT3D::HUD::NumberKind::Ammo) ||
+                (layout.OutlineHDSkulltula() && kind == OOT3D::HUD::NumberKind::Skulltula)) return false;
+        }
+    }
     // Replace the native magic frame on the verified top HUD at every frame rate.
     if(is_indexed && regs.pipeline.num_vertices==92*6) {
         const auto mesh=OotHudMesh();
@@ -969,17 +973,15 @@ void RasterizerVulkan::DrawTriangles() {
     if (vertex_batch.empty()) {
         return;
     }
-    bool hud_colors=false,outline_rupees=false;
+    bool hud_colors=false;
 #ifdef ENABLE_OOT3D_PRESENTATION
     oot_magic_replay.reset();
     oot_hud_midpoint.clear();
-    bool rupee_counter=false;
-    if (const auto mesh = OotHudMesh(&rupee_counter); mesh && vertex_batch.size() == regs.pipeline.num_vertices) {
+    if (const auto mesh = OotHudMesh(); mesh && vertex_batch.size() == regs.pipeline.num_vertices) {
         const auto [quads, top] = *mesh;
         std::vector<HardwareVertex> filtered;
         filtered.reserve(vertex_batch.size()+132);
         const auto layout=OOT3D::HUD::GetEffectiveLayout();
-        outline_rupees=top && rupee_counter && layout.OutlineHDRupees();
         if(top && quads==92) {
             OOT3D::MagicMeter::PrepareHudColors(std::span{vertex_batch},62,layout);
             hud_colors=true;
@@ -1062,14 +1064,14 @@ void RasterizerVulkan::DrawTriangles() {
     pipeline_cache.UseTrivialVertexShader();
     pipeline_cache.UseTrivialGeometryShader();
 
-    Draw(false, false, hud_colors, outline_rupees);
+    Draw(false, false, hud_colors);
 #ifdef ENABLE_OOT3D_PRESENTATION
     oot_magic_replay.reset();
     oot_hud_midpoint.clear();
 #endif
 }
 
-bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed, bool hud_colors, [[maybe_unused]] bool outline_rupees) {
+bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed, bool hud_colors) {
     MICROPROFILE_SCOPE(Vulkan_Drawing);
     bool cpu_interpolation = false;
 #ifdef ENABLE_OOT3D_PRESENTATION
@@ -1370,7 +1372,7 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed, bool hud_colors, [
     // bound. Async font loading and texture-pack fallbacks keep native geometry.
     if(!accelerate && oot_number_backdrop)
         OOT3D::AmmoBackdrop::Prepend(vertex_batch,*oot_number_backdrop);
-    if(outline_rupees && oot_rupee_digit_outline &&
+    if(!accelerate && oot_rupee_digit_outline &&
        OOT3D::HUD::PrepareRupeeDigits(vertex_batch,regs.pipeline.num_vertices,*oot_rupee_digit_outline)) {
         hud_colors=true;
         const auto& s=*oot_rupee_digit_outline;
@@ -4226,7 +4228,7 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
             const bool boss_timer = font_descriptor.width==512 && font_descriptor.height==256 &&
                 font_descriptor.format==13 && number_layout.hd_numbers && number_layout.hd_timer_numbers;
             std::shared_ptr<const OOT3D::HDFont::RupeeAtlas> rupees;
-            bool ammo_backdrop=false,rupee_backdrop=false,timer_backdrop=false;
+            bool ammo_backdrop=false,rupee_backdrop=false;
             bool styled_counter=false;
             if(number_layout.hd_numbers && font_descriptor.width==256 && font_descriptor.height==128 && font_descriptor.format==4) {
                 const auto& layout=number_layout;
@@ -4243,8 +4245,8 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
                     const auto mesh=OotUIMeshHash(32);
                     if(mesh) {
                         if(layout.hd_timer_numbers && OOT3D::HUD::IsTimerMesh(mesh->first,mesh->second/4)) {
-                            timer_backdrop=texture_index==0 && OOT3D::AmmoBackdrop::TimerEnabled(layout);
-                            rupees=OOT3D::HDFont::StyledRupeeAtlas(layout.hd_timer_shadow,true,timer_backdrop,layout.hd_numbers_bold);
+                            rupees=OOT3D::HDFont::StyledRupeeAtlas({.enabled=false},true,false,layout.hd_numbers_bold);
+                            styled_counter=texture_index==0 && layout.OutlineHDTimer();
                         }
                         if(const auto kind=OOT3D::HUD::FindNumberMesh(mesh->first,mesh->second/4))
                             if((*kind==OOT3D::HUD::NumberKind::Ammo && layout.hd_ammo_numbers) ||
@@ -4253,8 +4255,9 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
                             {
                                 ammo_backdrop=texture_index==0 && *kind==OOT3D::HUD::NumberKind::Ammo &&
                                     OOT3D::AmmoBackdrop::Enabled(layout);
-                                const bool bold=layout.hd_numbers_bold || *kind==OOT3D::HUD::NumberKind::Ammo ||
-                                    *kind==OOT3D::HUD::NumberKind::Skulltula;
+                                const bool skulltula = *kind == OOT3D::HUD::NumberKind::Skulltula;
+                                styled_counter = texture_index == 0 && skulltula && layout.OutlineHDSkulltula();
+                                const bool bold = layout.hd_numbers_bold || *kind == OOT3D::HUD::NumberKind::Ammo || skulltula;
                                 rupees=OOT3D::HDFont::StyledRupeeAtlas(layout.hd_rupee_shadow,false,ammo_backdrop,bold);
                             }
                     }
@@ -4279,16 +4282,15 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
                         surface.oot_font_hash) : nullptr;
                     if(rupees && rupees->hash!=surface.oot_font_hash)rupees.reset();
                     if(boss_timer)rupees=OOT3D::HDFont::StyledBossTimerAtlas(
-                        surface.oot_font_hash,number_layout.hd_timer_shadow,number_layout.hd_numbers_bold);
+                        surface.oot_font_hash,number_layout.rupee_digit_outline,number_layout.hd_numbers_bold);
                     if ((expected && *expected == surface.oot_font_hash) || generated || rupees) {
                         if (const auto view = hd_fonts.Get(runtime, font_descriptor, surface.oot_font_hash,
                             bytes, rupees ? std::span<const u8>(rupees->rgba) :
                                 generated ? std::span<const u8>(*generated) : std::span<const u8>{},rupees?rupees->variant:0)) {
                             texture_view = view;
                             if(styled_counter && rupees)oot_rupee_digit_outline=number_layout.rupee_digit_outline;
-                            if(rupees && (ammo_backdrop || rupee_backdrop || timer_backdrop))
-                                oot_number_backdrop=timer_backdrop?number_layout.hd_timer_backdrop:
-                                    rupee_backdrop?number_layout.hd_rupee_backdrop:number_layout.hd_ammo_backdrop;
+                            if(rupees && (ammo_backdrop || rupee_backdrop))
+                                oot_number_backdrop=rupee_backdrop?number_layout.hd_rupee_backdrop:number_layout.hd_ammo_backdrop;
                             ++OOT3D::HDFont::replacements;
                         }
                     }

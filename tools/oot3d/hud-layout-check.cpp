@@ -116,6 +116,29 @@ int main(int argc,char** argv) {
     }
     const auto spaced=m.words;m.words=original;apply(0,layout);assert(m.words==spaced);
     m.words=original;apply(0,{});assert(m.words==defaults);
+    // Check single-row clearance and the existing second-row position, including after damage.
+    for (const bool custom : {false, true}) for (float heart_scale : {.5f, 1.f, 2.f}) {
+        Layout poses;poses[Hearts].scale=heart_scale;poses[Magic]={7,-9,.5f};
+        if (custom) {poses.magic_one_row_y=-3.5f;poses.magic_two_row_y=7.5f;}
+        m.words=original;apply(0,poses);
+        const auto baseline=m.words;
+        for (U32 capacity : {0x30u, 0xa0u, 0xa1u, 0xb0u, 0x140u}) {
+            for (U32 health : {0x10u, capacity}) {
+                m.words=original;
+                m.words[0x587958+0x40]=(capacity<<16)|0xffff;
+                m.words[0x587958+0x44]=health;
+                apply(0,poses);
+                const float dy=(capacity>0xa0 ? (custom ? 7.5f : 13.f) : (custom ? -3.5f : 2.f))*heart_scale;
+                for(unsigned q=59;q<63;++q)for(unsigned v=0;v<4;++v) {
+                    const U32 at=vertices+q*48+v*12;
+                    assert(m.words.at(at)==baseline.at(at));
+                    assert(m.Float(at+4)==std::bit_cast<float>(baseline.at(at+4))+dy);
+                    assert(m.words.at(at+8)==baseline.at(at+8));
+                }
+            }
+        }
+    }
+    m.words=defaults;
     // A depleted magic fill remains a correctly transformed zero-width edge,
     // allowing render interpolation into/out of zero with an edited HUD pose.
     {

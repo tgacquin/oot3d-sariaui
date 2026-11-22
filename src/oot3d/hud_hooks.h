@@ -581,7 +581,14 @@ template<class M, class R> void Handle(M& memory, R& regs, unsigned site, const 
         }
         Quads(memory, *helper, 63, 20, TopPose(layout[Hearts], Hearts), 82, 2, 320,
               std::isfinite(layout.heart_spacing)?std::clamp(layout.heart_spacing,-8.f,20.f):0);
-        Quads(memory, *helper, 59, 4, TopPose(layout[Magic], Magic), 78, 28, 320);
+        // Native 0x44423c starts row two 13 pixels below row one when capacity exceeds ten hearts.
+        // Capacity is the signed halfword at save+0x42, in sixteenths of a heart.
+        const auto capacity = static_cast<std::int16_t>(memory.Read(0x587958 + 0x40).value_or(0) >> 16);
+        const float heart_scale = layout[Hearts].scale;
+        const float scale = heart_scale >= .1f && heart_scale <= 3.f ? heart_scale : 1.f;
+        const float row_y = capacity > 10 * 16 ? layout.magic_two_row_y : layout.magic_one_row_y;
+        const float row_offset = capacity > 0 ? row_y * scale : 0.f;
+        Quads(memory, *helper, 59, 4, TopPose(layout[Magic], Magic), 78, 28, 320, 0, {0, row_offset});
         Quads(memory, *helper, 26, 1, TopPose(layout[Rupees], Rupees), 2, 111, 320);
         Quads(memory, *helper, 27, 1, TopPose(layout[Keys], Keys), 2, 151, 320);
         // 0x444544 updates six carrot quads (0x56..0x5b) from play+0x2e18.

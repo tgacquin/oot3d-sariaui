@@ -2224,6 +2224,8 @@ void GMainWindow::ConnectWidgetEvents() {
                 read("shadow_blur",1,0,4),read("shadow_strength",.6f,0,1)};
         }
         if (i == OOT3D::HUD::Magic) {
+            hud_layout.magic_one_row_y=read("one_row_y",hud_layout.magic_one_row_y,-240,240);
+            hud_layout.magic_two_row_y=read("two_row_y",hud_layout.magic_two_row_y,-240,240);
             auto& shadow=hud_layout.magic_shadow;
             shadow.enabled=oot_editor_config->value(QStringLiteral("shadow_enabled"),shadow.enabled).toBool();
             shadow.x=read("shadow_x",shadow.x,-20,20);
@@ -3274,6 +3276,8 @@ void GMainWindow::ConnectWidgetEvents() {
                     oot_editor_config->setValue(QStringLiteral("shadow_strength"),layout.carrot_shadow.strength);
                 }
                 if (i == OOT3D::HUD::Magic) {
+                    oot_editor_config->setValue(QStringLiteral("one_row_y"),layout.magic_one_row_y);
+                    oot_editor_config->setValue(QStringLiteral("two_row_y"),layout.magic_two_row_y);
                     const auto& shadow=layout.magic_shadow;
                     oot_editor_config->setValue(QStringLiteral("shadow_enabled"),shadow.enabled);
                     oot_editor_config->setValue(QStringLiteral("shadow_x"),shadow.x);

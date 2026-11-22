@@ -12,10 +12,6 @@ inline bool Enabled(const HUD::Layout& l,bool rupees=false) {
     return l.hd_numbers && (rupees?l.hd_rupee_numbers:l.hd_ammo_numbers) && b.enabled &&
         std::isfinite(b.opacity) && b.opacity>0;
 }
-inline bool TimerEnabled(const HUD::Layout& l) {
-    return l.hd_numbers && l.hd_timer_numbers && l.hd_timer_backdrop.enabled &&
-        std::isfinite(l.hd_timer_backdrop.opacity) && l.hd_timer_backdrop.opacity>0;
-}
 // Shader-output geometry: native material opacity is already in vertex alpha.
 // One soft oval per complete counter, preceding its unchanged digit triangles.
 // Both native and custom counters take this path after their final transforms.

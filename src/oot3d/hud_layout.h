@@ -32,6 +32,7 @@ struct RupeeDigitOutline {
     static constexpr float MinThickness=.25f, MaxThickness=3.f;
     float thickness=1.f;
     std::array<float,3> color{.08f,.08f,.08f};
+    bool operator==(const RupeeDigitOutline&) const = default;
 };
 struct AmmoBackdrop {
     bool enabled=false;
@@ -65,7 +66,6 @@ struct Layout : std::array<Pose, ElementCount> {
     float hd_rupee_spacing = 0; // Additional digit advance before text/group scaling.
     HDFont::RupeeShadow hd_rupee_shadow{};
     bool hd_timer_numbers = true;
-    HDFont::RupeeShadow hd_timer_shadow{};
     Pose hd_timer_text{};
     bool hd_ammo_numbers = true, hd_score_numbers = true;
     Pose hd_ammo_text{}, hd_score_text{};
@@ -73,7 +73,7 @@ struct Layout : std::array<Pose, ElementCount> {
     bool hd_skulltula_numbers=true;
     Pose hd_skulltula_text{};
     float hd_skulltula_spacing=0;
-    AmmoBackdrop hd_ammo_backdrop{},hd_rupee_backdrop{},hd_timer_backdrop{};
+    AmmoBackdrop hd_ammo_backdrop{},hd_rupee_backdrop{};
     float hd_timer_spacing=0, hd_ammo_spacing=0, hd_score_spacing=0;
     bool minimap_lock_corner = true; // Room changes and scaling keep the bottom-right fixed.
     Pose outside_minimap{};
@@ -92,8 +92,11 @@ struct Layout : std::array<Pose, ElementCount> {
     float magic_border_roundness=0;
     DropShadow magic_shadow{};
     RupeeDigitOutline rupee_digit_outline{};
+    bool OutlineHDSkulltula() const {return hd_numbers && hd_skulltula_numbers && rupee_digit_outline.enabled;}
+    bool OutlineHDTimer() const {return hd_numbers && hd_timer_numbers && rupee_digit_outline.enabled;}
     bool OutlineHDRupees() const {return hd_numbers && hd_rupee_numbers && rupee_digit_outline.enabled;}
     float heart_spacing = 0; // Additional pixels per column, before HUD scaling.
+    float magic_one_row_y = 2.f, magic_two_row_y = 13.f; // Offsets in pixels at native heart scale.
     float magic_width = 1; // Relative horizontal length, preserving the fill fraction.
     float magic_height = 1; // Green fill height; top edge stays fixed.
     float magic_border = 1; // Fill padding, independent of fill height.

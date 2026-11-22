@@ -50,7 +50,7 @@ template<class V> bool PrepareRupeeContour(V* quad,const SpriteContour& s) {
 }
 
 template<class V> bool PrepareRupeeDigits(std::vector<V>& vertices,unsigned count,const RupeeDigitOutline& s) {
-    if(!s.enabled || !count || count%6 || count>24 || count>vertices.size())return false;
+    if(!s.enabled || !count || count%6 || count>48 || count>vertices.size())return false;
     for(auto& v:vertices)v.tex_coord0_w=0;
     bool styled=false;
     for(auto i=vertices.size()-count;i<vertices.size();i+=6)
