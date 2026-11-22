@@ -2,42 +2,36 @@
 
 This is a mod to make Ocarina of Time 3D fully functional on one screen. In fact, the bottom screen isn't even accessible.
 
-Play with a built-in randomizer and multiplayer, controller rumble, cleaner and more responsive menus, and smoother dialogue and textboxes.
-
 Every element that could only be interacted with through the bottom screen has now been brought to the top. Previously large HUD elements have also been adapted in an effort to bring it in line with the original game. The goal was to make this game feel like any other console Zelda while also allowing for a very customizable experience so it could feel fresh for returning players.
 
-A custom fork of Azahar is used as the backing engine.
+A custom version of Azahar is used as the backing engine.
 
 ## Features
 
-- Built-in randomizer with presets and support for Original and Master Quest dungeon layouts
-- Multiplayer for randomized files, with Host and Join options, visible players, shared progression, and an activity feed
-- Controller rumble for impacts, fishing, and nearby secrets
-- Cleaner, more responsive menus, with file select, options, saving, and death menus on one screen
-- Smoother dialogue camera transitions, textbox animations, text reveal, and animated dialogue indicators
-- Frame interpolation up to 120fps with CPU (default) and GPU options, a frame-rate slider, and optional display refresh-rate matching. Defaults to 60fps; select Original in Graphics for 30fps
+- Single screen HUD designed to emulate a console-like experience
+- Widescreen, increased FOV, and up to 120FPS interpolation
 - Gear, Items, and Map accessible all through one screen with item models and descriptions preserved
 - Ocarina song menu accessible on one screen
-- On-screen minimap with a controller shortcut to hide or show it
-- Redesigned HUD elements (smaller and wider textboxes, thicker magic bar) meant to emulate a console-like experience
-- HUD scaling, positioning, spacing, and visibility controls, including grouped button scaling and adjustable heart spacing
-- HD text and optional HD numbers
-- Difficulty options (damage multiplier, adjustable red potion, blue potion, and bottled fairy healing, no heart, rupee, fairy, or magic drops, disabled ammo pickups, rupee loss on death, and 2×/3× purchase prices)
-- Widescreen, increased FOV, and sliders to adjust camera distance
+- Restored rumble functionality from the original N64 version
 - Right-stick camera controls with adjustable sensitivity, acceleration, deceleration, and axis inversion
-- Optional smooth camera pullback
+- Difficulty options (damage multiplier, adjustable red potion, blue potion, and bottled fairy healing, no heart, rupee, fairy, or magic drops, disabled ammo pickups, rupee loss on death, and 2×/3× purchase prices)
+- HD text and optional HD numbers
+- Built-in randomizer with presets and support for Original and Master Quest dungeon layouts. [Randomizer guide](RANDOMIZER.md)
+- Multiplayer for randomized files, with Host and Join options, shared progression, and an activity feed
+- Cleaner, more responsive menus that respond at user's frame rate
+- Smoother dialogue camera transitions, textbox animations, text reveal, and animated dialogue indicators
 - References in text to the bottom screen and other 3DS-specific features have been replaced with the new controls for a more console-like experience
-- Higher-resolution pause-menu backgrounds and adapted world and dungeon maps
-- Quality-of-life options, including faster area loading, disabling Navi's unsolicited reminders, and muting the low-health beep
+- Quality-of-life options, including faster area loading, disabling Navi reminders, and muting the low-health beep
+- HUD scaling, positioning, spacing, and visibility controls, including grouped button scaling and adjustable heart spacing
 - Custom texture support, with configurable shortcuts for toggling textures and fullscreen
 - French and Spanish support with translations for custom button prompts and new dialogue
-- Many other minor changes in camera and HUD elements
+- Many other minor changes not included here
 
 ## Getting started
 
 1. Download the latest release corresponding to your platform.
 2. Extract the complete release into a writable folder.
-3. Put your legally acquired Ocarina of Time 3D (USA, Rev 1) `.cci` or `.3ds` file in the same folder as the application. Keep only one game file there. On Mac, put it beside `SariaUI.app`, not inside it.
+3. Put your legally acquired Ocarina of Time 3D (USA, Rev 1) `.cci` or `.3ds` file in the same folder as the application.
 4. Run `SariaUI.exe` on Windows, `SariaUI.app` on Mac, or `SariaUI.AppImage` on Linux. It opens the game automatically and creates a `user` folder beside the application on first launch.
 
 **Press F1 to open settings and adjust graphics, camera, HUD layout, difficulty, quality-of-life options, audio, controls, and randomizer settings.**
@@ -87,8 +81,6 @@ Both reports include the seed, quest mode, difficulty and randomizer settings. T
 
 ## Note about this project
 
-AI was used extensively for the purpose of identifying each element the game renders and allowing repositioning, scaling, and transforming of them from the bottom screen to the top screen. This project otherwise would not have been feasible for me to do as Ocarina of Time 3D is not yet decompiled and changes have to be done at the assembly level. However, all repositioning/scaling of the elements for a clean interface was done by me and required a lot of forethought in terms of how the layouts should look. For those unwilling to try this project because of this, [Ship of Harkinian](https://www.shipofharkinian.com/) is also an excellent way to enjoy Ocarina of Time.
-
-This project is currently in beta and likely has many bugs I've yet to see, so make sure you save frequently!
+AI was used extensively in the making of this project, although layouts were manually made by me after being able to scale and reposition individual elements.
 
 Thank you to the [OoT3D Randomizer](https://github.com/gamestabled/OoT3D_Randomizer) team for their work on the randomizer, and to the Azahar and Citra contributors for the underlying engine!
