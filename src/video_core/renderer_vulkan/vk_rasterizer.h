@@ -3,6 +3,8 @@
 // Refer to the license.txt file included.
 
 #pragma once
+#include <span>
+
 #ifdef ENABLE_OOT3D_PRESENTATION
 #include "oot3d/interpolation_replay.h"
 #include "oot3d/interpolation_pose.h"
@@ -233,6 +235,9 @@ private:
     std::optional<std::array<float,4>> oot_sparkle_color;
     OOT3D::Interpolation::SongVisual::Layer oot_song_visual_layer{};
     struct MagicReplay {
+        MagicReplay(std::span<const HardwareVertex, 24> vertices, const OOT3D::HUD::Layout& layout,
+                    std::size_t begin, std::int64_t lens_elapsed);
+
         std::array<HardwareVertex,24> native;
         OOT3D::HUD::Layout layout;
         std::size_t begin{},end{};

@@ -944,6 +944,13 @@ std::optional<std::pair<unsigned, bool>> RasterizerVulkan::OotHudMesh(bool* hd_c
 #endif
 
 #ifdef ENABLE_OOT3D_PRESENTATION
+RasterizerVulkan::MagicReplay::MagicReplay(std::span<const HardwareVertex, 24> vertices,
+                                           const OOT3D::HUD::Layout& layout, std::size_t begin,
+                                           std::int64_t lens_elapsed)
+    : layout(layout), begin(begin), lens_elapsed(lens_elapsed) {
+    std::copy(vertices.begin(), vertices.end(), native.begin());
+}
+
 template<class V> static V MixHudVertex(const V& a,const V& b,float t) {
     V v;
     v.position=a.position*(1-t)+b.position*t;
@@ -993,11 +1000,7 @@ void RasterizerVulkan::DrawTriangles() {
                     const bool moving=oot_magic_history.Observe(native,OOT3D::Interpolation::guest_frames.load(),
                         carrot_time,OOT3D::Interpolation::generation.load());
                     if(moving || elapsed>=0) {
-                        auto& replay=oot_magic_replay.emplace();
-                        std::copy(native.begin(),native.end(),replay.native.begin());
-                        replay.begin=filtered.size();
-                        replay.layout=layout;
-                        replay.lens_elapsed=elapsed;
+                        oot_magic_replay.emplace(native, layout, filtered.size(), elapsed);
                     }
                 } else oot_magic_history.seen=false;
                 magic_replaced=OOT3D::MagicMeter::Append(
