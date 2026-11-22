@@ -27,7 +27,7 @@ inline float PreviewRotationSpeed(float value) {
 enum Part { Tabs, Items, Slots, Background, Back, GearTab, MapTab, ItemsTab,
     Titles, GearLeft, GearRight, GearBottomLeft, GearBottomRight, Description, Preview, Map,
     LocationMap, LocationBanner, DungeonMap, DungeonContents, DungeonLeft, DungeonRight, DungeonBanner, DungeonItems, DungeonFloors, WorldLocationPanel, DungeonDescription, DungeonLocationPaper, DungeonLocationTitle, DungeonSkulltula, PartCount };
-constexpr std::array Names{"tabs","items","slots","background","back","gear_tab","map_tab","items_tab",
+inline constexpr std::array Names{"tabs","items","slots","background","back","gear_tab","map_tab","items_tab",
     "titles","gear_left","gear_right","gear_bottom_left","gear_bottom_right","description","preview","map",
     "location_map","location_banner","dungeon_map","dungeon_contents","dungeon_left","dungeon_right","dungeon_banner","dungeon_items","dungeon_floors","world_location_panel","dungeon_description","dungeon_location_paper","dungeon_location_title","dungeon_skulltula"};
 constexpr std::array Labels{"All tabs (legacy)","Item panel","Item slot bar","Brown Triforce background",
@@ -40,7 +40,7 @@ struct ColorOverlay {
     bool operator==(const ColorOverlay&) const = default;
 };
 enum class PauseColor : unsigned {MapBanner,ItemsBanner,GearBanner,SlotBackground};
-constexpr std::array ColorNames{"map_banner","items_banner","gear_banner","slot_background"};
+inline constexpr std::array ColorNames{"map_banner","items_banner","gear_banner","slot_background"};
 constexpr std::array ColorLabels{"Map banner","Items banner","Gear banner","Item-slot background"};
 using ColorScheme=std::array<ColorOverlay,4>;
 struct ColorLayouts {
@@ -370,7 +370,7 @@ constexpr std::array<TitleScreen::Site,22> Sites{{
 }};
 inline U32 Instruction(U32 pc,U32 word) {
     for(unsigned i=0;i<Sites.size();++i)
-        if(pc==Sites[i].pc && word==Sites[i].instruction) return 0xef000000|FirstSVC+i;
+        if(pc==Sites[i].pc && word==Sites[i].instruction) return 0xef000000 | (FirstSVC + i);
     return word;
 }
 template<class M> bool CodeMatches(M& m) {

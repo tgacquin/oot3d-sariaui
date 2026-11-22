@@ -46,7 +46,7 @@ constexpr std::array<TitleScreen::Site,21> Sites{{
 }};
 inline U32 Instruction(U32 pc,U32 word) {
     for(unsigned i=0;i<Sites.size();++i)
-        if(pc==Sites[i].pc && word==Sites[i].instruction)return 0xef000000|FirstSVC+i;
+        if(pc==Sites[i].pc && word==Sites[i].instruction)return 0xef000000 | (FirstSVC + i);
     return word;
 }
 template<class M,class R> void AcceptName(M& m,R& r) {
@@ -71,7 +71,7 @@ constexpr std::array Names{"File 1 stone","File 2 stone","File 3 stone","Prompt 
     "Overwrite cancel stone","Overwrite stone","Copy arrow"};
 enum NamePart : unsigned {Keyboard,NameBox,Cancel,Okay,KeyboardBackground,ConfirmNo,ConfirmYes,NameCount};
 constexpr unsigned QuestFocus=Count,NameFocus=Count+2,FocusCount=NameFocus+NameCount;
-constexpr std::array NameLabels{"Keyboard","Name box","Cancel","OK","Blue keyboard background","No confirmation stone","Yes confirmation stone"};
+inline constexpr std::array NameLabels{"Keyboard","Name box","Cancel","OK","Blue keyboard background","No confirmation stone","Yes confirmation stone"};
 struct KeyboardShadow {
     bool enabled=true;
     float opacity=.6f,softness=12,spread=2,x=0,y=3;

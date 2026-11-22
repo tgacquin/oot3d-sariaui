@@ -22,7 +22,7 @@ constexpr std::array<TitleScreen::Site,9> Sites{{
 }};
 inline U32 Instruction(U32 pc,U32 word) {
     for(unsigned i=0;i<Sites.size();++i)
-        if(pc==Sites[i].pc && word==Sites[i].instruction)return 0xef000000|FirstSVC+i;
+        if(pc==Sites[i].pc && word==Sites[i].instruction)return 0xef000000 | (FirstSVC + i);
     return word;
 }
 template<class M> bool CodeMatches(M& m) {

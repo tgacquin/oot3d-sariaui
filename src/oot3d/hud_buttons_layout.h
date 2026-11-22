@@ -6,7 +6,7 @@
 
 namespace OOT3D::HUDButtons {
 enum Element { B, X, Y, I, II, Count };
-constexpr std::array Names{"b","x","y","i","ii"};
+inline constexpr std::array Names{"b","x","y","i","ii"};
 constexpr std::array Labels{"B button","X item button","Y item button","I item button","II item button"};
 struct Button {bool enabled=true;PausePrompts::Pose pose{};};
 struct Layout {

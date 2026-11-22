@@ -14,7 +14,7 @@
 namespace OOT3D::DeathMenu {
 using TitleScreen::U32;
 enum Part : unsigned {Prompt,Save,DontSave,Count};
-constexpr std::array Names{"prompt","save","dont_save"};
+inline constexpr std::array Names{"prompt","save","dont_save"};
 constexpr std::array Labels{"Prompt box and text","Save stone","Don't save stone"};
 constexpr std::array<std::array<float,2>,Count> Anchors{{{160,24},{224,120},{96,120}}};
 struct Pose {float x=0,y=0,scale=1;};

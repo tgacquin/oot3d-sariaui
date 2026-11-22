@@ -29,7 +29,7 @@ struct Layout {
     NavigationShadow map_navigation_shadow{};
     std::array<Prompt,PromptCount> prompts{};
 };
-constexpr std::array Names{"choose","return","map_move","map_return","equip_i","equip_ii","change_tab","items_to_map","map_to_items"};
+inline constexpr std::array Names{"choose","return","map_move","map_return","equip_i","equip_ii","change_tab","items_to_map","map_to_items"};
 constexpr std::array Labels{"Items / Gear: A Choose","Items / Gear: B Return",
                             "Map: Circle Pad Move cursor","Map: B Return","Items / Gear: ZL Equip to I",
                             "Items / Gear: ZR Equip to II","Items / Gear: L / R Change tab",

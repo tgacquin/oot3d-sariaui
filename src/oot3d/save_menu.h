@@ -9,7 +9,7 @@ namespace OOT3D::SaveMenu {
 using TitleScreen::U32;
 constexpr U32 Owner=0x50a508;
 enum Part { DontSave, Save, Prompt, Back, Options, OptionsItems, HelpMessage, Cancel, Okay, CardWarning, Count };
-constexpr std::array Names{"dont_save","save","prompt","back","options","options_items","help_message","cancel","okay","card_warning"};
+inline constexpr std::array Names{"dont_save","save","prompt","back","options","options_items","help_message","cancel","okay","card_warning"};
 constexpr std::array Labels{"Don't save button","Save button","Prompt box and text","B Back","Options button",
     "Options controls (all)","Options help message","Options: Cancel button","Options: OK button","Game Card warning box and text"};
 constexpr std::array<std::array<float,2>,Count> Anchors{{

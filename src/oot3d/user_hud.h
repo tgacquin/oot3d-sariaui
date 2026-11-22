@@ -12,7 +12,7 @@ namespace OOT3D::UserHUD {
 enum Element { Hearts, Rupees, Magic, AButton, LoadingIcon, Minimap, Keys, Timer,
     Minigame, ShardAgony, TargetIndicator, Carrots, OutsideMinimap, BButton,
     ItemButtons, DPad, XButton, YButton, IButton, IIButton, CounterGroup, Count };
-constexpr std::array Names{"hearts", "rupees", "magic", "a_button", "loading_icon",
+inline constexpr std::array Names{"hearts", "rupees", "magic", "a_button", "loading_icon",
     "minimap", "keys", "timer", "minigame", "shard_agony", "target_indicator",
     "carrots", "outside_minimap", "b_button", "item_buttons", "dpad", "x_button", "y_button", "i_button", "ii_button", "counter_group"};
 constexpr std::array Labels{"Hearts", "Rupees", "Magic bar", "A button", "Loading icon",
@@ -21,8 +21,8 @@ constexpr std::array Labels{"Hearts", "Rupees", "Magic bar", "A button", "Loadin
     "Item buttons (X, Y, I, II)", "D-pad", "X button", "Y button", "I button", "II button", "Rupees and small keys"};
 // Stable persisted indices remain available for old configurations. F2 exposes
 // one map adjustment and no independent targeting/minigame-counter controls.
-constexpr std::array EditableElements{DPad,Hearts,CounterGroup,Magic,Minimap,Timer,ShardAgony,Carrots};
-constexpr std::array ButtonElements{AButton,BButton,XButton,YButton,IButton,IIButton};
+inline constexpr std::array EditableElements{DPad,Hearts,CounterGroup,Magic,Minimap,Timer,ShardAgony,Carrots};
+inline constexpr std::array ButtonElements{AButton,BButton,XButton,YButton,IButton,IIButton};
 struct Adjustment { float x=0, y=0, scale=0; }; // Scale is a percentage change.
 inline constexpr int SidePaddingLimit=100,VerticalPaddingLimit=40;
 struct Padding {

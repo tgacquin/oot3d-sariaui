@@ -2,6 +2,7 @@
 #pragma once
 #include <algorithm>
 #include <cstdint>
+#include <iterator>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -81,7 +82,7 @@ inline unsigned Apply(std::vector<std::uint8_t>& bytes,Language language=Languag
     // partly rewrite a tutorial when its source no longer matches the audit.
     const auto expected=std::count_if(catalog.begin(),catalog.end(),
         [](const auto& m){return Ready(m.dependency);});
-    if(targets.size()!=expected)return 0;
+    if(std::ssize(targets)!=expected)return 0;
     auto patched=bytes;
     for(const auto& [at,message]:targets) {
         const auto off=Read32(bytes,at),size=Read32(bytes,at+4);

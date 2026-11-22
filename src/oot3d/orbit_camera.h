@@ -94,7 +94,7 @@ constexpr U32 LockedBoomerangMode=0x252ebc;
 inline U32 Instruction(U32 pc,U32 word) {
     if(pc==LockedBoomerangMode && word==0x13a08014)return 0x13a08002; // MOVNE r8,#2
     for (unsigned i=0;i<Sites.size();++i)
-        if(pc==Sites[i].pc && word==Sites[i].instruction) return 0xef000000|FirstSVC+i;
+        if(pc==Sites[i].pc && word==Sites[i].instruction) return 0xef000000 | (FirstSVC + i);
     return word;
 }
 template<class M> bool CodeMatches(M& m) {
