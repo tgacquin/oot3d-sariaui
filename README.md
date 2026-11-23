@@ -32,24 +32,24 @@ A custom version of Azahar is used as the backing engine.
 
 <table>
   <tr>
-    <td><img width="390" alt="Screenshot 2026-11-22 at 6 42 16 PM" src="https://github.com/user-attachments/assets/f5ce2a8e-444a-439c-8469-ad698f654976" /></td>
-    <td><img width="390" alt="Screenshot 2026-11-22 at 6 30 50 PM" src="https://github.com/user-attachments/assets/c6c5a28f-ea08-4887-a702-41ffde18d132" /></td>
+    <td><img width="425" alt="Screenshot 2026-11-22 at 6 42 16 PM" src="https://github.com/user-attachments/assets/f5ce2a8e-444a-439c-8469-ad698f654976" /></td>
+    <td><img width="425" alt="Screenshot 2026-11-22 at 6 30 50 PM" src="https://github.com/user-attachments/assets/c6c5a28f-ea08-4887-a702-41ffde18d132" /></td>
   </tr>
   <tr>
-    <td><img width="390" alt="Screenshot 2026-11-22 at 6 32 13 PM" src="https://github.com/user-attachments/assets/70555802-1734-4955-9d3b-75aabb32dd51" /></td>
-    <td><img width="390" alt="Screenshot 2026-11-22 at 6 33 22 PM" src="https://github.com/user-attachments/assets/725f546b-e61d-45fc-864b-85b8150f2f4b" /></td>
+    <td><img width="425" alt="Screenshot 2026-11-22 at 6 32 13 PM" src="https://github.com/user-attachments/assets/70555802-1734-4955-9d3b-75aabb32dd51" /></td>
+    <td><img width="425" alt="Screenshot 2026-11-22 at 6 33 22 PM" src="https://github.com/user-attachments/assets/725f546b-e61d-45fc-864b-85b8150f2f4b" /></td>
   </tr>
   <tr>
-    <td><img width="390" alt="Screenshot 2026-11-22 at 6 32 37 PM" src="https://github.com/user-attachments/assets/1b1cf881-8504-4a03-8901-1d03074bf5db" /></td>
-    <td><img width="390" alt="Screenshot 2026-11-22 at 6 42 50 PM" src="https://github.com/user-attachments/assets/0fdc9a94-1805-4c3e-8f88-e0d042256c0c" /></td>
+    <td><img width="425" alt="Screenshot 2026-11-22 at 6 32 37 PM" src="https://github.com/user-attachments/assets/1b1cf881-8504-4a03-8901-1d03074bf5db" /></td>
+    <td><img width="425" alt="Screenshot 2026-11-22 at 6 42 50 PM" src="https://github.com/user-attachments/assets/0fdc9a94-1805-4c3e-8f88-e0d042256c0c" /></td>
   </tr>
   <tr>
-    <td><img width="390" alt="Screenshot 2026-11-22 at 6 44 17 PM" src="https://github.com/user-attachments/assets/0a15b630-313a-422d-b2f3-f8281bf58f38" /></td>
-    <td><img width="390" alt="Screenshot 2026-11-22 at 6 43 31 PM" src="https://github.com/user-attachments/assets/b2d7c6a7-342a-4b0b-b3fa-c7406126b653" /></td>
+    <td><img width="425" alt="Screenshot 2026-11-22 at 6 44 17 PM" src="https://github.com/user-attachments/assets/0a15b630-313a-422d-b2f3-f8281bf58f38" /></td>
+    <td><img width="425" alt="Screenshot 2026-11-22 at 6 43 31 PM" src="https://github.com/user-attachments/assets/b2d7c6a7-342a-4b0b-b3fa-c7406126b653" /></td>
   </tr>
   <tr>
-    <td><img width="390" alt="Screenshot 2026-11-22 at 6 45 12 PM" src="https://github.com/user-attachments/assets/0c5f6d3a-486d-4968-94f2-9b2218e2cea1" /></td>
-    <td><img width="390" alt="Screenshot 2026-11-22 at 7 01 41 PM" src="https://github.com/user-attachments/assets/3894d09b-174f-4633-9a93-b1d186682c4a" /></td>
+    <td><img width="425" alt="Screenshot 2026-11-22 at 6 45 12 PM" src="https://github.com/user-attachments/assets/0c5f6d3a-486d-4968-94f2-9b2218e2cea1" /></td>
+    <td><img width="425" alt="Screenshot 2026-11-22 at 7 01 41 PM" src="https://github.com/user-attachments/assets/3894d09b-174f-4633-9a93-b1d186682c4a" /></td>
   </tr>
 </table>
 
