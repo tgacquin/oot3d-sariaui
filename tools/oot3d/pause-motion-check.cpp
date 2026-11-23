@@ -78,11 +78,11 @@ int main() {
         assert(CopyPositions(m,mesh,dst,src,37*48));
         std::array<U32,12> rail{};
         for(unsigned k=0;k<12;++k)rail[k]=m.words[dst+12*48+k*4];
-        l.slot_content_scale=size;l.slot_spacing=.8f;l.slot_content_x=13;SetLayout(l,false);
+        l.slot_content_scale=size;l.slot_spacing=.8f;l.slot_content_x=13;l.slot_content_y=9;SetLayout(l,false);
         assert(CopyPositions(m,mesh,dst,src,37*48));
         for(unsigned k=0;k<12;++k)assert(rail[k]==m.words[dst+12*48+k*4]);
         const float cx=horizontal?288+(28-120)*.8f+13:292+13;
-        const float cy=horizontal?120:120+(28-120)*.8f;
+        const float cy=horizontal?129:129+(28-120)*.8f;
         const auto center=Move(cx,cy,Slots,l[Slots]);
         const auto at=dst+17*48;
         assert(Near((m.F(at)+m.F(at+12))/2,center[0]));
@@ -101,7 +101,7 @@ int main() {
     m.words[number_model]=0x4ebd60;m.words[number_model+4]=number_mesh;
     assert(OwnedItemCounter(m,number_mesh) && !OwnedItemCounter(m,number_mesh+4));
     for(bool horizontal:{false,true})for(unsigned slot=0;slot<4;++slot) {
-        Layout layout{};layout.horizontal=horizontal;layout[Slots]={-100,-60,.75f};SetLayout(layout,false);
+        Layout layout{};layout.horizontal=horizontal;layout[Slots]={-100,-60,.75f};layout.slot_content_y=9;SetLayout(layout,false);
         const auto c=SlotCenters[slot];const float x=c[0]+8,y=c[1]+10;
         quad(src,x,y,8,12);quad(src+48,x+8,y,8,12);quad(src+96,400,240,8,12);
         const auto before=m.words;
@@ -110,7 +110,7 @@ int main() {
         motion_y=motion_slots=-20;motion_x=-90;hook.Handle(m,r,3);
         assert(r[15]==0x3675f4 && hook.pending.empty());
         const auto expected=AnimatedMove(horizontal?x+288+c[1]-120-c[0]:x,
-            horizontal?y+120-c[1]:y,Slots,layout[Slots]);
+            (horizontal?y+120-c[1]:y)+9,Slots,layout[Slots]);
         assert(Near(m.F(dst),expected[0]) && Near(m.F(dst+4),expected[1]));
         assert(Near(m.F(dst+12)-m.F(dst),6) && Near(m.F(dst+48)-m.F(dst),6));
         for(U32 i=0;i<144;i+=4)assert(m.words.at(src+i)==before.at(src+i));

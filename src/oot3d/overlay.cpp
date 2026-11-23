@@ -2170,9 +2170,10 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                                         changed |= ImGui::SliderFloat("Scale",&layout.slot_content_scale,.25f,2.f,"%.2fx",ImGuiSliderFlags_AlwaysClamp);
                                         changed |= ImGui::SliderFloat("Spacing",&layout.slot_spacing,.25f,2.f,"%.2fx",ImGuiSliderFlags_AlwaysClamp);
                                         changed |= ImGui::SliderFloat("X",&layout.slot_content_x,-240.f,240.f,"%.1f",ImGuiSliderFlags_AlwaysClamp);
+                                        changed |= ImGui::SliderFloat("Y",&layout.slot_content_y,-240.f,240.f,"%.1f",ImGuiSliderFlags_AlwaysClamp);
                                         ImGui::TextWrapped("Adjusts the slot contents inside the green strip. The strip keeps its own size and position.");
                                         if(ImGui::Button("Reset slot contents")) {
-                                            layout.slot_content_scale=layout.slot_spacing=1;layout.slot_content_x=0;changed=true;
+                                            layout.slot_content_scale=layout.slot_spacing=1;layout.slot_content_x=layout.slot_content_y=0;changed=true;
                                         }
                                         ImGui::TreePop();
                                     }
@@ -2196,7 +2197,7 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                                     if(part==PauseMenu::Slots)layout.horizontal=false;
                                     if(PauseMenu::IsLowerGear(part))layout.gear_vertical[part-PauseMenu::GearBottomLeft]=false;
                                     if(part==PauseMenu::Background) {layout.stack_background=false;layout.background_darkness=0;layout.background_shadow={};}
-                                    if(part==PauseMenu::Slots) {layout.slots_shadow={};layout.slot_content_scale=layout.slot_spacing=1;layout.slot_content_x=0;}
+                                    if(part==PauseMenu::Slots) {layout.slots_shadow={};layout.slot_content_scale=layout.slot_spacing=1;layout.slot_content_x=layout.slot_content_y=0;}
                                     if(part==PauseMenu::Map)layout.map_darkness=0;
                                     if(part==PauseMenu::Items)layout.items_shadow={};
                                     changed=true;

@@ -155,7 +155,7 @@ struct Layout : std::array<Pose,PartCount> {
     float transition_seconds=DefaultTransitionSeconds;
     float preview_rotation_speed=1.f;
     float selection_grow_seconds=0;
-    float slot_content_scale=1.f, slot_spacing=1.f, slot_content_x=0;
+    float slot_content_scale=1.f, slot_spacing=1.f, slot_content_x=0, slot_content_y=0;
     Shadow header_shadow{}, slots_shadow{}, background_shadow{}, items_shadow{};
     std::array<Shadow,2> gear_shadows{};
     ColorOverlay header_overlay{}, slots_overlay{};
@@ -199,7 +199,8 @@ struct Layout : std::array<Pose,PartCount> {
 inline bool ValidSlotContents(const Layout& l) {
     return std::isfinite(l.slot_content_scale) && l.slot_content_scale>=.25f && l.slot_content_scale<=2 &&
         std::isfinite(l.slot_spacing) && l.slot_spacing>=.25f && l.slot_spacing<=2 &&
-        std::isfinite(l.slot_content_x) && std::abs(l.slot_content_x)<=240;
+        std::isfinite(l.slot_content_x) && std::abs(l.slot_content_x)<=240 &&
+        std::isfinite(l.slot_content_y) && std::abs(l.slot_content_y)<=240;
 }
 inline std::mutex layout_mutex;
 inline Layout layout{};
@@ -248,8 +249,9 @@ constexpr std::array<std::array<float,2>,4> SlotCenters{{{292,28},{296,94},{284,
 // Move upright slot art inside the rail; the long green background is separate.
 inline std::array<float,2> SlotCenter(unsigned slot,const Layout& l) {
     const auto c=SlotCenters[slot];
-    return l.horizontal?std::array{288+(c[1]-120)*l.slot_spacing+l.slot_content_x,120.f}:
-        std::array{c[0]+l.slot_content_x,120+(c[1]-120)*l.slot_spacing};
+    const float center_y=120.f+l.slot_content_y;
+    return l.horizontal?std::array{288+(c[1]-120)*l.slot_spacing+l.slot_content_x,center_y}:
+        std::array{c[0]+l.slot_content_x,center_y+(c[1]-120)*l.slot_spacing};
 }
 inline std::array<float,2> SlotPoint(float x,float y,unsigned slot,const Layout& l) {
     const auto c=SlotCenters[slot],target=SlotCenter(slot,l);

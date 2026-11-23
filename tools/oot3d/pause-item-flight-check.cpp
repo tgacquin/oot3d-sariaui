@@ -48,7 +48,7 @@ int main(int argc,char** argv) {
         if(source==destination)continue;
         Layout poses;poses.horizontal=horizontal;
         poses[Items]={-35,12,1.2f};poses[Slots]={-170,-80,.65f};
-        poses.slot_content_scale=content_scale;poses.slot_spacing=.8f;poses.slot_content_x=13;
+        poses.slot_content_scale=content_scale;poses.slot_spacing=.8f;poses.slot_content_x=13;poses.slot_content_y=-8;
         SetLayout(poses,false);
         const auto a=point(source),b=point(destination);
         m.words[root+0x50]=source;m.words[root+0x54]=destination;
@@ -58,8 +58,8 @@ int main(int argc,char** argv) {
         const auto target=[&](unsigned index) {
             auto p=point(index);const bool slot=index%6==5;
             if(slot) {
-                p=horizontal?std::array{288+(p[1]-120)*.8f+13,120.f}:
-                    std::array{p[0]+13,120+(p[1]-120)*.8f};
+                p=horizontal?std::array{288+(p[1]-120)*.8f+13,112.f}:
+                    std::array{p[0]+13,112+(p[1]-120)*.8f};
             }
             return Move(p[0],p[1],slot?Slots:Items,poses[slot?Slots:Items]);
         };

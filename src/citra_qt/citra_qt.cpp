@@ -1694,6 +1694,7 @@ void GMainWindow::ConnectWidgetEvents() {
     pause_layout.slot_content_scale=read_pause_float(QStringLiteral("PauseScreen/slot_content_scale"),1.f,.25f,2.f);
     pause_layout.slot_spacing=read_pause_float(QStringLiteral("PauseScreen/slot_spacing"),1.f,.25f,2.f);
     pause_layout.slot_content_x=read_pause_float(QStringLiteral("PauseScreen/slot_content_x"),0.f,-240.f,240.f);
+    pause_layout.slot_content_y=read_pause_float(QStringLiteral("PauseScreen/slot_content_y"),0.f,-240.f,240.f);
     pause_layout.preview_rotation_speed=read_pause_float(QStringLiteral("PauseScreen/preview_rotation_speed"),1.f,.25f,5.f);
     OOT3D::BossChallenge::Layout boss_layout;
     for(unsigned i=0;i<OOT3D::BossChallenge::Count;++i) {
@@ -2974,6 +2975,7 @@ void GMainWindow::ConnectWidgetEvents() {
             oot_editor_config->setValue(QStringLiteral("PauseScreen/slot_content_scale"),layout.slot_content_scale);
             oot_editor_config->setValue(QStringLiteral("PauseScreen/slot_spacing"),layout.slot_spacing);
             oot_editor_config->setValue(QStringLiteral("PauseScreen/slot_content_x"),layout.slot_content_x);
+            oot_editor_config->setValue(QStringLiteral("PauseScreen/slot_content_y"),layout.slot_content_y);
             oot_editor_config->setValue(QStringLiteral("PauseScreen/preview_rotation_speed"),layout.preview_rotation_speed);
             oot_editor_config->setValue(QStringLiteral("PauseScreen/background_darkness"),layout.background_darkness);
             oot_editor_config->setValue(QStringLiteral("PauseScreen/map_frame/enabled"),layout.map_frame.enabled);
