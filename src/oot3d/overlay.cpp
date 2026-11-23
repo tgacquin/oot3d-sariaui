@@ -988,12 +988,8 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                     bool bombchu=defaults ? defaults->value("QOL/no_bombchu_first_person",false).toBool() : QOL::no_bombchu_first_person.load();
                     bool hide_stones=QOL::hide_sheikah_stones.load();
                     bool changed=false;
-                    changed|=ImGui::Checkbox(UILanguage::Pick("Faster loading###fast_loading",
-                        "Chargements rapides###fast_loading","Carga rápida###fast_loading").data(),&loading);
-                    if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",UILanguage::Pick(
-                        "Shortens loading pauses between areas. Fade speed is unchanged.",
-                        "Réduit l’attente entre les zones sans modifier la vitesse des fondus.",
-                        "Reduce la espera entre zonas sin cambiar la velocidad de los fundidos.").data());
+                    changed|=ImGui::Checkbox("Faster loading###fast_loading",&loading);
+                    if(ImGui::IsItemHovered())ImGui::SetTooltip("Shortens loading pauses between areas. Fade speed is unchanged.");
                     changed|=ImGui::Checkbox("Disable Navi",&navi);
                     if(ImGui::IsItemHovered())ImGui::SetTooltip("Disables Navi's unsolicited reminders. Story dialogue and targeting remain available.");
                     changed|=ImGui::Checkbox("Disable heart beep",&beep);
@@ -1063,10 +1059,7 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                         else configure_textures_shortcut=true;
                     }
                     int targeting=defaults ? defaults->value("Controller/hold_targeting",true).toBool() : GameControlOptions::hold_targeting.load();
-                    const char* targeting_modes[]={UILanguage::Pick("Switch","Alterner","Alternar").data(),
-                        UILanguage::Pick("Hold","Maintenir","Mantener").data()};
-                    if(ImGui::Combo(UILanguage::Pick("Targeting style","Mode de ciblage","Modo de fijación").data(),
-                                    &targeting,targeting_modes,2)) {
+                    if(ImGui::Combo("Targeting style",&targeting,"Switch\0Hold\0")) {
                         if(defaults) defaults->setValue("Controller/hold_targeting",targeting==1);
                         else {
                             GameControlOptions::hold_targeting=targeting==1;
@@ -1074,8 +1067,7 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                         }
                     }
                     bool invert=defaults ? defaults->value("Controller/invert_camera_y",false).toBool() : GameControlOptions::invert_camera_y.load();
-                    if(ImGui::Checkbox(UILanguage::Pick("Invert first-person Y-axis","Inverser l’axe Y en vue subjective",
-                                                       "Invertir el eje Y en primera persona").data(),&invert)) {
+                    if(ImGui::Checkbox("Invert first-person Y-axis",&invert)) {
                         if(defaults) defaults->setValue("Controller/invert_camera_y",invert);
                         else {
                             GameControlOptions::invert_camera_y=invert;
@@ -1083,8 +1075,7 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                         }
                     }
                     bool motion=defaults ? defaults->value("Controller/motion_controls",true).toBool() : GameControlOptions::motion_controls.load();
-                    if(ImGui::Checkbox(UILanguage::Pick("Motion controls","Commandes par mouvements",
-                                                       "Controles de movimiento").data(),&motion)) {
+                    if(ImGui::Checkbox("Motion controls",&motion)) {
                         if(defaults) defaults->setValue("Controller/motion_controls",motion);
                         else {
                             GameControlOptions::motion_controls=motion;
@@ -1093,9 +1084,7 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                     }
                     if(!player) {
                         bool gyro_aim=GyroAim::enabled.load();
-                        if(ImGui::Checkbox(UILanguage::Pick("Responsive gyro aim (experimental)",
-                            "Visée gyroscopique réactive (expérimental)",
-                            "Puntería giroscópica rápida (experimental)").data(),&gyro_aim)) {
+                        if(ImGui::Checkbox("Responsive gyro aim (experimental)",&gyro_aim)) {
                             GyroAim::history.Reset();
                             GyroAim::enabled=gyro_aim;
                         }
