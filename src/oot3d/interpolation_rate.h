@@ -11,7 +11,7 @@ namespace OOT3D::Interpolation {
 inline std::atomic<int> target_fps{60};
 inline std::atomic<bool> match_refresh_rate{false};
 inline std::atomic<float> display_refresh_rate{60};
-enum class MenuPage { None, Items, Gear, Map, FileSelect, NameEntry, Save };
+enum class MenuPage { None, Items, Gear, Map, FileSelect, NameEntry, Save, Death };
 inline std::atomic<MenuPage> menu_page{MenuPage::None};
 inline constexpr unsigned MaxRateSamples=4;
 inline int TargetFPS() {

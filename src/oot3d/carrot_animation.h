@@ -109,34 +109,26 @@ template<class V> struct History {
             }
         }
     }
-    void Append(std::vector<V>& out,std::int64_t now,const HUD::DropShadow& shadow={},float configured_opacity=1) const {
-        if(!shadow.enabled) {AppendSprites(out,now,configured_opacity);return;}
-        const auto finite=[](float v,float fallback,float lo,float hi) {
-            return std::isfinite(v)?std::clamp(v,lo,hi):fallback;
-        };
-        const float strength=finite(shadow.strength,.6f,0,1);
-        if(strength==0) {AppendSprites(out,now,configured_opacity);return;}
-        std::vector<V> sprites;AppendSprites(sprites,now,configured_opacity);
-        const float dx=finite(shadow.x,1.5f,-12,12),dy=finite(shadow.y,2,-12,12);
-        const float blur=finite(shadow.blur,1,0,4);
-        // Reuse the sprite alpha mask, with black vertex tint. A normalized
-        // 5x5 binomial kernel softens the silhouette without a rectangular panel.
-        constexpr std::array<float,5> weights{1,4,6,4,1};
-        const int radius=blur>0?2:0;
-        for(int y=-radius;y<=radius;++y)for(int x=-radius;x<=radius;++x) {
-            const float weight=radius?weights[x+2]*weights[y+2]/256.f:1.f;
-            const float alpha=radius?1-std::pow(1-std::min(strength,.9999f),weight):strength;
-            for(auto v:sprites) {
-                v.position[0]-=(dy+y*blur/2)/120*v.position[3];
-                v.position[1]-=(dx+x*blur/2)/200*v.position[3];
-                v.color[0]=v.color[1]=v.color[2]=0;
-                v.color[3]*=alpha;out.push_back(v);
-            }
+    void Append(std::vector<V>& out,std::int64_t now,const HUD::CarrotShadow& shadow={},float configured_opacity=1) const {
+        const auto first=out.size();
+        AppendSprites(out,now,configured_opacity);
+        const auto end=out.size();
+        if(first==end || !shadow.enabled || !std::isfinite(shadow.opacity) || shadow.opacity<=0)return;
+        const float opacity=std::min(shadow.opacity,1.f);
+        const float dx=std::isfinite(shadow.x)?std::clamp(shadow.x,-12.f,12.f):0.f;
+        const float dy=std::isfinite(shadow.y)?std::clamp(shadow.y,-12.f,12.f):0.f;
+        // Place every silhouette behind the whole animated row, using the
+        // current sprite UVs and vertex fade even during the spent-carrot bounce.
+        out.reserve(end+(end-first));
+        for(auto i=first;i<end;++i) {
+            auto& v=out[i];
+            out.push_back(v);
+            v.position[0]-=dy/120*v.position[3];
+            v.position[1]-=dx/200*v.position[3];
+            v.color[0]=v.color[1]=v.color[2]=0;
+            v.color[3]*=opacity;
+            v.tex_coord0_w=-1.f; // HUD shader: vertex RGB with the sprite's sampled alpha.
         }
-        // All silhouettes precede the full row, so one carrot's shadow can
-        // never cover its neighbor. Vertical bounce and HUD fades match.
-        out.insert(out.end(),sprites.begin(),sprites.end());
     }
-
 };
 }

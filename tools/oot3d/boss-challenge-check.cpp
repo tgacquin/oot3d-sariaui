@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "oot3d/boss_challenge.h"
 #include "oot3d/death_menu.h"
+#include "oot3d/pause_input.h"
+#include "oot3d/control_swap.h"
 #include "dynarmic/interface/A32/a32.h"
 #include <cassert>
 #include <cstring>
@@ -275,9 +277,11 @@ int main(int argc,char** argv) {
         constexpr U32 p=0x880000,model=0x881000,mesh=0x882000;
         e.Write(p+0x64,model);e.Write(p+0x68,0);e.Write(model,0x4ebd60);e.Write(model+4,mesh);
         e.Write(mesh+0x13c,0);e.Write(mesh+0x140,0);
-        failed.FilterFailedTitle(e,p);assert(e.Read(mesh+0x13c)==1 && e.Read(mesh+0x140)==3);
-        e.Write(mesh+0x13c,0);failed.FilterTitleAtDraw(e,model);assert(e.Read(mesh+0x13c)==1);
-        failed.RestoreTitleFilter(e);assert(e.Read(mesh+0x13c)==0 && e.Read(mesh+0x140)==0);
+        for(unsigned pane:{6u,7u,8u,12u}) {
+            failed.pane=pane;failed.FilterResultTitle(e,p);assert(e.Read(mesh+0x13c)==1 && e.Read(mesh+0x140)==3);
+            e.Write(mesh+0x13c,0);failed.FilterTitleAtDraw(e,model);assert(e.Read(mesh+0x13c)==1);
+            failed.RestoreTitleFilter(e);assert(e.Read(mesh+0x13c)==0 && e.Read(mesh+0x140)==0);
+        }
         failed.pane=6;failed.battle=true;assert(failed.ModelTransform().sx==1);
     }
     // Filter the renderer's effective sampler before command submission,
@@ -343,7 +347,8 @@ int main(int argc,char** argv) {
         e.Write(H::UI+0xc,play);e.Write(play+0x100,0x0203);
         e.Write(play+0x7f24,0x100);e.Write(H::Main+0x34,2);
         e.Write(play+0x5c2c,0);e.Write(play+0x7f10,0);
-        assert(B::Hook::GameplayTimerOpacity(e,true,.6f)==.6f);
+        e.Write(B::Owner+0xc,1);assert(B::Hook::GameplayTimerOpacity(e,true,1)==0);
+        e.Write(B::Owner+0xc,0x101);assert(B::Hook::GameplayTimerOpacity(e,true,.6f)==.6f);
         assert(B::Hook::GameplayTimerOpacity(e,false,1)==0);
         e.Write(play+0x5c2c,0x100);assert(B::Hook::GameplayTimerOpacity(e,true,1)==0);
         e.Write(play+0x5c2c,0);e.Write(play+0x7f10,0x10000);
@@ -377,11 +382,20 @@ int main(int argc,char** argv) {
         }
         e.Write(B::Owner+8,0x1010a);e.Write(pane+0x6c,0x100);
         e.Write(pane+0xc,0x886000);
+        e.Write(label+0x84,std::bit_cast<U32>(146.f));
+        e.Write(model+0x28,std::bit_cast<U32>(146.f));
         for(float frame:{-1.f,0.f}) {
             e.Write(pane+0x18,std::bit_cast<U32>(frame));e.Write(alpha,std::bit_cast<U32>(1.f));
             result.DrawMaterial(e,renderer,alpha);assert(std::bit_cast<float>(*e.Read(alpha))==0);
         }
         e.Write(pane+0x18,std::bit_cast<U32>(1.f));
+        // The first sampled result draw was fully opaque at the old anchor.
+        for(U32 anim:{0u,0x886000u}) {
+            e.Write(pane+0xc,anim);e.Write(model+0x28,std::bit_cast<U32>(18.f));
+            e.Write(alpha,std::bit_cast<U32>(1.f));result.DrawMaterial(e,renderer,alpha);
+            assert(std::bit_cast<float>(*e.Read(alpha))==0);
+        }
+        e.Write(model+0x28,std::bit_cast<U32>(146.f));
         e.Write(alpha,std::bit_cast<U32>(.65f));result.DrawMaterial(e,renderer,alpha);
         assert(std::bit_cast<float>(*e.Read(alpha))==.65f); // HUD hidden: result still visible.
         for(float label_alpha:{0.f,.25f,1.f}) {
@@ -496,10 +510,38 @@ int main(int argc,char** argv) {
     cpu.ClearCache();cpu.Regs()=r;cpu.SetCpsr(0x10);e.remaining=100000;cpu.Run();r=cpu.Regs();
     assert(r[15]==Env::Stop+4 && r[13]==0x980000 && (e.Read(death+8).value()&255)==5);
     assert(e.Read(death+0x10)==1 && e.Read(death+0x24)==0);
+    // A one-frame direction on either half of the render pair must reach
+    // each native stone handler, including immediate reversals.
+    e.Write(death+4,play);e.Write(death+0x10,1);
+    e.Write(death+0x14,0);e.Write(death+0x24,0);D::half_frame=true;
+    struct Dialog {U32 state,handler;};
+    for(const auto dialog:{Dialog{4,0x426e48},Dialog{10,0x4272fc},Dialog{14,0x427424}})
+    for(bool first_extra:{false,true}) {
+        e.Write(death+8,0x10100|dialog.state);
+        D::extra_frame=first_extra;
+        for(U32 pressed:{0x10u,0x20u,0x10000000u,0x20000000u}) {
+            e.Write(play+0x18,pressed);e.Write(play+0x14,pressed);
+            r={};r[1]=play;r[4]=death;r[15]=D::Sites[6].pc+4;
+            e.death_hook.ControlUpdate(e,r);assert(r[15]==D::Sites[6].pc+4);
+            r[0]=death;r[13]=0x980000;r[14]=Env::Stop;r[15]=dialog.handler;
+            cpu.ClearCache();cpu.Regs()=r;cpu.SetCpsr(0x10);e.remaining=100000;cpu.Run();
+            assert(cpu.Regs()[15]==Env::Stop+4 && e.Read(death+8)==(0x10100|dialog.state));
+            assert(e.Read(death+0x10)==((pressed==0x10 || pressed==0x10000000)?0u:1u));
+            D::extra_frame=!D::extra_frame;
+        }
+    }
+    D::extra_frame=true;
+    for(U32 pending:{0u,3u}) {
+        e.Write(play+0x18,pending?0x10:0);e.Write(play+0x14,0x10);
+        e.Write(death+0x24,pending);
+        r={};r[1]=play;r[4]=death;r[15]=D::Sites[6].pc+4;
+        e.death_hook.ControlUpdate(e,r);assert(r[15]==0x41ce0c && e.Read(death+0x24)==pending);
+    }
+    D::extra_frame=D::half_frame=false;
     // Run the complete Boss Challenge input handler: A on either choice,
-    // B, and Start must invoke the native callback without a simulated touch.
-    for(U32 button:{1u,2u,8u})for(U32 choice:{0u,1u})for(unsigned repress:{0u,1u,2u}) {
-        D::PollStart(false);D::PollStart(button==8);
+    // B resumes, and logical Start leaves the dialog and focus untouched.
+    for(U32 button:{1u,2u,8u})for(U32 choice:{0u,1u}) {
+        e.Write(death+0x20,0x1234);
         e.Write(death+8,0x1010e);e.Write(death+4,play);e.Write(death+0x10,choice);
         e.Write(death+0x14,0);e.Write(death+0x24,0);e.Write(play+0x18,button);e.Write(play+0x14,button);
         for(unsigned i=0;i<4;++i) {
@@ -511,51 +553,46 @@ int main(int argc,char** argv) {
         for(unsigned i=4;i<12;++i)r[i]=0xcafe0000+i;
         cpu.ClearCache();cpu.Regs()=r;cpu.SetCpsr(0x10);e.remaining=100000;cpu.Run();r=cpu.Regs();
         assert(r[15]==Env::Stop+4 && r[13]==0x980000 && e.death_hook.input_stage==0);
+        for(unsigned i=4;i<12;++i)assert(r[i]==0xcafe0000+i);
+        if(button==8) {
+            assert(e.Read(death+8)==0x1010e && e.Read(death+0x10)==choice);
+            assert(e.Read(death+0x24)==0 && e.Read(death+0x20)==0x1234);
+            continue;
+        }
         assert((e.Read(death+8).value()&255)==15);
         assert(e.Read(death+0x24)==0 && e.Read(death+0x20)==0xffffffff);
         assert(((e.Read(death+8).value()>>8)&255)==(button==1 && choice==1?2:1));
-        for(unsigned i=4;i<12;++i)assert(r[i]==0xcafe0000+i);
-        if(button==8) {
-            // The physical hold survives while the pause queue clears, then
-            // repopulates its pressed mask on return to gameplay.
-            e.Write(0x5043d4+0xc,play);e.Write(0x50af34+4,0x880000);e.Write(play+0x14,8);
-            e.Write(0x50af18,8);e.Write(0x50af14,8);
-            for(unsigned frame=0;frame<20;++frame) {
-                D::PollStart(true); // Repeated HID polls are still the same press.
-                // Native pause cleanup may blank the play snapshot while
-                // HID still reports Start held, and update another controller.
-                e.Write(play+0x14,0);r={};r[1]=play+0x100;
-                e.death_hook.ControlUpdate(e,r);
-                r={};e.death_hook.Input(e,r,12,true);
-                assert(r[15]==D::Sites[12].pc+4 && !(r[0]&8));
-                assert(e.death_hook.closing_start_play==play);
-                e.Write(0x50af18,8);e.Write(0x50af14,8);
+    }
+    assert(D::Instruction(0x42ec04,0xebfc3278)==0xebfc3278); // Gameplay input remains native.
+    // Run the ROM's Items tab hit tests for a press and release with the
+    // coordinates produced by the mapped shortcut. Stop at the HUD loop tail.
+    {
+        namespace P=OOT3D::PauseMenu;
+        constexpr U32 main=0x50af34,touch=0x50bb38,stack=0x980000,tail=0x42f270;
+        const auto saved=e.bytes;
+        e.Write(tail,0xef000000);
+        e.Write(P::UI+0xc,play);e.Write(P::UI+0x18,0);e.Write(P::UI+0x20,0);
+        e.Write(play+0x100,0x203);e.Write(play+0x20ac,0x910000);e.Write(stack+0x40,play);
+        e.Write(death+8,0);e.Write(B::Owner+8,0x10108);e.Write(B::Owner+0x3ec,0);
+        e.Write(main+0x68,0);
+        for(bool swap:{false,true}) {
+            OOT3D::ControlSwap::enabled=swap;
+            OOT3D::ControlSwap::Input mapping;P::MenuInput shortcut;
+            shortcut.last_page=P::MenuInput::Target::Map;
+            U32 keys=0;mapping.Filter(keys,true);
+            e.Write(main+0x34,2);e.Write(P::UI+0x14,0);
+            keys=swap?shortcut.Start:shortcut.Select;mapping.Filter(keys,true);
+            assert(shortcut.Filter(e,keys,true) && keys==0);
+            e.Put<std::uint16_t>(touch+2,shortcut.touch_x);e.Put<std::uint16_t>(touch+4,220);
+            for(bool release:{false,true}) {
+                e.Put<std::uint16_t>(touch+8,!release);e.Put<std::uint16_t>(touch+10,release);
+                r={};r[5]=main;r[13]=stack;r[15]=release?0x42edf4:0x42e7f4;
+                cpu.ClearCache();cpu.Regs()=r;cpu.SetCpsr(0x10);e.remaining=100000;cpu.Run();
+                assert(cpu.Regs()[15]==tail+4 && e.Read(main+0x34)==(release?12u:7u));
+                assert(e.Read(P::UI+0x14)==unsigned(release));
             }
-            D::PollStart(false);
-            if(repress) {
-                // A new press during cleanup must survive even if it is also
-                // released before gameplay reaches its next Start query.
-                D::PollStart(true);
-                if(repress==2)D::PollStart(false);
-                e.Write(0x50af18,8|2);e.Write(0x50af14,8|1);
-                r={};r[1]=play;e.death_hook.ControlUpdate(e,r);
-                r={};e.death_hook.Input(e,r,12,true);
-                assert(r[15]==0x33b5ec && !e.death_hook.closing_start_play);
-                assert(e.Read(0x50af18)==(8|2) && e.Read(0x50af14)==(8|1));
-                // Execute the original input query, not just the hook branch.
-                r[14]=Env::Stop;r[13]=0x980000;cpu.Regs()=r;
-                cpu.SetCpsr(0x10);cpu.ClearHalt();e.remaining=100000;cpu.Run();r=cpu.Regs();
-                assert(r[15]==Env::Stop+4 && r[0]==(8|2));
-                continue;
-            }
-            e.Write(play+0x14,0);r={};r[1]=play;
-            e.death_hook.ControlUpdate(e,r);
-            assert(e.death_hook.closing_start_play==play);
-            r={};e.death_hook.Input(e,r,12,true);
-            assert(r[15]==D::Sites[12].pc+4 && !(r[0]&8) && !e.death_hook.closing_start_play);
-            e.Write(play+0x14,8);r={};e.death_hook.Input(e,r,12,true);
-            assert(r[15]==0x33b5ec); // A fresh Start still opens normally.
         }
+        OOT3D::ControlSwap::enabled=false;e.bytes=saved;cpu.ClearCache();
     }
     {
         namespace W=OOT3D::Widescreen;

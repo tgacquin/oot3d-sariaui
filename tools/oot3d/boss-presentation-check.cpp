@@ -29,6 +29,18 @@ int main(int argc,char** argv) {
             visible+=((*titles)[S::Tiled(x,i*64+y,256)]&255)>0;
         assert(visible>100);
     }
+    OOT3D::HUD::RupeeDigitOutline outline;
+    const auto plain=OOT3D::HDFont::MakeGauntletTitle(false,outline);
+    outline.enabled=true;outline.color={1,0,0};
+    const auto label=OOT3D::HDFont::MakeGauntletTitle(false,outline);
+    const auto bold=OOT3D::HDFont::MakeGauntletTitle(true,outline);
+    assert(label.advance && plain.advance==label.advance && bold.pixels!=label.pixels);
+    unsigned rim=0;
+    for(unsigned i=0;i<plain.pixels.size();++i) {
+        if(plain.pixels[i]&255)assert((plain.pixels[i]>>8)==0xffffff); // Only the face, with no shadow.
+        else if(label.pixels[i]&255){assert((label.pixels[i]>>8)==0xff0000);++rim;}
+    }
+    assert(rim>0);
     B::Layout l;
     for(unsigned i=0;i<9;++i) {
         const auto name=B::NativeNameGeometry(l,i);assert(name.count==(i<8?1:0));
@@ -38,7 +50,7 @@ int main(int argc,char** argv) {
             const unsigned bottom=unsigned((1-name.uvs[5])*OOT3D::BossTitle::Height);
             assert(top==i*64 && bottom==i*64+63);
         }
-        assert(B::NameGeometry(l,i,*text).count>0 == (i==8));
+        assert(B::NameGeometry(l,i,label).count==(i==8?1:0));
         auto moved=l;moved[B::BossName].x+=12;moved[B::BossName].y-=7;
         const auto shifted=B::NativeNameGeometry(moved,i);assert(shifted.count==name.count);
         for(unsigned j=0;j<name.count*12;j+=3) {
@@ -50,7 +62,7 @@ int main(int argc,char** argv) {
             assert(B::Neighbor(i,1,two)==((i+8)%9));
         }
     }
-    assert(!B::NameGeometry(l,9,*text).count);
+    assert(!B::NameGeometry(l,9,label).count);
     const auto hints=B::NavigationHints(l,0),moving=B::NavigationHints(l,.25);
     assert(hints.count==4 && moving.count==4);
     assert(moving.positions[0]==hints.positions[0] && moving.positions[1]==hints.positions[1]+.25f);
@@ -134,7 +146,10 @@ int main(int argc,char** argv) {
     }
     const auto buttons=B::ButtonPrompts(l,*prompts);
     assert(buttons.icons.count==2 && buttons.text.count==10); // Select / Back.
-    assert(buttons.icons.positions[0]==120 && buttons.icons.positions[12]==220);
+    namespace P=OOT3D::PausePrompts;
+    const float column=P::LabelColumn(*prompts,{P::FileSelectText,P::FileBackText});
+    assert(buttons.icons.positions[0]==l[B::SelectPrompt].x);
+    assert(buttons.icons.positions[12]==l[B::BackPrompt].x+(column+4)*l[B::BackPrompt].scale);
     static_assert(decltype(B::Hook{}.text)::TextureBytes==sizeof(prompts->text));
     std::cout<<"Boss presentation: native shop art, animated mirrored hints, all boss labels, positioning/scaling, Select/Back atlas and sequential navigation passed\n";
 }

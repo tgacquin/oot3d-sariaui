@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "oot3d/pause_input.h"
+#include "oot3d/control_swap.h"
 #include <cassert>
 #include <iostream>
 #include <map>
@@ -86,6 +87,31 @@ int main() {
         poll(MenuInput::Select,false,0);assert(input.last_page==remembered);
         m.words[OOT3D::SaveMenu::Owner+0x28]=0;
     }
+
+    // Start/Select are remapped before the Items shortcut. A remembered
+    // world map cannot be opened during a rematch, so open Items directly.
+    for(bool swap:{false,true}) {
+        OOT3D::ControlSwap::Input mapping;
+        OOT3D::ControlSwap::enabled=swap;
+        U32 buttons=0;mapping.Filter(buttons,true);
+        input={};input.last_page=MenuInput::Target::Map;
+        m.words[OOT3D::BossChallenge::Owner+0x3ec]=2;
+        m.words[OOT3D::BossChallenge::Owner+8]=0x10108;
+        m.words[UI+0x14]=0;
+        buttons=swap?MenuInput::Start:MenuInput::Select;
+        mapping.Filter(buttons,true);poll(buttons,true,0,220);
+        m.words[UI+0x14]=1;page(1,0);poll(buttons,false,0);
+        poll(0,false,0);
+        constexpr U32 dialog=0x8700000;
+        m.words[OOT3D::DeathMenu::ControllerPointer]=dialog;
+        m.words[dialog+8]=0x1010e;poll(buttons,false,0);
+        buttons=swap?MenuInput::Select:MenuInput::Start;
+        mapping.Filter(buttons,true);poll(buttons,false,MenuInput::Start);
+        m.words[dialog+8]=0;
+    }
+    OOT3D::ControlSwap::enabled=false;
+    m.words[OOT3D::BossChallenge::Owner+8]=0;
+    m.words[UI+0x14]=1;
 
     // Hidden cards are collapsed in fresh geometry and absent from touch mapping.
     constexpr std::array<Part,4> cards{Back,GearTab,MapTab,ItemsTab};

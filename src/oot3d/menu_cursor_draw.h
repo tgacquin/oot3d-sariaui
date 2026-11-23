@@ -11,14 +11,18 @@ struct Draw {
     U32 indices{},owner{},focus{},detail{},epoch{};
     std::uint64_t frame{};
 };
-inline std::mutex mutex;
-inline std::array<Draw,12> draws{};
-inline unsigned next_draw{};
+struct DrawHistory {
+    std::mutex mutex;
+    std::array<Draw,12> draws{};
+    unsigned next{};
+    std::atomic<std::uint64_t> last_frame{~std::uint64_t{}};
+};
+inline DrawHistory cursors, boss_text;
 
 // Match the submitted float3 stream, including the replacement mesh used
 // to draw the dungeon cursor above the floor cards.
 template<class M,class Resolve>
-void Record(M& m,U32 model,U32 owner,U32 focus,U32 detail,Resolve resolve) {
+void Record(M& m,U32 model,U32 owner,U32 focus,U32 detail,Resolve resolve,DrawHistory& history=cursors) {
     const U32 mesh=m.Read(model+4).value_or(0);
     if(!TitleScreen::Pointer(mesh,0x1a8))return;
     const auto bank=m.Read(mesh+0x124).value_or(2);
@@ -27,8 +31,9 @@ void Record(M& m,U32 model,U32 owner,U32 focus,U32 detail,Resolve resolve) {
     Draw draw{resolve(live),m.Read(model+0x174).value_or(0),owner,focus,detail,
               generation.load(),guest_frames.load()};
     if(!draw.positions || !draw.indices)return;
-    std::scoped_lock lock{mutex};
-    draws[next_draw++%draws.size()]=draw;
+    std::scoped_lock lock{history.mutex};
+    history.draws[history.next++%history.draws.size()]=draw;
+    history.last_frame.store(draw.frame,std::memory_order_release);
 }
 
 template<class M,class Resolve>
@@ -96,11 +101,13 @@ void Capture(M& m,MenuPage page,U32 model,U32 source,Resolve resolve) {
         }
     }
 }
-inline std::array<U32,3> Selection(const void* positions,U32 count,std::uint64_t frame,U32 epoch) {
-    if(!positions)return {};
-    std::scoped_lock lock{mutex};
+inline std::array<U32,3> Selection(const void* positions,U32 count,std::uint64_t frame,U32 epoch,DrawHistory& history=cursors) {
+    const auto latest=history.last_frame.load(std::memory_order_acquire);
+    if(!positions || latest==~std::uint64_t{} || (frame>latest && frame-latest>1))return {};
+    std::scoped_lock lock{history.mutex};
+    const auto& draws=history.draws;
     for(unsigned i=0;i<draws.size();++i) {
-        const auto& d=draws[(next_draw%draws.size()+draws.size()-1-i)%draws.size()];
+        const auto& d=draws[(history.next%draws.size()+draws.size()-1-i)%draws.size()];
         if(d.indices==count && d.epoch==epoch && frame>=d.frame && frame-d.frame<=1 &&
            positions==d.positions)return {d.owner,d.focus,d.detail};
     }

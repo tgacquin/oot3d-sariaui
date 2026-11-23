@@ -2,6 +2,7 @@
 #pragma once
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -33,5 +34,5 @@ std::shared_ptr<const std::vector<std::uint8_t>> FindTextAtlas(
 // byte-exact native glyph cells are replaced. Unknown fonts/packs stay native.
 // Empty means no matching glyphs: use the existing native texture view.
 std::vector<std::uint8_t> Redraw(std::span<const std::uint8_t> alpha,
-                               unsigned width, unsigned height);
+                               unsigned width, unsigned height, std::optional<bool> bold={}, float outline=0);
 } // namespace OOT3D::HDFont

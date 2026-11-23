@@ -158,6 +158,18 @@ struct Clouds {
             for(const auto& q:cloud) {
                 const float left=q.p[0],right=q.p[3],top=q.p[1],bottom=q.p[7];
                 if(right<=left || bottom<=top)continue;
+                // The 16 sprites are packed edge-to-edge. Keep bilinear taps
+                // inside this sprite, including when its UVs are flipped.
+                const auto texels=[&](unsigned axis) {
+                    const auto coord=[&](unsigned v) {
+                        const float uv=q.uv[2*v+axis];
+                        return (axis==0?uv:1-uv)*256;
+                    };
+                    const auto [lo,hi]=std::minmax({coord(0),coord(1),coord(2),coord(3)});
+                    return std::array{std::min(lo,(lo+hi)*.5f-.5f),
+                                      std::max(hi-1,(lo+hi)*.5f-.5f)};
+                };
+                const auto u=texels(0),v=texels(1);
                 const int x0=int(std::clamp(std::floor(left*width),0.f,float(width))),x1=int(std::clamp(std::ceil(right*width),0.f,float(width)));
                 const int y0=int(std::clamp(std::floor(top*height),0.f,float(height))),y1=int(std::clamp(std::ceil(bottom*height),0.f,float(height)));
                 for(int y=std::max(y0,int(first));y<std::min(y1,int(last));++y)for(int x=x0;x<x1;++x) {
@@ -166,8 +178,9 @@ struct Clouds {
                     const auto interpolate=[&](const auto& a,unsigned stride,unsigned c) {
                         return std::lerp(std::lerp(a[c],a[stride+c],tx),std::lerp(a[2*stride+c],a[3*stride+c],tx),ty);
                     };
-                    auto pixel=DungeonParchment::Sample(atlas,256,256,interpolate(q.uv,2,0)*256-.5f,
-                        (1-interpolate(q.uv,2,1))*256-.5f);
+                    auto pixel=DungeonParchment::Sample(atlas,256,256,
+                        std::clamp(interpolate(q.uv,2,0)*256-.5f,u[0],u[1]),
+                        std::clamp((1-interpolate(q.uv,2,1))*256-.5f,v[0],v[1]));
                     for(unsigned c=0;c<4;++c)pixel[c]*=interpolate(q.color,4,c);
                     raster[y*width+x]=Over(pixel,raster[y*width+x]);
                 }

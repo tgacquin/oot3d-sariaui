@@ -55,6 +55,28 @@ std::vector<std::uint8_t> MakeBossTimerAtlas(std::span<const std::uint8_t> nativ
     std::vector<std::uint8_t> out(W*H*S*S*4);
     for(unsigned y=0;y<H*S;++y)for(unsigned x=0;x<W*S;++x)
         for(unsigned c=0;c<4;++c)out[((H*S-1-y)*W*S+x)*4+c]=native[((y/S)*W+x/S)*4+c];
+    // challenge.qsp packs the two titles and New Record beside unrelated
+    // sprites. Filter inside each crop, weighting RGB by the sampled alpha.
+    struct Crop {int x,y,w,h;};
+    for(const auto crop:{Crop{208,112,296,48},Crop{208,160,296,48},Crop{384,0,104,56}}) {
+        for(int y=crop.y*S;y<(crop.y+crop.h)*int(S);++y)for(int x=crop.x*S;x<(crop.x+crop.w)*int(S);++x) {
+            const float sx=(x+.5f)/S-.5f,sy=(y+.5f)/S-.5f;
+            const int ix=int(std::floor(sx)),iy=int(std::floor(sy));
+            float alpha=0;
+            std::array<float,3> rgb{};
+            for(int j=0;j<2;++j)for(int i=0;i<2;++i) {
+                const int tx=std::clamp(ix+i,crop.x,crop.x+crop.w-1);
+                const int ty=std::clamp(iy+j,crop.y,crop.y+crop.h-1);
+                const auto pixel=(ty*W+tx)*4;
+                const float weight=(i?sx-ix:1-(sx-ix))*(j?sy-iy:1-(sy-iy))*native[pixel+3];
+                alpha+=weight;
+                for(unsigned c=0;c<3;++c)rgb[c]+=native[pixel+c]*weight;
+            }
+            const auto dest=((H*S-1-y)*W*S+x)*4;
+            for(unsigned c=0;c<3;++c)out[dest+c]=alpha?std::lround(rgb[c]/alpha):0;
+            out[dest+3]=std::lround(alpha);
+        }
+    }
     for(unsigned d=0;d<12;++d) {
         const unsigned cell_x=336+(d<10?d:d-10)*12,cell_y=d<10?208:232;
         int left=64,right=0;

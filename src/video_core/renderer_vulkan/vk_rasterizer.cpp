@@ -1485,6 +1485,9 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed, bool hud_colors) {
     // Sync and bind the shader
     auto fragment_config=user_config;
     fragment_config.hud_colors.Assign(hud_colors);
+#ifdef ENABLE_OOT3D_PRESENTATION
+    fragment_config.boss_text.Assign(oot_boss_text);
+#endif
     fragment_config.torch_fog.Assign(torch_fog);
     pipeline_cache.UseFragmentShader(regs, fragment_config
 #ifdef ENABLE_MM3D_PRESENTATION
@@ -4120,6 +4123,7 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
 #ifdef ENABLE_OOT3D_PRESENTATION
     oot_number_backdrop.reset();
     oot_rupee_digit_outline.reset();
+    oot_boss_text=false;
     // Exact native indicator ownership, also published with interpolation off.
     // Other sprites sharing its atlas retain their original sampling.
     bool smooth_indicator=false;
@@ -4212,6 +4216,7 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
             , smooth_indicator
 #endif
         );
+        vk::Sampler texture_sampler=sampler.Handle();
         const vk::ImageView color_view = framebuffer->ImageView(SurfaceType::Color);
         const bool is_feedback_loop = color_view == surface.FramebufferView();
         vk::ImageView texture_view =
@@ -4263,7 +4268,20 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
                     }
                 }
             }
-            if (expected || custom_text || rupees || boss_timer) {
+            unsigned text_layer=0;
+            if(texture_index==0 && (font_descriptor.format==8 || font_descriptor.format==11) &&
+               OOT3D::HDFont::Supported(font_descriptor)) {
+                using namespace OOT3D::Interpolation;
+                const auto& attrs=regs.pipeline.vertex_attributes;
+                for(const auto& loader:attrs.attribute_loaders) {
+                    if(loader.component_count!=1 || loader.byte_count!=12)continue;
+                    const auto addr=u64(attrs.GetPhysicalBaseAddress())+loader.data_offset;
+                    if(addr<=UINT32_MAX)text_layer=MenuCursor::Selection(memory.GetPhysicalPointer(PAddr(addr)),
+                        regs.pipeline.num_vertices,guest_frames.load(),generation.load(),MenuCursor::boss_text)[0];
+                    if(text_layer)break;
+                }
+            }
+            if (expected || custom_text || rupees || boss_timer || text_layer) {
                 const auto ref = memory.GetPhysicalRef(font_descriptor.address);
                 const auto size = boss_timer ? 512*256 : rupees ? 256*128*2 : custom_text ? font_descriptor.width * font_descriptor.height * 4 :
                     OOT3D::HDFont::ByteSize(font_descriptor);
@@ -4283,11 +4301,25 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
                     if(rupees && rupees->hash!=surface.oot_font_hash)rupees.reset();
                     if(boss_timer)rupees=OOT3D::HDFont::StyledBossTimerAtlas(
                         surface.oot_font_hash,number_layout.rupee_digit_outline,number_layout.hd_numbers_bold);
-                    if ((expected && *expected == surface.oot_font_hash) || generated || rupees) {
+                    const auto& outline=number_layout.rupee_digit_outline;
+                    const float radius=outline.enabled?std::clamp(outline.thickness,outline.MinThickness,outline.MaxThickness):0;
+                    const auto variant=text_layer?(u64{1}<<63 | u64(number_layout.hd_numbers_bold)<<32 |
+                        std::bit_cast<u32>(radius)):(rupees?rupees->variant:0);
+                    if ((expected && *expected == surface.oot_font_hash) || generated || rupees || text_layer) {
                         if (const auto view = hd_fonts.Get(runtime, font_descriptor, surface.oot_font_hash,
                             bytes, rupees ? std::span<const u8>(rupees->rgba) :
-                                generated ? std::span<const u8>(*generated) : std::span<const u8>{},rupees?rupees->variant:0)) {
+                                generated ? std::span<const u8>(*generated) : std::span<const u8>{},variant,
+                            text_layer?std::optional{number_layout.hd_numbers_bold}:std::nullopt,text_layer?radius:0)) {
                             texture_view = view;
+                            if(text_layer) {
+                                using Filter=Pica::TexturingRegs::TextureConfig::TextureFilter;
+                                sampler_config.mag_filter.Assign(Filter::Linear);
+                                sampler_config.min_filter.Assign(Filter::Linear);
+                                texture_sampler=res_cache.GetSampler(sampler_config,true).Handle();
+                                oot_boss_text=true;
+                                const Common::Vec4f style{outline.color[0],outline.color[1],outline.color[2],text_layer==2?-1.f:1.f};
+                                if(fs_data.rupee_digit_outline!=style){fs_data.rupee_digit_outline=style;fs_data_dirty=true;}
+                            }
                             if(styled_counter && rupees)oot_rupee_digit_outline=number_layout.rupee_digit_outline;
                             if(rupees && (ammo_backdrop || rupee_backdrop))
                                 oot_number_backdrop=rupee_backdrop?number_layout.hd_rupee_backdrop:number_layout.hd_ammo_backdrop;
@@ -4453,7 +4485,7 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
                 surface.GetWidth(), surface.GetHeight(), texture_key);
         }
 #endif
-        update_queue.AddImageSampler(texture_set, texture_index, 0, texture_view, sampler.Handle());
+        update_queue.AddImageSampler(texture_set, texture_index, 0, texture_view, texture_sampler);
     }
 }
 

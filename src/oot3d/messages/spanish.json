@@ -180,8 +180,8 @@
     "004A": {
       "edits": [
         {
-          "find": "Toca {24:16}\nen la pantalla táctil para usarla.",
-          "replace": "Oprime\nderecha en la cruz de control\npara tocarla."
+          "find": " Toca {24:16}\nen la pantalla táctil para usarla.",
+          "replace": "\nOprime {24:03} para tocarla."
         }
       ]
     },
@@ -280,7 +280,7 @@
       "edits": [
         {
           "find": "Cuando {1d:44}Navi {1d:00}hable, usa {24:17} y presta mucha\natención a lo que dice, {0b}.",
-          "replace": "Cuando {1d:44}Navi {1d:00}hable, pulsa arriba en\nla cruz de control y escucha bien,\n{0b}."
+          "replace": "Cuando {1d:44}Navi {1d:00}hable, pulsa {24:02}\ny escucha bien, {0b}."
         }
       ],
       "requires": "NaviUp"
@@ -345,7 +345,7 @@
         },
         {
           "find": "En la parte central de la pantalla inferior\npuedes ver el mapa general de la zona\ndonde te encuentras.",
-          "replace": "Puedes cambiar este atajo en los\najustes de controles."
+          "replace": "El mapa muestra toda la zona."
         },
         {
           "find": "Toca {24:1b} en la pantalla inferior para ver el\nmapa con nombres de lugares.",
@@ -401,7 +401,7 @@
         },
         {
           "find": "Cuando se muestra {24:17} en lugar de {24:18},\nsignifica que Navi tiene algo que decirte.\n¡Usa {24:17} para escucharla!",
-          "replace": "Cuando Navi tenga algo que decirte,\npulsa arriba en la cruz de control\npara escucharla."
+          "replace": "Si Navi te llama, pulsa {24:02} para oírla."
         }
       ],
       "requires": "NaviUp"
@@ -410,7 +410,7 @@
       "edits": [
         {
           "find": "Si sacas la ocarina con {24:16} en un lugar\ndonde es necesario tocar una melodía,\naparecerá un {1d:41}pentagrama{1d:00}.",
-          "replace": "Oprime derecha en la cruz de control\npara sacar la ocarina. Si hace falta\nuna melodía, verás un {1d:41}pentagrama{1d:00}."
+          "replace": "Oprime {24:03} para sacar la ocarina.\nSi debes tocar, verás un {1d:41}pentagrama{1d:00}."
         }
       ]
     },
@@ -418,7 +418,7 @@
       "edits": [
         {
           "find": "Para ver las melodías que has aprendido,\nve a la {1d:44}pantalla de la ocarina{1d:00} y toca el\nicono de la esquina inferior derecha.",
-          "replace": "Oprime derecha en la cruz de control\npara sacar la ocarina. Luego oprime START\npara ver las melodías que has aprendido."
+          "replace": "Oprime {24:03} para sacar la ocarina. Luego\noprime START para ver las melodías que\nhas aprendido."
         },
         {
           "find": "Toca los iconos para ver el nombre y la\npartitura de las melodías correspondientes.",

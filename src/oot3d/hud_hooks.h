@@ -408,7 +408,7 @@ template<class M> bool LoadingRect(M& memory, U32 controller, U32 rect, const Po
 }
 template<class M, class R> void Handle(M& memory, R& regs, unsigned site, const Layout& layout,
                                       RoutingState& routing, bool paused = false,
-                                      std::int64_t now_us = 0) {
+                                      std::int64_t now_us = 0, bool boss_battle = false) {
     if(site==6) {
         regs[0]=memory.Read(regs[0]+0x214).value_or(0); // Displaced LDR.
         routing.drawing_top_model=regs[6]==HUDFade::Queue+5*4 &&
@@ -575,6 +575,10 @@ template<class M, class R> void Handle(M& memory, R& regs, unsigned site, const 
         routing.hud_return.Track(memory,paused,now_us);
         if(routing.hud_return.returning || routing.hud_return.hidden || MountedHUD(memory)) {
             HUDReturn::Stationary(memory,*helper,59,24);
+        } else if(boss_battle) {
+            // The challenge quit dialog starts the native heart exit slide
+            // before the regular pause controller becomes active.
+            HUDReturn::Stationary(memory,*helper,63,20);
         }
         if(routing.hud_return.returning) {
             HUDReturn::Stationary(memory,*helper,26,1);

@@ -29,7 +29,7 @@ struct MenuInput {
         if(!TitleScreen::Pointer(play,0x104) || (m.Read(play+0x100).value_or(0)&255)!=3 ||
            m.Read(UI+0x20).value_or(1)!=0) {Cancel();return false;}
         buttons&=~Select;
-        if(SaveMenu::Active(m)) {Cancel();return false;}
+        if(SaveMenu::Active(m) || DeathMenu::Active(m)) {Cancel();return false;}
         pause_tabs=Active(m);
         const auto items=m.Read(0x5066f8+0x34).value_or(0);
         const auto gear=m.Read(0x50446c+0x18).value_or(0);
@@ -69,7 +69,10 @@ struct MenuInput {
             if(target!=Target::None)ticks=10;
         }
         buttons&=~consumed;
-        const auto touch_target=target==Target::OpenLast?last_page:target;
+        auto touch_target=target==Target::OpenLast?last_page:target;
+        // Native 42e8e8 rejects Map during Boss Challenge.
+        if(target==Target::OpenLast && last_page==Target::Map && BossChallenge::InBattle(m))
+            touch_target=Target::Items;
         touch_x=touch_target==Target::Close?30:touch_target==Target::Map?170:
             touch_target==Target::Gear?100:220;
         if(ticks) {if(--ticks==0)target=Target::None;return true;}

@@ -22,7 +22,54 @@ struct Memory {
     }
     float F(U32 a) {return std::bit_cast<float>(words.at(a));}
 };
+void CheckStoneFocus() {
+    const auto original=FileSelect::GetLayout();
+    auto settings=original;
+    settings.stone_focus_seconds=.2f;
+    constexpr U32 death=0x08000000;
+    constexpr std::array neutral{1.f,1.f};
+    for(unsigned hz:{30u,60u,120u}) {
+        settings.stone_focus_grow=true;
+        FileSelect::SetLayout(settings,false);
+        Memory m;
+        PauseFramerate::Hook clock;
+        clock.fast=true;
+        const auto tick=[&](unsigned frames) {
+            for(unsigned i=0;i<frames;++i)clock.UpdateStoneFocus(m,1.f/hz);
+        };
+        m.words[SaveMenu::Owner+0x28]=2;
+        m.words[SaveMenu::Owner+0x24]=1;
+        m.words[SaveMenu::Owner+0x38]=0;
+        m.words[SaveMenu::Owner+0x34]=1;
+        tick(hz/10);
+        auto frame=SaveMenu::GetFrameLayout();
+        assert(std::abs(SaveMenu::ControlPose(SaveMenu::Save,frame).scale-1.025f)<.0001f);
+        assert(frame.focus_scale[SaveMenu::DontSave]==1 && SaveMenu::GetLayout().focus_scale==neutral);
+        m.words[SaveMenu::Owner+0x34]=0;
+        tick(1);
+        frame=SaveMenu::GetFrameLayout();
+        assert(frame.focus_scale[SaveMenu::DontSave]>1 && frame.focus_scale[SaveMenu::Save]<1.025f);
+        m.words[SaveMenu::Owner+0x28]=0;
+        tick(1);assert(SaveMenu::GetFrameLayout().focus_scale==neutral);
+        m.words[DeathMenu::ControllerPointer]=death;
+        m.words[death+DeathMenu::LayoutOffset+4]=0x08010000;
+        for(U32 state:{4u,10u,14u}) {
+            m.words[death+8]=0x10000|state;
+            m.words[death+0x10]=0;
+            tick(hz/5);
+            assert(std::abs(DeathMenu::focus_scale[SaveMenu::Save]-1.05f)<.0001f);
+            m.words[death+0x10]=1;
+            tick(hz/10);
+            for(float s:DeathMenu::focus_scale)assert(std::abs(s-1.025f)<.0001f);
+            m.words[death+8]=0;tick(1);assert(DeathMenu::focus_scale==neutral);
+        }
+        settings.stone_focus_grow=false;FileSelect::SetLayout(settings,false);
+        m.words[death+8]=0x10004;tick(hz/5);assert(DeathMenu::focus_scale==neutral);
+    }
+    FileSelect::SetLayout(original,false);
+}
 int main(int argc,char** argv) {
+    CheckStoneFocus();
     assert(argc==2);Memory m;std::ifstream file(argv[1],std::ios::binary);assert(file);U32 word;
     for(U32 a=0x100000;file.read(reinterpret_cast<char*>(&word),4);a+=4)m.words[a]=word;
     assert(PauseMenu::CodeMatches(m));

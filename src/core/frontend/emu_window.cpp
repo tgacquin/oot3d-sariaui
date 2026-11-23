@@ -244,7 +244,7 @@ bool EmuWindow::TouchPressed(unsigned framebuffer_x, unsigned framebuffer_y) {
         const float v=float(framebuffer_y-rect.top)/rect.GetHeight();
         const float width=OOT3D::Widescreen::Active()?OOT3D::Widescreen::Aspect*240:400;
         const auto mapped=OOT3D::SaveMenu::on_top.load()?
-            OOT3D::SaveMenu::MapPointer(u,v,width,OOT3D::SaveMenu::GetLayout(),
+            OOT3D::SaveMenu::MapPointer(u,v,width,OOT3D::SaveMenu::GetFrameLayout(),
                                       OOT3D::SaveMenu::input_page.load()):
             OOT3D::PauseMenu::MapPointer(u,v,width,OOT3D::PauseMenu::GetLayout(),
                 OOT3D::PauseMenu::item_page.load(),OOT3D::PauseMenu::gear_page.load(),

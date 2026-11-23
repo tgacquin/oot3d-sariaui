@@ -28,7 +28,7 @@ assert font[:4]==b'QBF1'
 glyphs=struct.unpack_from('<H',font,4)[0]
 advances={struct.unpack_from('<H',font,16+i*8)[0]:font[16+i*8+5]+font[15] for i in range(glyphs)}
 def visible(s):
-    s=re.sub(r'\{24:([0-9a-f]+)\}',lambda match:'['+{'1e':'X','1f':'Y','0a':'L','0b':'R','06':'A','07':'B','00':'Circle Pad'}.get(match[1],'icon '+match[1])+']',s)
+    s=re.sub(r'\{24:([0-9a-f]+)\}',lambda match:'['+{'1e':'X','1f':'Y','0a':'L','0b':'R','06':'A','07':'B','00':'Circle Pad','02':'D-pad Up','03':'D-pad Right'}.get(match[1],'icon '+match[1])+']',s)
     return re.sub(r'\{[^}]+\}', '',s.replace('{01}','\n\n').replace('{0b}','<Link>'))
 def widths(s):
     # Use the eight widest letters for the player's editable name. Native
@@ -53,6 +53,8 @@ for language in ('english','french','spanish'):
         result+=source[cursor:]
         text=m['decode'](result);before=m['decode'](source)
         assert m['script_controls'](text)==m['script_controls'](before),(language,hex(mid))
+        direction={0x004a:'03',0x10c5:'03',0x10c7:'03',0x1017:'02',0x103f:'02'}.get(mid)
+        if direction:assert '{24:'+direction+'}' in text,(language,hex(mid))
         assert max(widths(text))<=max(310,max(widths(before))),(language,hex(mid),max(widths(text)))
         plain=' '.join(visible(text).split())
         assert not re.search(r"écran (tactile|supérieur|inférieur)|pantalla (táctil|superior|inferior)",plain,re.I),(language,hex(mid))

@@ -11,6 +11,7 @@
 #include "oot3d/user_hud.h"
 #include "oot3d/file_status_assets.h"
 #include "oot3d/name_keyboard.h"
+#include "oot3d/stone_focus.h"
 #include "oot3d/name_typing.h"
 #include "oot3d/loading_icon_assets.h"
 #include "oot3d/randomizer/file_status.h"
@@ -122,7 +123,7 @@ struct Layout {
 };
 inline float FocusScale(const Layout& l,unsigned index) {
     return l.stone_focus_grow && index<FocusCount?
-        1+.05f*std::clamp(l.stone_focus_amount[index],0.f,1.f):1.f;
+        StoneFocus::Scale(l.stone_focus_amount[index]):1.f;
 }
 using BackgroundGeometry=PausePrompts::QuadGeometry<4>;
 using VignetteGeometry=PausePrompts::QuadGeometry<4*12*12>;
@@ -298,6 +299,10 @@ struct FileOperationPromptTransition {
     }
 };
 inline Layout GetLayout() {std::scoped_lock lock{mutex};return layout;}
+inline StoneFocus::Settings GetStoneFocusSettings() {
+    std::scoped_lock lock{mutex};
+    return {layout.stone_focus_grow,layout.stone_focus_seconds};
+}
 inline Layout PresentationLayout(Layout value) {
     if(UserHUD::classic_file_select.load()) {
         value.backgrounds_enabled=false;
@@ -1008,7 +1013,23 @@ inline SeedShadowGeometry SeedBackdrop(const FileStatusText::Geometry& text,cons
     }
     return out;
 }
-inline PausePrompts::Pair Prompts(const Layout& l,const PausePrompts::Assets& assets,float alpha,bool back_only=false) {
+// X places the left edge of the button icon. Labels extend toward the middle.
+inline float VisiblePromptX(float x,float scale) {
+    const float margin=PausePrompts::SafeLeft();
+    return std::clamp(x,margin,std::min(400.f,400-margin-16*scale));
+}
+struct ButtonLabel {float button,text,text_scale;};
+inline ButtonLabel PlaceButtonLabel(float x,float scale,float width) {
+    x=VisiblePromptX(x,scale);
+    const float gap=4*scale,margin=PausePrompts::SafeLeft();
+    const bool right=x+8*scale>=200;
+    const float space=right?x-gap-margin:400-margin-(x+16*scale+gap);
+    const float text_scale=width>0?std::min(scale,space/width):scale;
+    return {x,right?x-gap-width*text_scale:x+16*scale+gap,text_scale};
+}
+enum class PromptAnchor { Button, Group };
+inline PausePrompts::Pair Prompts(const Layout& l,const PausePrompts::Assets& assets,float alpha,
+                                  bool back_only=false,PromptAnchor anchor=PromptAnchor::Button) {
     PausePrompts::Pair out;
     for(unsigned i=0;i<2;++i) {
         if(back_only && i==0)continue;
@@ -1016,15 +1037,21 @@ inline PausePrompts::Pair Prompts(const Layout& l,const PausePrompts::Assets& as
         const unsigned ib=out.icons.count,tb=out.text.count;
         const float tx=i?144:128,s=p.scale;
         const unsigned row=i?PausePrompts::FileBackText:PausePrompts::FileSelectText;
-        const auto edge=PausePrompts::EdgePrompt(p.x,s,PausePrompts::LabelWidth(assets,row),
-            PausePrompts::LabelColumn(assets,{PausePrompts::FileSelectText,PausePrompts::FileBackText}));
+        const float width=PausePrompts::LabelWidth(assets,row);
+        auto edge=PlaceButtonLabel(p.x,s,width);
+        if(anchor==PromptAnchor::Group) {
+            const auto group=PausePrompts::EdgePrompt(p.x,s,width,
+                PausePrompts::LabelColumn(assets,{PausePrompts::FileSelectText,PausePrompts::FileBackText}));
+            edge={group.button,group.text,s};
+        }
+        const float ts=edge.text_scale;
         out.icons.Add(edge.button,p.y,16*s,16*s,(tx+.5f)/256,95.5f/128,(tx+15.5f)/256,80.5f/128);
         for(unsigned j=0;j<assets.glyphs[row].size();++j) {
             const auto glyph=assets.glyphs[row][j];if(!glyph.width)continue;
             const float start=glyph.x-1;
             const float shift=j*(1.f-assets.native_spacing);
-            out.text.Add(edge.text+(start+shift)*.75f*s,p.y+.5f*s,
-                (glyph.width+2)*.75f*s,15*s,start/PausePrompts::TextWidth,
+            out.text.Add(edge.text+(start+shift)*.75f*ts,p.y+8*s-7.5f*ts,
+                (glyph.width+2)*.75f*ts,15*ts,start/PausePrompts::TextWidth,
                 (row*PausePrompts::TextRowHeight+.5f)/PausePrompts::TextHeight,
                 (start+glyph.width+2)/PausePrompts::TextWidth,(row*PausePrompts::TextRowHeight+19.5f)/PausePrompts::TextHeight);
         }
@@ -1597,14 +1624,8 @@ template<class M> unsigned FocusedStone(M& m,bool naming) {
 struct StoneFocusAnimation {
     std::array<float,FocusCount> amount{};
     void Apply(Layout& frame,unsigned selected) {
-        const float seconds=std::isfinite(frame.stone_focus_seconds)?std::clamp(frame.stone_focus_seconds,0.f,.3f):.1f;
-        const float step=seconds>0?1/(60*seconds):1;
-        for(unsigned i=0;i<amount.size();++i) {
-            if(!frame.stone_focus_grow)amount[i]=0;
-            else amount[i]=std::clamp(amount[i]+(i==selected?step:-step),0.f,1.f);
-            const float t=amount[i];
-            frame.stone_focus_amount[i]=t*t*(3-2*t);
-        }
+        frame.stone_focus_amount=StoneFocus::Advance(amount,selected,
+            {frame.stone_focus_grow,frame.stone_focus_seconds},1.f/60);
     }
 };
 // Saving remains entirely native. Track only its presentation and the automatic
@@ -2200,12 +2221,11 @@ struct Hook {
         PausePrompts::Geometry buttons;lettering={};status_geometry={};seed_shadow_geometry={};
         for(unsigned i=0;i<2;++i) {
             const auto name_label=NamePromptLabel(i);
-            const auto column=WidestPrompt({NamePromptLabel(0),NamePromptLabel(1)});
-            const auto p=FitLabel(NamePromptPose(frame_layout,i),column);
-            const auto edge=StatusPromptEdge(*status_assets,p,name_label,column);
-            const float y=p.y,tx=i?144:128,s=p.scale;
+            const auto p=NamePromptPose(frame_layout,i);
+            const float s=std::min(p.scale,236.f/16),y=std::clamp(p.y,2.f,238-16*s),tx=i?144:128;
+            const auto edge=PlaceButtonLabel(p.x,s,FileStatusText::Measure(*status_assets,name_label)+.75f);
             buttons.Add(edge.button,y,16*s,16*s,(tx+.5f)/256,95.5f/128,(tx+15.5f)/256,80.5f/128);
-            const auto label=FileStatusText::Text(*status_assets,name_label,edge.text,y+15.5f*s,1000*s,.75f*s);
+            const auto label=FileStatusText::Text(*status_assets,name_label,edge.text,y+8*s+7.5f*edge.text_scale,1000*s,.75f*edge.text_scale);
             const unsigned n=status_geometry.count;
             std::copy_n(label.positions.begin(),label.count*12,status_geometry.positions.begin()+n*12);
             std::copy_n(label.uvs.begin(),label.count*8,status_geometry.uvs.begin()+n*8);

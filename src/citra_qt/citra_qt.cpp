@@ -2220,8 +2220,7 @@ void GMainWindow::ConnectWidgetEvents() {
             hud_layout.carrot_spacing = read("spacing", 0, -20, 40);
             hud_layout.carrot_animation_delay = read("animation_delay", 0, 0, 2);
             hud_layout.carrot_shadow={oot_editor_config->value(QStringLiteral("shadow_enabled"),false).toBool(),
-                read("shadow_x",1.5f,-12,12),read("shadow_y",2,-12,12),
-                read("shadow_blur",1,0,4),read("shadow_strength",.6f,0,1)};
+                read("shadow_x",1.5f,-12,12),read("shadow_y",1.4f,-12,12),read("shadow_opacity",.8f,0,1)};
         }
         if (i == OOT3D::HUD::Magic) {
             hud_layout.magic_one_row_y=read("one_row_y",hud_layout.magic_one_row_y,-240,240);
@@ -2435,20 +2434,7 @@ void GMainWindow::ConnectWidgetEvents() {
                 OOT3D::PlayerDefaultsDraft draft(QString::fromUtf8(OOT3D::PlayerDefaultsDirectory()));
                 QString error;
                 if(!draft.Writable()) error=tr("Could not open the player defaults for writing.");
-                else if(request==DefaultsDialog::ImportHUD || request==DefaultsDialog::ExportHUD) {
-                    const bool importing=request==DefaultsDialog::ImportHUD;
-                    const auto filter=tr("SariaUI HUD presets (*.json)");
-                    const auto path=importing ? QFileDialog::getOpenFileName(this,tr("Import default HUD"),{},filter) :
-                        QFileDialog::getSaveFileName(this,tr("Export default HUD"),QStringLiteral("SariaUI-HUD.json"),filter);
-                    if(!path.isEmpty() && importing) {
-                        QVariantMap values;
-                        error=OOT3D::UserHUD::ImportPreset(path,&values);
-                        if(error.isEmpty()) for(auto it=values.cbegin();it!=values.cend();++it) draft.setValue(it.key(),it.value());
-                    } else if(!path.isEmpty()) {
-                        error=OOT3D::UserHUD::ExportPreset(path,OOT3D::UserHUD::HUDSettings(
-                            OOT3D::UserHUD::ReadHUDLayout(draft),draft.value(QStringLiteral("UserHUD/hd_numbers"),-1).toInt()));
-                    }
-                } else {
+                else {
                     const bool textures=request==DefaultsDialog::TexturesShortcut;
                     const QString key=textures ? QStringLiteral("UI/Shortcuts/Main Window/Toggle Custom Textures/KeySeq") :
                                                 QStringLiteral("UI/Shortcuts/Main Window/Fullscreen/KeySeq");
@@ -3272,8 +3258,7 @@ void GMainWindow::ConnectWidgetEvents() {
                     oot_editor_config->setValue(QStringLiteral("shadow_enabled"),layout.carrot_shadow.enabled);
                     oot_editor_config->setValue(QStringLiteral("shadow_x"),layout.carrot_shadow.x);
                     oot_editor_config->setValue(QStringLiteral("shadow_y"),layout.carrot_shadow.y);
-                    oot_editor_config->setValue(QStringLiteral("shadow_blur"),layout.carrot_shadow.blur);
-                    oot_editor_config->setValue(QStringLiteral("shadow_strength"),layout.carrot_shadow.strength);
+                    oot_editor_config->setValue(QStringLiteral("shadow_opacity"),layout.carrot_shadow.opacity);
                 }
                 if (i == OOT3D::HUD::Magic) {
                     oot_editor_config->setValue(QStringLiteral("one_row_y"),layout.magic_one_row_y);

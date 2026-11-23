@@ -15,6 +15,10 @@ struct DropShadow {
     bool enabled=false;
     float x=1.5f,y=2.f,blur=1.f,strength=.6f;
 };
+struct CarrotShadow {
+    bool enabled=false;
+    float x=1.5f,y=1.4f,opacity=.8f;
+};
 struct SpriteContour {
     bool enabled=false;
     float width=1.f,height=1.f,opacity=.65f;
@@ -79,7 +83,7 @@ struct Layout : std::array<Pose, ElementCount> {
     Pose outside_minimap{};
     Pose navi_text{}; // The separate native Navi label, not the D-pad icon.
     std::array<std::array<float,2>,2> shop_prompt_offsets{};
-    DropShadow carrot_shadow{};
+    CarrotShadow carrot_shadow{};
     float carrot_opacity = 1;
     float carrot_spacing = 0; // Extra pixels per gap, centered before row scaling.
     float carrot_animation_delay = 0; // Seconds after spending a carrot.
@@ -201,9 +205,9 @@ inline void PlaceCounters(Layout& hud,const UserHUD::Layout& personal,float over
 
 // Native clock starts at (159,216) and is 20x20. The five timer cells
 // start at (182,215), advance by 10 and have 11x21 geometry.
-inline void AnchorTimer(Layout& hud,float authored_scale) {
+inline void PlaceTimerAndCarrots(Layout& hud,float authored_scale,float overall) {
     const float delta=authored_scale-hud[Timer].scale;
-    if(delta==0)return;
+    if(delta==0 && overall<=1)return;
     const bool hd=hud.hd_numbers && hud.hd_timer_numbers;
     const auto text=hd?hud.hd_timer_text:Pose{};
     const float spacing=hd?hud.hd_timer_spacing:0;
@@ -213,6 +217,22 @@ inline void AnchorTimer(Layout& hud,float authored_scale) {
     const float bottom=std::max(20.f,-1+text.y+21*text.scale);
     hud[Timer].x+=center*delta;
     hud[Timer].y+=bottom*delta;
+    if(overall<=1)return;
+    // The clock grows upward around its bottom edge. The six 24px carrots
+    // grow around (200,20) after routing, so reserve room for both HUD rows.
+    const auto& timer=hud[Timer];
+    auto& carrots=hud[Carrots];
+    const float half_width=(72.f+2.5f*hud.carrot_spacing)*carrots.scale;
+    const float row_x=200+carrots.x;
+    const float clock_x=159+timer.x;
+    if(row_x+half_width<=clock_x+std::min(0.f,left)*timer.scale ||
+       row_x-half_width>=clock_x+std::max(20.f,right)*timer.scale)return;
+    const float clock_y=216+timer.y;
+    if(20+carrots.y>=clock_y+bottom*timer.scale)return;
+    const float timer_top=clock_y+std::min(0.f,text.y-1)*timer.scale;
+    const float shadow=hud.carrot_shadow.enabled && hud.carrot_shadow.opacity>0 ?
+        std::max(0.f,hud.carrot_shadow.y):0.f;
+    carrots.y=std::min(carrots.y,timer_top-2.f-shadow-12.f*carrots.scale-20.f);
 }
 static_assert(static_cast<int>(Carrots)==static_cast<int>(UserHUD::Carrots));
 // Scale a routed top-left HUD pivot about the authored heart origin (12,10).
@@ -246,7 +266,7 @@ inline Layout GetEffectiveLayout() {
         if(i!=AButton && i!=Keys && i!=Rupees)result[i]=UserHUD::Apply(result[i],offsets[i]);
     result.magic_padding_ratio=authored_magic_scale/result[Magic].scale;
     result.hd_numbers=UserHUD::HDNumbers(result.hd_numbers);
-    AnchorTimer(result,authored_timer_scale);
+    PlaceTimerAndCarrots(result,authored_timer_scale,offsets.overall_scale);
     if(result[Hearts].scale!=authored_heart_scale && authored_heart_scale>0) {
         const float ratio=result[Hearts].scale/authored_heart_scale;
         auto& contours=result.heart_contours;

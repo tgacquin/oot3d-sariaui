@@ -31,7 +31,6 @@
 #include "oot3d/player_defaults_draft.h"
 #include "oot3d/player_mode.h"
 #include "oot3d/user_camera_config.h"
-#include "oot3d/user_hud_config.h"
 #include "oot3d/control_swap.h"
 #include "oot3d/game_control_options.h"
 #include "oot3d/gyro_aim.h"
@@ -96,6 +95,9 @@ static bool DrawHUDOpacity(const char* label,float& opacity) {
     opacity=percent/100.f;
     return true;
 }
+static bool DrawMagicBorderThickness(float& thickness) {
+    return ImGui::SliderFloat("Outer border thickness",&thickness,.25f,8.f,"%.2f px",ImGuiSliderFlags_AlwaysClamp);
+}
 static bool DrawSpriteContour(const char* label,HUD::SpriteContour& layer,const char* tooltip=nullptr,
                               float* border_roundness=nullptr) {
     bool changed=false;
@@ -105,11 +107,6 @@ static bool DrawSpriteContour(const char* label,HUD::SpriteContour& layer,const 
     if(layer.enabled) {
         changed|=ImGui::ColorEdit3("Color",layer.color.data(),ImGuiColorEditFlags_NoOptions);
         if(border_roundness) {
-            float thickness=(layer.width+layer.height)*.5f;
-            if(ImGui::SliderFloat("Border thickness",&thickness,.25f,8,"%.2f px",ImGuiSliderFlags_AlwaysClamp)) {
-                layer.width=layer.height=thickness;
-                changed=true;
-            }
             changed|=ImGui::SliderFloat("Corner roundness",border_roundness,0,1,"%.2f",ImGuiSliderFlags_AlwaysClamp);
         } else {
             changed|=ImGui::SliderFloat("Width",&layer.width,.25f,3,"%.2f px",ImGuiSliderFlags_AlwaysClamp);
@@ -808,11 +805,12 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                     DrawPlayerCameraSettings(defaults);
                     ImGui::EndTabItem();
                 }
-                if (player && ImGui::BeginTabItem("HUD")) {
-                    auto layout=defaults ? UserHUD::ReadHUDLayout(*defaults) : UserHUD::GetLayout();bool changed=false;
-                    int hd_override=defaults ? defaults->value("UserHUD/hd_numbers",-1).toInt() : UserHUD::hd_numbers_override.load();
-                    bool hd_numbers=defaults ? (hd_override<0 ? defaults->value("HDNumbers/enabled",true).toBool() : hd_override!=0)
-                                            : UserHUD::HDNumbers(HUD::GetLayout().hd_numbers);
+                if (player && !defaults && ImGui::BeginTabItem("HUD")) {
+                    auto layout=UserHUD::GetLayout();
+                    const auto authored=HUD::GetLayout();
+                    bool changed=false;
+                    int hd_override=UserHUD::hd_numbers_override.load();
+                    bool hd_numbers=UserHUD::HDNumbers(authored.hd_numbers);
                     if(ImGui::Checkbox("Enable HD Numbers",&hd_numbers)) {
                         hd_override=hd_numbers?1:0;changed=true;
                     }
@@ -830,30 +828,22 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                                 changed|=ImGui::DragFloat("Y",&p.y,.1f,-240,240,"%.2f",ImGuiSliderFlags_AlwaysClamp);
                                 changed|=ImGui::DragFloat("Scale",&p.scale,.1f,-90,200,"%.2f%%",ImGuiSliderFlags_AlwaysClamp);
                                 if(i==UserHUD::CounterGroup) {
-                                    const float base=defaults ? defaults->value("HUD/rupees/key_distance",0.f).toFloat() : HUD::GetLayout().counter_distance;
-                                    float distance=std::clamp(base+layout.counter_distance_offset,0.f,UserHUD::Layout::MaxCounterDistance);
-                                    if(ImGui::SliderFloat("Distance between counters",&distance,0,UserHUD::Layout::MaxCounterDistance,"%.1f px",ImGuiSliderFlags_AlwaysClamp)) {
-                                        layout.counter_distance_offset=distance-base;
-                                        changed=true;
-                                    }
+                                    const float base=authored.counter_distance;
+                                    changed|=ImGui::SliderFloat("Counter spacing offset",&layout.counter_distance_offset,
+                                        -base,UserHUD::Layout::MaxCounterDistance-base,"%.1f px",ImGuiSliderFlags_AlwaysClamp);
+                                    if(ImGui::IsItemHovered())ImGui::SetTooltip("Zero uses the default gap. Negative brings the counters closer; positive moves them apart.");
                                 }
                                 if(i==UserHUD::Minimap)changed|=DrawHUDOpacity("Minimap opacity",layout.minimap_opacity);
                                 if(i==UserHUD::Hearts) {
-                                    const float authored=defaults ? defaults->value("HUD/hearts/spacing",0.f).toFloat() : HUD::GetLayout().heart_spacing;
-                                    float spacing=std::clamp(authored+layout.heart_spacing,-8.f,20.f);
-                                    if(ImGui::SliderFloat("Spacing",&spacing,-8.f,20.f,"%+.1f px",ImGuiSliderFlags_AlwaysClamp)) {
-                                        layout.heart_spacing=spacing-authored;changed=true;
-                                    }
-                                    if(ImGui::IsItemHovered())ImGui::SetTooltip("Adjusts spacing between heart columns. Reset restores the authored default.");
+                                    changed|=ImGui::SliderFloat("Heart spacing offset",&layout.heart_spacing,
+                                        -8.f-authored.heart_spacing,20.f-authored.heart_spacing,"%.1f px",ImGuiSliderFlags_AlwaysClamp);
+                                    if(ImGui::IsItemHovered())ImGui::SetTooltip("Zero uses the default spacing. Negative brings hearts closer together. Positive moves them apart.");
                                 }
                                 if(i==UserHUD::Magic) {
-                                    const auto authored=HUD::GetLayout();
-                                    float height=layout.magic_height==0 ? (defaults ? defaults->value("HUD/magic/height",1.f).toFloat() : authored.magic_height) : layout.magic_height;
+                                    float height=layout.magic_height==0 ? authored.magic_height : layout.magic_height;
                                     float border=layout.magic_outer_thickness;
-                                    if(border==0) border=defaults ? .5f*(defaults->value("HUD/magic/contour_width",1.f).toFloat()+
-                                        defaults->value("HUD/magic/contour_height",1.f).toFloat()) :
-                                        (authored.magic_contour.width+authored.magic_contour.height)*.5f;
-                                    if(ImGui::SliderFloat("Outer border thickness",&border,.25f,8,"%.2f px",ImGuiSliderFlags_AlwaysClamp)) {layout.magic_outer_thickness=border;changed=true;}
+                                    if(border==0)border=(authored.magic_contour.width+authored.magic_contour.height)*.5f;
+                                    if(DrawMagicBorderThickness(border)) {layout.magic_outer_thickness=border;changed=true;}
                                     if(ImGui::SliderFloat("Height",&height,1,8,"%.2fx",ImGuiSliderFlags_AlwaysClamp)) {layout.magic_height=height;changed=true;}
                                     changed|=ImGui::SliderFloat("Width",&layout.magic_width,.5f,4,"%.2fx",ImGuiSliderFlags_AlwaysClamp);
                                 }
@@ -898,22 +888,13 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                     }
                     ImGui::Separator();
                     if(ImGui::Button("Reset all HUD elements")) {layout={};changed=true;hd_override=-1;}
-                    if(changed && defaults) {
-                        const auto values=UserHUD::HUDSettings(layout,hd_override);
-                        for(auto it=values.cbegin();it!=values.cend();++it) defaults->setValue(it.key(),it.value());
-                    } else if(changed) {
+                    if(changed) {
                         UserHUD::hd_numbers_override=hd_override;
                         UserHUD::SetLayout(layout);
                     }
-                    if(ImGui::Button("Import HUD settings...")) {
-                        if(defaults) defaults_dialog=DefaultsDialog::ImportHUD;
-                        else hud_preset_request=HUDPresetAction::Import;
-                    }
+                    if(ImGui::Button("Import HUD settings..."))hud_preset_request=HUDPresetAction::Import;
                     ImGui::SameLine();
-                    if(ImGui::Button("Export HUD settings...")) {
-                        if(defaults) defaults_dialog=DefaultsDialog::ExportHUD;
-                        else hud_preset_request=HUDPresetAction::Export;
-                    }
+                    if(ImGui::Button("Export HUD settings..."))hud_preset_request=HUDPresetAction::Export;
                     ImGui::EndTabItem();
                 }
                 if (ImGui::BeginTabItem("Difficulty")) {
@@ -1465,7 +1446,7 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                         ImGui::TextDisabled("Shared by save slots, action/confirmation stones and Normal/Master Quest stones.");
                         changed|=ImGui::Checkbox("Grow highlighted stones (+5%)",&layout.stone_focus_grow);
                         changed|=ImGui::SliderFloat("Selection grow time",&layout.stone_focus_seconds,0,.3f,"%.2f s",ImGuiSliderFlags_AlwaysClamp);
-                        ImGui::TextDisabled("Shared by file, game-mode and action stones. 0 = instant; otherwise animates at 60 FPS.");
+                        ImGui::TextDisabled("Also applies to Save, Death and Boss Rush pause choices. Set the time to 0 for instant growth.");
                         if(ImGui::TreeNode("File stones")) {
                             auto& p=layout.stones;
                             changed|=ImGui::DragFloat("X",&p.x,.1f,-400,400,"%.1f");
@@ -1625,7 +1606,11 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                         constexpr std::array labels{"A Select","B Back"};
                         for(unsigned i=0;i<labels.size();++i)if(ImGui::TreeNode(labels[i])) {
                             auto& p=layout.prompts[i];
-                            changed|=ImGui::DragFloat("X",&p.x,.1f,-400,400,"%.1f");
+                            float x=FileSelect::VisiblePromptX(p.x,p.scale);
+                            if(ImGui::DragFloat("X",&x,.1f,PausePrompts::SafeLeft(),FileSelect::VisiblePromptX(400,p.scale),
+                                                "%.1f",ImGuiSliderFlags_AlwaysClamp)) {
+                                p.x=x;changed=true;
+                            }
                             changed|=ImGui::DragFloat("Y",&p.y,.1f,-240,240,"%.1f");
                             changed|=ImGui::DragFloat("Scale",&p.scale,.01f,.1f,4,"%.2fx");
                             if(ImGui::Button("Reset")){p=FileSelect::Layout{}.prompts[i];changed=true;}
@@ -1910,13 +1895,12 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                                 changed |= ImGui::SliderFloat("Opacity", &layout.carrot_opacity, 0.f, 1.f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
                                 changed |= ImGui::SliderFloat("Animation delay", &layout.carrot_animation_delay, 0.f, 2.f, "%.2f s", ImGuiSliderFlags_NoInput);
                                 if(ImGui::IsItemHovered())ImGui::SetTooltip("Delays the used carrot's vertical bounce and switch to gray.");
-                                if(ImGui::TreeNode("Shadow")) {
+                                if(ImGui::TreeNode("Hard shadow")) {
                                     auto& shadow=layout.carrot_shadow;
                                     changed |= ImGui::Checkbox("Enable shadow",&shadow.enabled);
                                     changed |= ImGui::SliderFloat("Horizontal offset",&shadow.x,-12,12,"%.1f px",ImGuiSliderFlags_NoInput);
                                     changed |= ImGui::SliderFloat("Vertical offset",&shadow.y,-12,12,"%.1f px",ImGuiSliderFlags_NoInput);
-                                    changed |= ImGui::SliderFloat("Blur",&shadow.blur,0,4,"%.1f px",ImGuiSliderFlags_NoInput);
-                                    changed |= ImGui::SliderFloat("Strength",&shadow.strength,0,1,"%.2f",ImGuiSliderFlags_NoInput);
+                                    changed |= ImGui::SliderFloat("Opacity",&shadow.opacity,0,1,"%.2f",ImGuiSliderFlags_AlwaysClamp);
                                     if(ImGui::Button("Reset shadow")){shadow={};changed=true;}
                                     ImGui::TreePop();
                                 }
@@ -1925,6 +1909,13 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                                 changed |= ImGui::DragFloat("One heart row Y offset",&layout.magic_one_row_y,.1f,-240,240,"%+.1f px",ImGuiSliderFlags_AlwaysClamp);
                                 changed |= ImGui::DragFloat("Two heart rows Y offset",&layout.magic_two_row_y,.1f,-240,240,"%+.1f px",ImGuiSliderFlags_AlwaysClamp);
                                 changed |= ImGui::DragFloat("Height scale",&layout.magic_height,.01f,1,8,"%.2fx",ImGuiSliderFlags_AlwaysClamp);
+                                auto& border=layout.magic_contour;
+                                float thickness=(border.width+border.height)*.5f;
+                                if(DrawMagicBorderThickness(thickness)) {
+                                    border.width=border.height=thickness;
+                                    border.enabled=true;
+                                    changed=true;
+                                }
                                 changed |= ImGui::DragFloat("Fill padding",&layout.magic_border,.01f,0,4,"%.2fx",ImGuiSliderFlags_AlwaysClamp);
                                 changed |= ImGui::SliderFloat("Black background opacity",&layout.magic_background_opacity,0,1,"%.2f",ImGuiSliderFlags_AlwaysClamp);
                                 changed |= ImGui::ColorEdit3("Fill color",layout.magic_fill_color.data(),ImGuiColorEditFlags_NoOptions);

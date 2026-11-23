@@ -33,7 +33,7 @@ inline bool Valid(const Pose& p) {
 constexpr U32 ControllerPointer=0x5c588c, LayoutOffset=0x2e0, PanesOffset=0xaf8;
 constexpr U32 PaneResourcesOffset=LayoutOffset+0x18;
 constexpr U32 FirstSVC=0xfff220;
-constexpr std::array<TitleScreen::Site,13> Sites{{
+constexpr std::array<TitleScreen::Site,12> Sites{{
     {0x300544,0xeb049d33,0xe2840dcb}, // Native top game-over draw.
     {0x2fde88,0x1bffccfc,0xe2844001}, // Bottom layout's conditional pane draw.
     {0x41c960,0xe3a03012,0xe3a02001}, // Title entrance finished: choose its next animation.
@@ -46,7 +46,6 @@ constexpr std::array<TitleScreen::Site,13> Sites{{
     {0x42755c,0xebfb3656,0xe5940004}, // Accepted Boss Challenge A/B.
     {0x4275a8,0xeafb3643,0xe28dd008}, // Boss Challenge Start/back tail call.
     {0x426fe0,0x0affffcb,0xe5940010}, // Save question: no A, allow B to decline saving.
-    {0x42ec04,0xebfc3278,0xe3100008}, // Gameplay's Start-to-open input query.
 }};
 inline U32 Instruction(U32 pc,U32 word) {
     for(unsigned i=0;i<Sites.size();++i)if(pc==Sites[i].pc && word==Sites[i].instruction)
@@ -77,20 +76,24 @@ template<class M> bool Drawable(M& m,U32 owner) {
         (m.Read(owner+8).value_or(0)>>24)==0 &&
         m.Read(owner+LayoutOffset+4).value_or(0)!=0;
 }
-// Only presentation transitions need extra frames. Input, saving and scene
-// fade states retain their original cadence, including Boss Challenge.
+// Native transition curves and selectable stone focus have separate lifetimes.
 constexpr bool Moving(U32 state) {return state==3 || state==5 || state==9 || state==11 || state==13 || state==15;}
-template<class M> bool FastTransition(M& m) {
+constexpr bool Selectable(U32 state) {return state==4 || state==10 || state==14;}
+template<class M> bool FastPresentation(M& m) {
     const U32 owner=Controller(m);
-    return Drawable(m,owner) && Moving(m.Read(owner+8).value_or(0)&255);
+    if(!Drawable(m,owner))return false;
+    const auto state=m.Read(owner+8).value_or(0)&255;
+    return Moving(state) || Selectable(state);
 }
 inline bool half_frame=false,extra_frame=false;
+inline std::array<float,2> focus_scale{1,1}; // Indexed by the shared save-layout parts.
 // Native QLY pane IDs, shared by the English/French/Spanish layouts.
 // Selection corners follow their selected control, leaving Visions on bottom.
+constexpr bool CursorPane(unsigned pane) {return (pane>=60 && pane<=63) || (pane>=65 && pane<=68);}
 constexpr bool RoutedPane(unsigned pane,U32 selection) {
     return (pane>=5 && pane<=13) || (pane>=15 && pane<=23) ||
         (pane>=25 && pane<=33) || (pane>=45 && pane<=47) || pane==90 || pane==91 ||
-        (selection<2 && ((pane>=60 && pane<=63) || (pane>=65 && pane<=68)));
+        (selection<2 && CursorPane(pane));
 }
 constexpr Part PanePart(unsigned pane,U32 selection) {
     if((pane>=5 && pane<=13) || (pane>=15 && pane<=23) || pane==90 || pane==91)return Prompt;
@@ -194,15 +197,6 @@ inline SaveMenu::Animation Animation(U32 state,float ticks) {
     return {};
 }
 inline std::atomic<bool> on_top{false};
-// Physical HID state survives the native pause controller clearing its snapshots.
-// Low bit is held; upper bits identify each new press. A release/re-press can
-// happen entirely during cleanup, before gameplay checks Start again.
-inline std::atomic<std::uint64_t> physical_start{0};
-inline void PollStart(bool pressed) {
-    const auto previous=physical_start.load();
-    if(bool(previous&1)==pressed)return;
-    physical_start.store(pressed?previous+3:previous&~std::uint64_t{1});
-}
 inline std::optional<std::array<float,2>> MapPointer(float u,float v,float width,const Layout& poses) {
     if(!std::isfinite(u) || !std::isfinite(v) || !std::isfinite(width) || width<=0)return {};
     const float x=(u-.5f)*width+160,y=v*240;
@@ -243,48 +237,27 @@ struct Hook {
     U32 animation_owner=0,animation_state=0;
     float animation_ticks=0;
     template<class M,class R> void ControlUpdate(M& m,R& r) {
-        // Native pause cleanup can clear its input snapshot before the first
-        // gameplay query. Keep the close latch through that transition.
         // Only actual game-over with zero health, not Boss Rush success UI.
         Randomizer::Activity::ObserveDeath(Active(m) && (m.Read(0x587958+0x44).value_or(1)&0xffff)==0);
         r[0]=m.Read(r[1]+0x100).value_or(0)&255; // Displaced LDRB.
         if(half_frame && extra_frame && r[4]==Controller(m) && Drawable(m,r[4])) {
-            // Keep input debounce, callbacks and the audio-synced death title
-            // at 30 Hz; only evaluate layout/cursor on the extra render frame.
+            // The selectable stone dialogs read newly pressed buttons.
+            // Skipping its frame loses the edge even if the player keeps holding.
+            if(Selectable(m.Read(r[4]+8).value_or(0)&255) && m.Read(r[4]+0x24)==0 &&
+               m.Read(r[1]+0x18).value_or(0)!=0)return;
+            // Pending touch callbacks and transition clocks advance on normal frames.
             m.Write(r[4]+4,r[1]);r[15]=0x41ce0c;
         }
     }
 
     std::array<U32,16> input_saved{};
     U32 input_control=0,input_site=0,input_stage=0;
-    U32 closing_start_play=0;
-    std::uint64_t closing_start_press=0;
     std::array<U32,2> input_stack{};
     template<class M,class R> void Input(M& m,R& r,unsigned site,bool supported) {
-        if(site==12) {
-            r[14]=Sites[site].pc+4;
-            r[15]=0x33b5ec;
-            if(!supported) {closing_start_play=0;return;}
-            // The pause-input queue is cleared during the close transition.
-            // A still-held Start then becomes a new edge when gameplay resumes.
-            // Consume that hold only after an accepted Boss Challenge close.
-            // 5043d4+c owns the play pointer. 50af34+4 is a HUD mesh helper.
-            const auto physical=physical_start.load();
-            if(closing_start_play && m.Read(0x5043d4+0xc)==closing_start_play &&
-               (physical>>1)==closing_start_press) {
-                r[1]=0x50af0c;
-                r[0]=m.Read(r[1]+0xc).value_or(0);
-                if(!r[0])r[0]=m.Read(r[1]+8).value_or(0);
-                r[0]&=~8u;
-                // Consume the final queued edge even if Start was released
-                // during the fade. A later, fresh press opens normally.
-                // Drain both native queues as well: a queued press can outlive
-                // the physical release and the first resumed gameplay frame.
-                for(const U32 at:{0x50af14u,0x50af18u})
-                    if(const auto value=m.Read(at))m.Write(at,*value&~8u);
-                if(!(physical&1))closing_start_play=0;
-                r[15]=r[14]; // The following TST supplies the caller's flags.
-            } else closing_start_play=0;
+        if(site==10) {
+            // Boss Challenge tests logical Start after HID remapping. The
+            // caller has restored LR and the stack before this tail call.
+            r[15]=supported?r[14]:0x2f4ebc;
             return;
         }
         if(site==11) {
@@ -310,10 +283,6 @@ struct Hook {
                (m.Read(control+0x18).value_or(0)&0xffff00)!=0x10100 ||
                m.Read(menu+0x24).value_or(0)!=0 || r[13]<8 ||
                !m.Read(r[13]-8) || !m.Read(r[13]-4))return;
-            if(site==10 && state==14) {
-                closing_start_play=m.Read(menu+4).value_or(0);
-                closing_start_press=physical_start.load()>>1;
-            }
             input_saved=r;input_control=control;input_site=site;input_stage=1;
             r[0]=menu;r[14]=Sites[site].pc;
             r[15]=state==4?(choice==0?0x43c4a0:0x43c590):(choice==1?0x43c36c:0x43c67c);
@@ -511,7 +480,8 @@ struct Hook {
         RestoreSamplers(m);
         if(stage==Stage::Idle) {
             routed_panes={};submitted=0;replaced={};attempted={};animation={};
-            save_layout=SaveMenu::GetLayout();frame_layout=SharedLayout(save_layout);shared_style=true;
+            save_layout=SaveMenu::GetLayout();save_layout.focus_scale=focus_scale;
+            frame_layout=SharedLayout(save_layout);shared_style=true;
             state=m.Read(Controller(m)+8).value_or(0)&255;
             if(BossChallenge::InBattle(m) && state>=12 && state<=17) {
                 const auto boss=BossChallenge::GetLayout();

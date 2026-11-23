@@ -471,20 +471,24 @@ int main(int argc,char** argv) {
     }
     e.Pause(true);e.Write(0x800100,2);e.Begin();assert(!e.hook.fast);
     e.Pause(true);e.Begin();
-    // Death transitions use the same native VBlank pacing, but saving,
-    // input waits, Game Over and final scene fades remain at 30 Hz.
+    // Game Over draws transitions and selectable stones on the menu clock.
     constexpr U32 death=0x890000;
     e.Write(DeathMenu::ControllerPointer,death);e.Write(death+DeathMenu::LayoutOffset+4,0x891000);
     for(U32 state:{0u,1u,3u,4u,5u,7u,9u,10u,11u,12u,13u,14u,15u,16u,17u}) {
         e.Pause(false);e.Write(death+8,0x10000|state);
         e.Write(0x54cc3c,0);e.Write(Renderer+0x88,0);e.waits=0;
-        unsigned extras=0;
+        const bool animated=DeathMenu::Moving(state) || state==4 || state==10 || state==14;
+        unsigned extras=0,presented=0;
+        Interpolation::RateClock clock;
         for(unsigned n=0;n<60;++n) {
-            e.Begin();assert(e.hook.death_fast==DeathMenu::Moving(state));
+            e.Begin();assert(e.hook.death_fast==animated);
+            assert(Interpolation::menu_page==(animated?Interpolation::MenuPage::Death:Interpolation::MenuPage::None));
+            if(animated)presented+=clock.Next(n,120,Interpolation::SourceFPS(Interpolation::menu_page)).count;
             extras+=DeathMenu::extra_frame;e.End();
         }
-        assert(e.waits==(DeathMenu::Moving(state)?60:120));
-        assert(extras==(DeathMenu::Moving(state)?30:0));
+        assert(e.waits==(animated?60:120));
+        assert(extras==(animated?30:0));
+        assert(presented==(animated?120:0));
     }
     e.Write(death+8,0);e.Pause(true);e.Begin();
     // Sixty distinct native matrix angles cover exactly the old 30-degree turn.

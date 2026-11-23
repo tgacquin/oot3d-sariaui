@@ -2123,6 +2123,11 @@ public:
                 if(page==OOT3D::Interpolation::MenuPage::FileSelect && oot_file_select.quest.Drawing() &&
                    model==oot_file_select.quest.model) {
                     OOT3D::Interpolation::MenuCursor::Record(guest,model,model,oot_file_select.quest_selection,0,resolve);
+                } else if(page==OOT3D::Interpolation::MenuPage::Death &&
+                          oot_death_menu.stage==OOT3D::DeathMenu::Hook::Stage::Panes &&
+                          OOT3D::DeathMenu::CursorPane(oot_death_menu.current_pane)) {
+                    OOT3D::Interpolation::MenuCursor::Record(guest,model,oot_death_menu.owner,
+                        oot_death_menu.selection,oot_death_menu.current_pane,resolve);
                 } else {
                     const u32 source=page==OOT3D::Interpolation::MenuPage::Map?
                         oot_dungeon_sides.ForegroundSource(model):model;
@@ -2176,6 +2181,13 @@ public:
             }
             if(oot_boss_challenge.Drawing()) {
                 auto& regs=parent.jit->Regs();regs[2]=regs[0]+0xc;
+                if(oot_boss_challenge.StatTextDraw()) {
+                    using namespace OOT3D::Interpolation::MenuCursor;
+                    const auto pane=guest.Read(OOT3D::BossChallenge::NativeLayout+0x418+4*oot_boss_challenge.pane).value_or(0);
+                    const bool shadow=guest.Read(pane+0x68)==regs[0] && guest.Read(pane+0x64)!=regs[0];
+                    Record(guest,regs[0],shadow?2:1,0,0,
+                        [&](u32 at){return guest.Mapped(at,12)?memory.GetPointer(at):nullptr;},boss_text);
+                }
                 oot_boss_challenge.PromptModel(guest,regs[0]);
                 oot_boss_challenge.SelectionModel(guest,regs[0]);
                 OOT3D::ScreenModels::Apply(guest,regs[1],regs[0],oot_boss_challenge.DrawTransform(guest,regs[0]));
@@ -2517,7 +2529,8 @@ public:
             OOT3D::HUD::Handle(guest, regs,
                 site, OOT3D::HUD::GetEffectiveLayout(), oot_hud_routing,
                 OOT3D::PauseMenu::Active(guest),
-                parent.system.CoreTiming().GetGlobalTimeUs().count());
+                parent.system.CoreTiming().GetGlobalTimeUs().count(),
+                site==0 && OOT3D::BossChallenge::InBattle(guest));
             if(site==8) {
                 if(OOT3D::HUD::RoutingCapture::Active() &&
                    guest.Read(regs[4]+0x354)==guest.Read(OOT3D::HUD::Main+0xc)) {

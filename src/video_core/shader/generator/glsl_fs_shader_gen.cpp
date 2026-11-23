@@ -266,6 +266,15 @@ vec4 secondary_fragment_color = vec4(0.0);
         WriteTevStage(index);
     }
 
+#ifdef ENABLE_OOT3D_PRESENTATION
+    if(user.boss_text) {
+        out += R"(
+if (rupee_digit_outline.w < 0.0) discard;
+vec4 inkMask = texture(tex0, texcoord0);
+if (inkMask.a > 0.0) combiner_output.rgb = mix(combiner_output.rgb, rupee_digit_outline.rgb, clamp(inkMask.r / inkMask.a, 0.0, 1.0));
+)";
+    }
+#endif
     if (user.hud_colors) {
         // The magic fill's main RGBA4 texel is (2,15,2). Retain its brightness
         // and any added white in the highlight, including between filtered texels.
@@ -1835,6 +1844,11 @@ void FragmentModule::DefineTexUnitSampler(u32 texture_unit) {
     }
 
 #ifdef ENABLE_OOT3D_PRESENTATION
+    if(texture_unit==0 && user.boss_text) {
+        // Reproduce the alpha-only native font input to the guest combiner.
+        out += "return vec4(0.0, 0.0, 0.0, texture(tex0, texcoord0).a);\n}\n";
+        return;
+    }
     if (texture_unit == 0 && user.hud_colors &&
         config.texture.texture0_type == TexturingRegs::TextureConfig::Texture2D) {
         out += R"(

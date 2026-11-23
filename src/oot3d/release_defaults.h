@@ -41,6 +41,8 @@ inline bool Apply(QSettings& settings, const QString& resource, bool runtime, bo
         QSettings choices(QStringLiteral(":/oot3d/defaults/player.ini"), QSettings::IniFormat);
         choices.beginGroup(runtime ? QStringLiteral("runtime") : QStringLiteral("presentation"));
         for (const auto& key : choices.allKeys()) {
+            // Older F3 drafts can contain personal HUD overrides. Fresh profiles inherit F1.
+            if (!runtime && key.startsWith(QStringLiteral("UserHUD/"))) continue;
             auto value=choices.value(key);
             if(runtime && key.startsWith(QStringLiteral("UI/Shortcuts/")) && key.endsWith(QStringLiteral("/KeySeq")))
                 value=QKeySequence::fromString(value.toString(),QKeySequence::PortableText).toString(QKeySequence::NativeText);

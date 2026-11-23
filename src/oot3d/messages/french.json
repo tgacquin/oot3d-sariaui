@@ -200,8 +200,8 @@
     "004A": {
       "edits": [
         {
-          "find": "Touchez\n{24:16} sur l'écran tactile pour en jouer!",
-          "replace": "Pour\nen jouer, appuyez à droite\nsur la croix directionnelle."
+          "find": " Touchez\n{24:16} sur l'écran tactile pour en jouer!",
+          "replace": "\nPour en jouer, appuyez sur {24:03}."
         }
       ]
     },
@@ -310,7 +310,7 @@
       "edits": [
         {
           "find": "désirera te parler, utilise {1d:46}{24:17} {1d:00}pour\nécouter ses conseils avisés...",
-          "replace": "désirera te parler, appuie sur le haut\nde la croix directionnelle pour\nécouter ses conseils avisés..."
+          "replace": "désirera te parler, appuie sur {24:02} pour\nécouter ses conseils avisés..."
         }
       ],
       "requires": "NaviUp"
@@ -371,7 +371,7 @@
         },
         {
           "find": "Au centre de l'écran tactile se situe la carte\ngénérale de la région.",
-          "replace": "Tu peux changer ce raccourci dans\nles paramètres des commandes."
+          "replace": "La carte montre toute la zone."
         },
         {
           "find": "Touche {24:1b} sur l'écran tactile pour afficher\nles noms de lieux.",
@@ -427,7 +427,7 @@
         },
         {
           "find": "Si {24:17} est affiché à la place de {24:18}, ta fée a\nquelque chose à te dire! Touche alors {24:17}\npour l'écouter!",
-          "replace": "Quand Navi veut te parler,\nappuie sur le haut de la croix\ndirectionnelle pour l'écouter!"
+          "replace": "Si Navi t'appelle, écoute-la avec {24:02}!"
         }
       ],
       "requires": "NaviUp"
@@ -436,7 +436,7 @@
       "edits": [
         {
           "find": "Si tu sors ton ocarina avec {24:16} au bon\nendroit, une {1d:41}portée {1d:00}apparaîtra.",
-          "replace": "Appuie à droite sur la croix directionnelle\npour sortir ton ocarina. Au bon endroit,\nune {1d:41}portée{1d:00} apparaîtra."
+          "replace": "Appuie sur {24:03} pour sortir ton ocarina.\nAu bon endroit, une {1d:41}portée{1d:00} apparaîtra."
         }
       ]
     },
@@ -444,7 +444,7 @@
       "edits": [
         {
           "find": "Pour voir les mélodies que tu as apprises,\naccède à l'{1d:44}écran de l'ocarina {1d:00}et touche\nl'icône en bas à droite.",
-          "replace": "Pour voir les mélodies que tu as apprises,\nappuie à droite sur la croix directionnelle\npour sortir ton ocarina, puis sur START."
+          "replace": "Pour voir les mélodies que tu as apprises,\nappuie sur {24:03} pour sortir ton ocarina,\npuis sur START."
         }
       ],
       "requires": "SongListStart"

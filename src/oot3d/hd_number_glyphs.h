@@ -6,7 +6,8 @@
 #include <array>
 
 namespace OOT3D::HDFont {
-inline bool NumberGlyph(unsigned code,bool bold,std::array<std::uint8_t,4096>& glyph) {
+inline bool NumberGlyph(unsigned code,bool bold,std::array<std::uint8_t,4096>& glyph,
+                        unsigned* left=nullptr,unsigned* width=nullptr) {
     const auto decode=[&](const auto& records,const auto& runs) {
         const auto it=std::find_if(std::begin(records),std::end(records),
             [&](const auto& r){return r.code==code;});
@@ -17,6 +18,8 @@ inline bool NumberGlyph(unsigned code,bool bold,std::array<std::uint8_t,4096>& g
             if(!count || n+count>glyph.size())return false;
             std::fill_n(glyph.begin()+n,count,runs[p+1]);n+=count;
         }
+        if(left)*left=it->left;
+        if(width)*width=it->width;
         return n==glyph.size();
     };
     return bold?decode(Artwork::Records,Artwork::Runs):decode(ThinArtwork::Records,ThinArtwork::Runs);

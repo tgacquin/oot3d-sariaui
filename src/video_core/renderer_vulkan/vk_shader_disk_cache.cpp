@@ -178,7 +178,7 @@ std::optional<std::pair<u64, Shader* const>> ShaderDiskCache::UseFragmentShader(
     }
 #endif
     auto fs_config_hash = atlas ? Common::HashCombine(fs_config.Hash(),u64{0x4d4d334441544c06}) : fs_config.Hash();
-    if(user.hud_colors || user.torch_fog)fs_config_hash=Common::HashCombine(fs_config_hash,u64{0x485544434f4c0300} | user.raw);
+    if(user.hud_colors || user.torch_fog || user.boss_text)fs_config_hash=Common::HashCombine(fs_config_hash,u64{0x485544434f4c0300} | user.raw);
     const auto [it, new_shader] = fragment_shaders.try_emplace(fs_config_hash, parent.instance);
     auto& shader = it->second;
 
@@ -187,7 +187,7 @@ std::optional<std::pair<u64, Shader* const>> ShaderDiskCache::UseFragmentShader(
 
         parent.shader_workers.QueueWork([fs_config, user, this, &shader, fs_config_hash, atlas]() {
             std::vector<u32> spirv;
-            const bool use_spirv = parent.profile.vk_use_spirv_generator && !atlas && !user.hud_colors && !user.torch_fog;
+            const bool use_spirv = parent.profile.vk_use_spirv_generator && !atlas && !user.hud_colors && !user.torch_fog && !user.boss_text;
             if (use_spirv && !fs_config.UsesSpirvIncompatibleConfig()) {
                 spirv = SPIRV::GenerateFragmentShader(fs_config, parent.profile);
                 shader.module = CompileSPV(spirv, parent.instance.GetDevice());

@@ -53,15 +53,42 @@ int main(int argc,char** argv) {
     assert(clouds.Prepare(m,model,decode) && before==m.words);
     const auto original=clouds.composed;
     assert(clouds.Prepare(m,model,decode) && clouds.composed==original);
+    // Native cloud 15 occupies (96,148)..(256,256) in the packed atlas.
+    // Magnification must repeat its edge texels without pulling in a neighbor.
+    for(bool flip:{false,true}) {
+        const float u0=flip?1.f:96.f/256,u1=flip?96.f/256:1.f;
+        const float v0=flip?0.f:108.f/256,v1=flip?108.f/256:0.f;
+        m.Floats(live+64*12,std::array{u0,v0,u1,v0,u0,v1,u1,v1});
+        assert(clouds.Prepare(m,model,decode));
+        unsigned mismatches_without_clamp=0;
+        constexpr unsigned width=DungeonParchment::Width,height=DungeonParchment::Height;
+        const auto check=[&](unsigned x,unsigned y) {
+            const float sx=std::lerp(u0,u1,(x+.5f)/width)*256-.5f;
+            const float sy=(1-std::lerp(v0,v1,(y+.5f)/height))*256-.5f;
+            const auto sample=[&](float a,float b) {
+                return std::lround(DungeonParchment::Sample(clouds.atlas,256,256,a,b)[3]);
+            };
+            const auto expected=sample(std::clamp(sx,96.f,255.f),std::clamp(sy,148.f,255.f));
+            mismatches_without_clamp+=sample(sx,sy)!=expected;
+            const auto index=DungeonParchment::TiledOffset(x,height-1-y);
+            assert(long((*clouds.composed)[index]&255)==expected);
+        };
+        for(unsigned x=0;x<width;++x){check(x,0);check(x,height-1);}
+        for(unsigned y=0;y<height;++y){check(0,y);check(width-1,y);}
+        assert(mismatches_without_clamp>0);
+    }
+    m.Floats(live+64*12,uv);assert(clouds.Prepare(m,model,decode));
+    assert(*clouds.composed==*original);
+    const auto restored=clouds.composed;
     // Actual native cloud descriptor: constant color, position/UV streams only.
     // Unrelated heap data immediately after the buffer must never be sampled.
     m.words[desc+0x1c]=0x1ec;
     for(unsigned i=0;i<64*16;i+=4)m.words.erase(live+64*20+i);
-    assert(clouds.Prepare(m,model,decode) && clouds.composed==original);
+    assert(clouds.Prepare(m,model,decode) && clouds.composed==restored);
     for(unsigned i=0;i<64*16;i+=4)m.words[live+64*20+i]=0x7fc00000; // Poison, not colors.
-    assert(clouds.Prepare(m,model,decode) && clouds.composed==original);
+    assert(clouds.Prepare(m,model,decode) && clouds.composed==restored);
     auto depth=positions;for(unsigned i=0;i<4;++i)depth[3*i+2]=.5f;
-    m.Floats(live,depth);assert(clouds.Prepare(m,model,decode) && clouds.composed==original);
+    m.Floats(live,depth);assert(clouds.Prepare(m,model,decode) && clouds.composed==restored);
     assert(clouds.prepared.positions[2]==.5f);m.Floats(live,positions);
     m.words[desc+0x1c]=0x1e4;
     for(unsigned q=0;q<16;++q)m.Floats(live+64*20+q*64,color);

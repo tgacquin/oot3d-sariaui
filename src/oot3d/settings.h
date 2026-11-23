@@ -10,7 +10,7 @@ inline std::atomic<bool> custom_textures{false},fullscreen_requested{false};
 inline std::atomic<int> requested_custom_textures{-1};
 inline std::atomic<bool> configure_textures_shortcut{false},configure_fullscreen_shortcut{false};
 inline std::atomic<bool> open_texture_folder{false},texture_folder_failed{false};
-enum class DefaultsDialog { None, ImportHUD, ExportHUD, FullscreenShortcut, TexturesShortcut };
+enum class DefaultsDialog { None, FullscreenShortcut, TexturesShortcut };
 inline std::atomic<DefaultsDialog> defaults_dialog{DefaultsDialog::None};
 inline std::atomic<unsigned> defaults_revision{0};
 enum class HUDPresetAction { None, Import, Export };

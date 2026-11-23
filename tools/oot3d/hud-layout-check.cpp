@@ -471,6 +471,14 @@ int main(int argc,char** argv) {
         m.Float(vertices+82*48+v*12,400+(v%2)*12);
         m.Float(vertices+82*48+v*12+4,364+(v/2)*12);
     }
+    const auto sliding=m.words;
+    regs[4]=Main;m.words[Main+4]=helper;
+    Handle(m,regs,0,Layout{},routing,false,0,true);
+    for(unsigned q=63;q<82;++q) {
+        assert(m.Float(vertices+q*48+4)==10 && m.Float(vertices+q*48+28)==22);
+        assert(m.Float(offsets+q*8+4)==-36);
+    }
+    m.words=sliding;
     OOT3D::HUDReturn::Stationary(m,helper,59,24);
     for(unsigned q=59;q<82;++q) {
         assert(m.Float(vertices+q*48+4)==2);

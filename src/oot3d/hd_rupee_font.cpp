@@ -1,12 +1,61 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "oot3d/hd_rupee_font.h"
 #include "oot3d/hd_number_glyphs.h"
+#include "oot3d/hud_layout.h"
+#include "video_core/utils.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <mutex>
+#include <string_view>
 
 namespace OOT3D::HDFont {
+GauntletTitle MakeGauntletTitle(bool bold,const HUD::RupeeDigitOutline& outline) {
+    GauntletTitle out;
+    constexpr int W=out.Width,H=out.Height,S=out.Scale,pad=out.Padding;
+    std::vector<std::uint8_t> mask(W*H);
+    unsigned pen=pad+1;
+    for(char code:std::string_view{"Boss Gauntlet"}) {
+        if(code==' ') {pen+=5;continue;} // Four-pixel space and the usual one-pixel gap.
+        std::array<std::uint8_t,4096> glyph{};
+        unsigned left=0,width=0;
+        if(!NumberGlyph(code,bold,glyph,&left,&width) || left+width>16 ||
+           (pen+width+pad)*S>W)return {};
+        for(unsigned y=0;y<64;++y)
+            std::copy_n(glyph.data()+64*y+left*S,width*S,mask.data()+(pad*S+y)*W+pen*S);
+        pen+=width+1;
+    }
+    out.advance=pen-pad-1;
+    out.pixels.resize(W*H);
+    const float thickness=std::clamp(outline.thickness,outline.MinThickness,outline.MaxThickness);
+    const auto sample=[&](int x,int y) {
+        return x>=0 && x<W && y>=0 && y<H?mask[y*W+x]/255.f:0.f;
+    };
+    for(int y=0;y<(16+2*pad)*S;++y)for(int x=0;x<int((pen+pad)*S);++x) {
+        const float face=sample(x,y);
+        float uncovered=1.f;
+        // Use the same eight bilinear alpha samples per ring as the rupee digits.
+        if(outline.enabled && face<1)for(int ring=1;ring<=std::ceil(thickness);++ring) {
+            const float radius=std::min(float(ring),thickness)*S;
+            for(int dy=-1;dy<=1;++dy)for(int dx=-1;dx<=1;++dx)if(dx || dy) {
+                const float sx=x+dx*radius,sy=y+dy*radius;
+                const int ix=int(std::floor(sx)),iy=int(std::floor(sy));
+                uncovered*=1-std::lerp(std::lerp(sample(ix,iy),sample(ix+1,iy),sx-ix),
+                    std::lerp(sample(ix,iy+1),sample(ix+1,iy+1),sx-ix),sy-iy);
+            }
+        }
+        const float rim=(1-face)*(1-uncovered),alpha=face+rim;
+        if(alpha==0)continue;
+        std::uint32_t pixel=0;
+        for(float color:outline.color)
+            pixel=(pixel<<8)|std::uint32_t(std::lround(255*(face+rim*color)/alpha));
+        const unsigned ty=H-1-y;
+        out.pixels[(ty/8)*W*8+VideoCore::GetMortonOffset(x,ty,1)]=
+            (pixel<<8)|std::uint32_t(std::lround(255*alpha));
+    }
+    return out;
+}
+
 std::shared_ptr<const RupeeAtlas> StyledRupeeAtlas(RupeeShadow shadow,bool timer,bool backdrop,bool bold) {
     const auto source=rupee_atlas.load();
     if(!source || (!bold && !timer && !backdrop && shadow==RupeeShadow{}))return source;

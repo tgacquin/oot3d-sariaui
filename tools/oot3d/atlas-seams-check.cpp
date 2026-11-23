@@ -296,8 +296,8 @@ int main(int argc,char** argv) {
     }
     // Dungeon selection cursor: four yellow corners plus four glow corners,
     // from the native 2f2448 mode-0 tables. Reject other cursor modes/owners.
-    {
-        Memory m;m.words[0x506cb0+0x1c]=banner;
+    for(U32 slot:{0x1cu,0x4cu}) {
+        Memory m;m.words[0x506cb0+slot]=banner;
         m.words[banner]=mesh;m.words[banner+4]=model;m.words[banner+8]=helper;
         m.words[banner+0xc]=8;m.words[banner+0x24]=0;
         m.words[model]=0x4ebd60;m.words[model+4]=mesh;

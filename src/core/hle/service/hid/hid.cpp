@@ -6,7 +6,6 @@
 #include "oot3d/orbit_camera.h"
 #include "oot3d/gyro_aim.h"
 #include "oot3d/pause_input.h"
-#include "oot3d/death_menu.h"
 #include "oot3d/control_swap.h"
 #include "oot3d/arrow_cycle.h"
 #include "oot3d/item_equip_input.h"
@@ -217,7 +216,6 @@ void Module::UpdatePadCallback(std::uintptr_t user_data, s64 cycles_late) {
             OOT3D::TitleScreen::Pointer(play,0x104) &&
             (guest.Read(play+0x100).value_or(0)&255)==3 && OOT3D::DPad::CodeMatches(guest),
             OOT3D::Ocarina::State(guest)!=0);
-        OOT3D::DeathMenu::PollStart((state.hex&8)!=0);
         if(!orbit_live || OOT3D::visible.load() || !OOT3D::DPad::CodeMatches(guest) ||
            !OOT3D::DPad::Gameplay(guest))OOT3D::MinimapControl::Consume(false);
         // Timestamp shelf navigation at the 234 Hz HID poll, before gameplay

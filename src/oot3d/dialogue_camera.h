@@ -150,6 +150,10 @@ constexpr std::array<U32,13> FishingIndoorWords{
 constexpr std::array<U32,13> FishingPondWords{
     0x0000ffe2,0x00010046,0x000200c8,0x000d0028,0x000e000a,0x000f0000,
     0x00100005,0x00110046,0x0007002d,0x00080032,0x0014ff38,0x0004000a,0x00093f20};
+// Epona uses setting 6 for mounted NPC conversations, including after lock-on.
+constexpr std::array<U32,13> HorsebackWords{
+    0x0000ffc4,0x0001008c,0x000200c8,0x000d0028,0x000e000a,0x000f0000,
+    0x00100005,0x00110046,0x0007002d,0x00080032,0x0014fed4,0x0004000a,0x00093500};
 template<class M> bool CommonContext(M& m,U32 cam) {
     const U32 play=m.Read(cam+0xd4).value_or(0);
     if(!MainCamera(m,play+0x188) || cam!=play+0x364)
@@ -161,8 +165,12 @@ template<class M> bool CommonContext(M& m,U32 cam) {
     const auto parameters=m.Read(modes+3*8+4).value_or(0);
     const auto* words=&CommonWords;
     if(parameters!=CommonParameters) {
-        if(OrbitCamera::Half(m,play+0x104)!=73 || m.Read(modes+3*8)!=0x000c000e)return false;
-        if(setting==4 && parameters==0x518114)words=&FishingIndoorWords;
+        if(m.Read(modes+3*8)!=0x000c000e)return false;
+        if(setting==6 && parameters==0x5183c8 &&
+           (m.Read(m.Read(cam+0xd8).value_or(0)+0x1710).value_or(0)&OrbitCamera::MountedFlag))
+            words=&HorsebackWords;
+        else if(OrbitCamera::Half(m,play+0x104)!=73)return false;
+        else if(setting==4 && parameters==0x518114)words=&FishingIndoorWords;
         else if(setting==59 && parameters==0x518ea8)words=&FishingPondWords;
         else return false;
     }

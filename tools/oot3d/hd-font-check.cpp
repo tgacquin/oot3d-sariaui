@@ -294,6 +294,19 @@ void CheckArtwork(const std::vector<char>& code, const char* font_path, bool use
     auto out = Redraw(alpha,32,32);
     assert(out.size() == 128*128*4);
     assert(out[(32*128+96)*4+3] == 119); // Unknown embedded icon is preserved.
+    // Boss Rush uses the rupee weight even when the regular HD text uses
+    // the other weight. The extra channel contains only outline coverage.
+    for(bool bold:{false,true}) {
+        const auto face=Redraw(alpha,32,32,bold);
+        const auto edged=Redraw(alpha,32,32,bold,.75f);
+        assert(face.size()==out.size() && edged.size()==out.size());
+        bool found_rim=false;
+        for(unsigned p=0;p<face.size();p+=4) {
+            assert(edged[p+3]==face[p+3]+edged[p]);
+            found_rim|=edged[p]!=0;
+        }
+        assert(found_rim && (bold==!use_thin)==(face==out));
+    }
     // The A8 decoder must produce the same alpha as the native A4 upload.
     for (unsigned i=0; i<512; ++i) {
         env.memory[0x820000+2*i]=(env.memory[0x800000+i]&15)*17;

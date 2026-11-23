@@ -246,6 +246,7 @@ private:
     std::optional<MagicReplay> oot_magic_replay;
     std::vector<HardwareVertex> oot_hud_midpoint;
     std::optional<OOT3D::HUD::AmmoBackdrop> oot_number_backdrop;
+    bool oot_boss_text=false;
     std::optional<OOT3D::HUD::RupeeDigitOutline> oot_rupee_digit_outline;
 #endif
 #ifdef ENABLE_MM3D_PRESENTATION

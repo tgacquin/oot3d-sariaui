@@ -159,7 +159,7 @@
       "edits": [
         {
           "find": "Tap {24:16} on the lower screen to\nstart playing it!",
-          "replace": "Press D-pad Right to\nstart playing it!"
+          "replace": "Press {24:03} to start playing it!"
         }
       ]
     },
@@ -273,7 +273,7 @@
       "edits": [
         {
           "find": "speaks, use {24:17} to listen well to her words\nof wisdom...",
-          "replace": "speaks, press D-pad Up to\nlisten well to her words of wisdom..."
+          "replace": "speaks, press {24:02} to listen well to her\nwords of wisdom..."
         }
       ],
       "requires": "NaviUp"
@@ -329,7 +329,7 @@
         },
         {
           "find": "In the middle of the lower screen is the\noverall map of your current area.",
-          "replace": "You can rebind Toggle Minimap in the\nemulator's Controller Hotkeys settings."
+          "replace": "The Map tab shows the whole area."
         },
         {
           "find": "Tap {24:1b} on the lower screen to see the map\nwith area names.",
@@ -385,7 +385,7 @@
         },
         {
           "find": "Also, when {24:17} is displayed in place of {24:18},\nthat means Navi the fairy wants to talk to\nyou. Use {24:17} to listen to her!",
-          "replace": "When Navi the fairy calls to you,\npress D-pad Up to listen to her!"
+          "replace": "When Navi calls, press {24:02} to listen!"
         }
       ],
       "requires": "NaviUp"
@@ -394,7 +394,7 @@
       "edits": [
         {
           "find": "If you hold the ocarina with {24:16} where a\nmelody is necessary, a {1d:41}musical staff {1d:00}will\nappear.",
-          "replace": "Press D-pad Right to take out your\nocarina. Where a melody is necessary,\na {1d:41}musical staff{1d:00} will appear."
+          "replace": "Press {24:03} to take out your ocarina.\nWhere a melody is necessary,\na {1d:41}musical staff{1d:00} will appear."
         }
       ]
     },
@@ -402,7 +402,7 @@
       "edits": [
         {
           "find": "To view the list of melodies you've learned,\nopen the {1d:44}Ocarina subscreen{1d:00} and tap the\nicon in the bottom-right corner.",
-          "replace": "To view the melodies you've learned,\ntake out your ocarina with D-pad Right,\nthen press START to open the song list."
+          "replace": "Take out your ocarina with {24:03}, then\npress START to see the songs you know."
         }
       ],
       "requires": "SongListStart"

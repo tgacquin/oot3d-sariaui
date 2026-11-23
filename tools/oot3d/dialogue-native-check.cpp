@@ -99,7 +99,8 @@ struct Env : Dynarmic::A32::UserCallbacks {
         Write(Play+0x104,scene);Put<std::uint8_t>(Play+0x361,1);
         Write(Cam+0xd4,Play);Write(Cam+0xd8,Player);Write(Cam+0xf0,Target);
         Write(Target+0x13c,1);Write(Cam+0x188,7|(setting<<16));Write(Cam+0x18c,0);
-        Write(Player+0x1710,0);Write(Player+0x1714,0);
+        Write(Player+0x1710,setting==6?0x818000:0);Write(Player+0x1714,0);
+        if(setting==6)Write(Cam+0x18c,2); // Captured mounted lock-on before TALK.
         const Pose pose{{side*150*scale,height,-100*scale},{0,height,0},{0,1,0},52};
         OOT3D::OrbitCamera::Put(*this,Cam+0x80,pose.at);
         OOT3D::OrbitCamera::Put(*this,Cam+0x8c,pose.eye);
@@ -128,9 +129,9 @@ int main(int argc,char** argv) {
     assert(CodeMatches(e));
     Dynarmic::A32::UserConfig config;config.callbacks=&e;
     Dynarmic::A32::Jit cpu(config);e.cpu=&cpu;
-    for(unsigned setting:{1u,4u,59u})
+    for(unsigned setting:{1u,4u,6u,59u})
       for(float height:{44.f,68.f})for(float scale:{1.f,2.f})for(float side:{-1.f,1.f}) {
-        e.Setup(true,side,scale,height,setting,setting==1?1:73);
+        e.Setup(true,side,scale,height,setting,setting==6?99:setting==1?1:73);
         const auto before=e.Vector(Env::Cam+0x8c);e.Tick();
         assert(e.hook.native_active && e.Get<std::uint16_t>(Env::Cam+0x4c)==30);
         assert(e.Vector(Env::Cam+0x8c)==before && e.Get<float>(Env::Cam+0x144)==52);
@@ -196,6 +197,10 @@ int main(int argc,char** argv) {
         assert(!e.hook.native_active && e.Get<std::uint16_t>(Env::Cam+0x4c)==10);
         assert(e.Get<float>(Env::Cam+4)==70 && e.Get<float>(Env::Cam+0x20)==45);
     }
+    e.Setup(true,1,1,68,6,99);
+    e.Write(Env::Player+0x1710,0);assert(!NativeContext(e,Env::Cam));
+    e.Setup(false,1,1,68,6,99);e.Tick();
+    assert(!e.hook.native_active && e.Get<std::uint16_t>(Env::Cam+0x4c)==10);
     // Disabled mode retains OoT's original timer and parameters.
     e.Setup(false,1,1,44);e.Tick();
     assert(!e.hook.native_active && e.Get<std::uint16_t>(Env::Cam+0x4c)==10);
@@ -234,5 +239,5 @@ int main(int argc,char** argv) {
     }
     std::cout<<"Fixed indoor TALK: native ARM 60->42 baseline, patched scene lens retained, 45/60/70/default FOV, fixed eye, both dialogue settings and guard fallbacks passed\n";
     mm_style=true;
-    std::cout<<"Native TALK: common and both Fishing Hole profiles, actual ARM handler, 30-update angular ease-out, both sides/ages, 1x/2x start continuity, lens handoff, collision calls, smooth-return endpoint, scene/table/handler/subcamera guards and legacy fallback passed\n";
+    std::cout<<"Native TALK: common, mounted lock-on and both Fishing Hole profiles, actual ARM handler, 30-update angular ease-out, both sides/ages, 1x/2x start continuity, lens handoff, collision calls, smooth-return endpoint, scene/table/handler/subcamera guards and legacy fallback passed\n";
 }

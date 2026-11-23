@@ -139,7 +139,7 @@ target_link_libraries(oot3d_aim_native_check PRIVATE dynarmic)
 target_compile_options(oot3d_aim_native_check PRIVATE -UNDEBUG)
 
 add_executable(oot3d_boss_challenge_check EXCLUDE_FROM_ALL ../../tools/oot3d/boss-challenge-check.cpp)
-target_link_libraries(oot3d_boss_challenge_check PRIVATE dynarmic)
+target_link_libraries(oot3d_boss_challenge_check PRIVATE dynarmic oot3d_hd_font)
 target_compile_options(oot3d_boss_challenge_check PRIVATE -UNDEBUG)
 
 add_executable(oot3d_actor_capture_check EXCLUDE_FROM_ALL

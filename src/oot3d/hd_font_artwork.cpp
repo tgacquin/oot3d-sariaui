@@ -210,7 +210,7 @@ std::vector<std::uint8_t> MakeTextAtlas(std::span<const std::uint8_t> qbf,
 }
 
 std::vector<std::uint8_t> Redraw(std::span<const std::uint8_t> alpha,
-                               unsigned width, unsigned height) {
+                               unsigned width, unsigned height,std::optional<bool> bold,float outline) {
     const auto face = artwork.load();
     if (!face || width < Cell || height < Cell || width > 512 || height > 512 ||
         width % 8 || height % 8 || alpha.size() != width * height) return {};
@@ -269,14 +269,35 @@ std::vector<std::uint8_t> Redraw(std::span<const std::uint8_t> alpha,
             }
         }
     }
-    const bool use_thin=thin.load();
+    const bool use_thin=bold ? !*bold : thin.load();
+    outline=std::isfinite(outline)?std::clamp(outline,0.f,3.f):0;
     for (const auto& match : matches) {
         const auto& glyph=face->glyphs[match.glyph];
         const auto& hd = use_thin?glyph.thin_hd:glyph.hd;
-        for (unsigned y = 0; y < HDCell; ++y)
-            for (unsigned x = 0; x < HDCell; ++x)
-                out[((match.y * Scale + y) * wide + match.x * Scale + x) * 4 + 3] =
-                    hd[(HDCell - 1 - y) * HDCell + x];
+        for (unsigned y=0;y<HDCell;++y)for(unsigned x=0;x<HDCell;++x) {
+            const unsigned row=HDCell-1-y;
+            const auto ink=hd[row*HDCell+x];
+            const auto dest=((match.y*Scale+y)*wide+match.x*Scale+x)*4;
+            out[dest+3]=ink;
+            if(outline<=0 || ink==255)continue;
+            const auto alpha=[&](int ix,int iy) {
+                return unsigned(ix)<HDCell && unsigned(iy)<HDCell?hd[iy*HDCell+ix]/255.f:0.f;
+            };
+            float uncovered=1;
+            for(int ring=1;ring<=std::ceil(outline);++ring) {
+                const float radius=std::min(float(ring),outline)*Scale;
+                for(int dy=-1;dy<=1;++dy)for(int dx=-1;dx<=1;++dx)if(dx || dy) {
+                    const float sx=x+dx*radius,sy=row+dy*radius;
+                    const int ix=int(std::floor(sx)),iy=int(std::floor(sy));
+                    uncovered*=1-std::lerp(std::lerp(alpha(ix,iy),alpha(ix+1,iy),sx-ix),
+                                          std::lerp(alpha(ix,iy+1),alpha(ix+1,iy+1),sx-ix),sy-iy);
+                }
+            }
+            // Store rim coverage separately. Filtering both coverage channels
+            // before division keeps the native fill color and fade at the edge.
+            out[dest]=std::lround((255-ink)*(1-uncovered));
+            out[dest+3]=ink+out[dest];
+        }
     }
     redrawn_glyphs += unsigned(matches.size());
     return out;

@@ -133,6 +133,30 @@ struct Hook {
     std::array<float,4> remainder{};
     std::int64_t frame_us=0,landing_start_us=0;
     bool landing_clock=false;
+    std::array<float,2> save_focus{},death_focus{};
+    template<class M> void UpdateStoneFocus(M& m,float dt) {
+        const bool save=fast && SaveMenu::Active(m);
+        const auto owner=DeathMenu::Controller(m);
+        const auto state=owner?(m.Read(owner+8).value_or(0)&255):0;
+        const bool death=state>=3 && state<=15 && DeathMenu::Drawable(m,owner);
+        if(!save && !death && save_focus==std::array<float,2>{} && death_focus==std::array<float,2>{})return;
+        const auto settings=FileSelect::GetStoneFocusSettings();
+        unsigned save_part=SaveMenu::Count,death_part=SaveMenu::Count;
+        if(save && SaveMenu::CurrentInputPage(m)==SaveMenu::InputPage::Save)
+            save_part=SaveMenu::SelectedSaveControl(m);
+        if(death && DeathMenu::Selectable(state)) {
+            const auto choice=m.Read(owner+0x10).value_or(2);
+            if(choice<2)death_part=choice==0?SaveMenu::Save:SaveMenu::DontSave;
+        }
+        const auto scales=[&](auto& amount,unsigned part,bool active) {
+            const auto eased=StoneFocus::Advance(amount,part,{active && settings.enabled,settings.seconds},dt);
+            return std::array{StoneFocus::Scale(eased[0]),StoneFocus::Scale(eased[1])};
+        };
+        DeathMenu::focus_scale=scales(death_focus,death_part,death);
+        const auto scales_for_save=scales(save_focus,save_part,save);
+        std::scoped_lock lock{SaveMenu::mutex};
+        SaveMenu::focus_scale=scales_for_save;
+    }
     float LandingFrame() const {
         // Native setup displays the unexpanded copy for one 30 Hz tick,
         // then samples 0..5 over six ticks. Preserve that initial hold too.
@@ -224,6 +248,7 @@ struct Hook {
             return;
         }
         if(site==0) {
+            const float dt=frame_us>0 && now>=frame_us?std::min(.3f,float(now-frame_us)/1e6f):1.f/60;
             frame_us=now;
             if(!PauseMenu::Active(m) || now<landing_start_us ||
                m.Read(0x5066f8+0x34)!=std::optional<U32>{11})landing_clock=false;
@@ -232,17 +257,18 @@ struct Hook {
             fast=r[5]==Renderer && PauseMenu::Active(m);
             boss_fast=r[5]==Renderer && BossSelector(m);
             const bool was_death=death_fast;
-            death_fast=r[5]==Renderer && DeathMenu::CodeMatches(m) && DeathMenu::FastTransition(m);
+            death_fast=r[5]==Renderer && DeathMenu::CodeMatches(m) && DeathMenu::FastPresentation(m);
             death_half=death_fast && was_death && !death_half;
             DeathMenu::half_frame=death_fast;DeathMenu::extra_frame=death_half;
             SaveMenu::animate=fast;
+            if(r[5]==Renderer)UpdateStoneFocus(m,dt);
             if(!SaveMenu::Active(m) || (m.Read(SaveMenu::Owner+0x28)==2 &&
                m.Read(SaveMenu::Owner+0x24)==1))SaveMenu::returning_from_options=false;
             const bool keyboard=r[5]==Renderer && FileSelect::NameActive(m);
             file.Frame(r[5]==Renderer && (keyboard || FileSelect::Active(m)) && FileSelectTiming::CodeMatches(m));
             using Interpolation::MenuPage;
             Interpolation::menu_page=file.active?(keyboard?MenuPage::NameEntry:MenuPage::FileSelect):
-                fast?PauseMenu::PresentationPage(m):MenuPage::None;
+                death_fast?MenuPage::Death:fast?PauseMenu::PresentationPage(m):MenuPage::None;
             if(!fast) {preview_fraction=0;preview_owner=0;remainder={};}
             if(m.Read(0x5066f8+0x34)!=std::optional<U32>{9})remainder={};
             r[0]+=(fast || death_fast || file.active || boss_fast)?1:2;

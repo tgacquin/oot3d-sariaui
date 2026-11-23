@@ -7,7 +7,16 @@
 #include <span>
 #include <vector>
 
+namespace OOT3D::HUD {struct RupeeDigitOutline;}
 namespace OOT3D::HDFont {
+// Four texels per native pixel, with padding for the widest allowed outline.
+struct GauntletTitle {
+    static constexpr unsigned Width=512, Height=128, Scale=4, Padding=4;
+    std::vector<std::uint32_t> pixels;
+    unsigned advance=0;
+};
+GauntletTitle MakeGauntletTitle(bool bold,const HUD::RupeeDigitOutline& outline);
+
 struct RupeeShadow {
     bool enabled=true;
     float x=.75f,y=.75f,blur=0,strength=.8f;

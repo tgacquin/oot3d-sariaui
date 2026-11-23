@@ -37,6 +37,29 @@ int main() {
                d.scale_x==dpad.group.scale_x && d.scale_y==dpad.group.scale_y);
     };
     unchanged();
+    // Epona race layout: the HD digits rise above the clock and the carrot
+    // shadow extends below the 24px sprites. Check both edges after scaling.
+    {
+        auto race=baseline;
+        race[HUD::Timer]={11.7f,-5.8f,.86f};
+        race[HUD::Carrots]={0,182,.71f};
+        race.hd_timer_text={-1.2f,-1.4f,1.22f};
+        race.carrot_shadow={true,1.5f,1.4f,.8f};
+        race.padding={-2,-3,0,0};
+        for(bool hd:{false,true})for(float authored:{1.f,1.5f,2.f}) {
+            race.hd_numbers=hd;race.overall_scale=authored;HUD::SetLayout(race,false);
+            UserHUD::Layout user;user.overall_scale=2;UserHUD::SetLayout(user,false);
+            const auto h=HUD::GetEffectiveLayout();
+            const float row_bottom=20+h[HUD::Carrots].y+12*h[HUD::Carrots].scale+1.4f;
+            const float timer_top=216+h[HUD::Timer].y+(hd?-2.4f:-1.f)*h[HUD::Timer].scale;
+            assert(timer_top-row_bottom>=1.999f && h[HUD::Carrots].x==0);
+        }
+        race.overall_scale=1;HUD::SetLayout(race,false);UserHUD::SetLayout({},false);
+        assert(HUD::GetEffectiveLayout()[HUD::Carrots].y==180);
+        UserHUD::Layout apart;apart.overall_scale=2;apart[UserHUD::Carrots].x=-300;
+        UserHUD::SetLayout(apart,false);assert(HUD::GetEffectiveLayout()[HUD::Carrots].y==180);
+        HUD::SetLayout(baseline,false);UserHUD::SetLayout({},false);
+    }
     // F1 moves the authored edges on top of the player's existing offsets.
     // Composing either layout must never bake F1 padding into a player preset.
     UserHUD::Layout personal_padding{};

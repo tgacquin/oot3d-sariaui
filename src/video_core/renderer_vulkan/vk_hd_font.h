@@ -31,7 +31,8 @@ public:
         });
     }
     vk::ImageView Get(TextureRuntime& runtime, const OOT3D::HDFont::Descriptor& d,
-                      u64 hash, std::span<const u8> tiled, std::span<const u8> generated = {},u64 variant=0) {
+                      u64 hash, std::span<const u8> tiled, std::span<const u8> generated = {},u64 variant=0,
+                      std::optional<bool> boss_bold={},float boss_outline=0) {
         const auto generation = OOT3D::HDFont::ArtworkGeneration();
         for (auto& entry : entries) {
             // Identical custom text atlases are used by several guest meshes.
@@ -66,7 +67,7 @@ public:
                 }
             }
             rebuilt = d.format==9 ? OOT3D::HDFont::RedrawSystem(alpha,d.width,d.height) :
-                OOT3D::HDFont::Redraw(alpha, d.width, d.height);
+                OOT3D::HDFont::Redraw(alpha,d.width,d.height,boss_bold,boss_outline);
         }
         const auto pixels = generated.empty() ? std::span<const u8>(rebuilt) : generated;
         if (pixels.empty()) {

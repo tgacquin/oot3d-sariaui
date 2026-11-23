@@ -380,6 +380,7 @@ union UserConfig {
     BitField<0, 1, u32> use_custom_normal;
     BitField<1, 1, u32> hud_colors;
     BitField<2, 1, u32> torch_fog;
+    BitField<3, 1, u32> boss_text;
 
     // Whether a FSConfig + UserConfig combination can be
     // cached to disk. Right now, this is true if the

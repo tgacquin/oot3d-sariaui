@@ -58,6 +58,11 @@ int main(int argc, char** argv) {
     // actual selected values so authoring a new release never breaks this test.
     Check(Prepare(root + "/player",true));
     QSettings player_editor(root + "/player/oot3d-editor.ini",QSettings::IniFormat);
+    for (const auto& key : player_editor.allKeys()) Check(!key.startsWith("UserHUD/"));
+    for (const auto& key : editor.allKeys()) {
+        if (key.startsWith("HUD/") || key.startsWith("HDNumbers/"))
+            Check(player_editor.value(key)==editor.value(key));
+    }
     QSettings player_qt(root + "/player/qt-config.ini",QSettings::IniFormat);
     QSettings choices(":/oot3d/defaults/player.ini",QSettings::IniFormat);
     for (const auto& group : {QStringLiteral("presentation"),QStringLiteral("runtime")}) {

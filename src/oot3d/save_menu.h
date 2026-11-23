@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "oot3d/title_hooks.h"
+#include "oot3d/stone_focus.h"
 #include <atomic>
 #include <mutex>
 #include <vector>
@@ -15,7 +16,7 @@ constexpr std::array Labels{"Don't save button","Save button","Prompt box and te
 constexpr std::array<std::array<float,2>,Count> Anchors{{
     {96,120},{224,120},{160,24},{28,220},{160,220},{160,120},{200,195},{52,220},{268,220},{160,204}}};
 struct Pose {float x=0,y=0,scale=1;};
-struct Layout : std::array<Pose,Count> {float darkness=.45f;bool hide_header=false;std::array<Pose,2> prompts{};};
+struct Layout : std::array<Pose,Count> {float darkness=.45f;bool hide_header=false;std::array<Pose,2> prompts{};std::array<float,2> focus_scale{1,1};};
 inline Layout layout;
 inline std::mutex mutex;
 inline std::atomic<bool> dirty{false},on_top{false};
@@ -46,6 +47,12 @@ template<class M> Animation CurrentAnimation(M& m) {
     if(state==7 || state==8)return {1-ease,1,18*ease};
     if(state==9)return {0,1,18}; // Saving: buttons remain hidden until the next prompt.
     return {};
+}
+// Render-only snapshot. The editor persists the authored stone sizes.
+inline std::array<float,2> focus_scale{1,1};
+inline Layout GetFrameLayout() {
+    std::scoped_lock lock{mutex};
+    auto frame=layout;frame.focus_scale=focus_scale;return frame;
 }
 inline Layout GetLayout() {std::scoped_lock lock{mutex};return layout;}
 inline void SetLayout(const Layout& value,bool save=true) {
@@ -118,6 +125,10 @@ template<class M> InputPage CurrentInputPage(M& m) {
     }
     return InputPage::Hidden;
 }
+template<class M> Part SelectedSaveControl(M& m) {
+    if(m.Read(Owner+0x38).value_or(0)!=0)return Options;
+    return m.Read(Owner+0x34).value_or(1)?Save:DontSave;
+}
 template<class M> std::optional<Part> PromptPart(M& m,U32 model) {
     for(U32 off:{0x1cu,0x20u}) {
         const U32 text=m.Read(Owner+off).value_or(0);
@@ -134,6 +145,9 @@ template<class M> bool PromptModel(M& m,U32 model) {return PromptPart(m,model).h
 // Warning controls add to the existing prompt layout so saved arrangements
 // remain unchanged until the new controls are adjusted.
 inline Pose ControlPose(Part part,const Layout& poses) {
+    if(part==Save || part==DontSave) {
+        auto p=poses[part];p.scale*=poses.focus_scale[part];return p;
+    }
     if(part!=CardWarning)return poses[part];
     const auto base=poses[Prompt],extra=poses[CardWarning];
     return {base.x+extra.x,base.y+extra.y+.8f*(Anchors[CardWarning][1]-Anchors[Prompt][1])*(base.scale-1),
@@ -177,7 +191,7 @@ template<class M> bool CopyPositions(M& m,U32 mesh,U32 dst,U32 src,U32 bytes) {
     if(!Active(m) || (!atlas && !labels && !selection) ||
        bytes!=(atlas?78u:8u)*48 || !TitleScreen::Pointer(src,bytes) ||
        !TitleScreen::Pointer(dst,bytes))return false;
-    const auto poses=GetLayout();
+    const auto poses=GetFrameLayout();
     for(const auto& p:poses)if(!Valid(p))return false;
     std::vector<std::array<float,12>> quads(bytes/48);
     for(unsigned q=0;q<quads.size();++q)
@@ -191,9 +205,7 @@ template<class M> bool CopyPositions(M& m,U32 mesh,U32 dst,U32 src,U32 bytes) {
     const U32 offsets=m.Read(helper+0x1c).value_or(0);
     for(unsigned q=0;q<quads.size();++q) {
         const auto part=selection?
-            (page==InputPage::Save?std::optional<Part>{
-                m.Read(Owner+0x38).value_or(0)==0?
-                    (m.Read(Owner+0x34).value_or(1)?Save:DontSave):Options}:
+            (page==InputPage::Save?std::optional<Part>{SelectedSaveControl(m)}:
                 page==InputPage::Options?std::optional<Part>{
                     m.Read(Owner+0x30).value_or(0)==3?Cancel:
                     m.Read(Owner+0x30).value_or(0)==4?Okay:OptionsItems}:std::nullopt):
@@ -314,7 +326,8 @@ inline std::optional<std::array<float,2>> MapPointer(float u,float v,float width
         return {};
     }
     for(Part part:{Back,Save,DontSave}) {
-        const auto p=poses[part];if(!Valid(p))continue;
+        if(!Valid(poses[part]))continue;
+        const auto p=ControlPose(part,poses);
         const auto a=Anchors[part];
         const float nx=a[0]+(x-a[0]-p.x/.8f)/p.scale,ny=a[1]+(y-a[1]-p.y/.8f)/p.scale;
         const float left=part==Back?4:part==Save?164:39;

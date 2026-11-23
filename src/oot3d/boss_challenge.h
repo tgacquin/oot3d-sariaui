@@ -91,13 +91,16 @@ inline ShadowGeometry PreviewShadow(const Layout& l) {
     return g;
 }
 // The gauntlet has no boss-intro artwork; retain its menu label only.
-inline FileStatusText::Geometry NameGeometry(const Layout& l,unsigned selected,const FileStatusText::Assets& font) {
-    const auto p=l[BossName];if(selected!=8 || !Valid(p))return {};
-    constexpr std::string_view name="Boss Gauntlet";float width=0;
-    for(auto c:FileStatusText::Codepoints(name))if(const auto glyph=font.Find(c))width+=(glyph->width+1)*p.scale;
-    return FileStatusText::Text(font,name,p.x-width/2,p.y,width+1,p.scale);
-}
 using TitleGeometry=PausePrompts::QuadGeometry<1>;
+inline TitleGeometry NameGeometry(const Layout& l,unsigned selected,const HDFont::GauntletTitle& title) {
+    TitleGeometry g;
+    const auto p=l[BossName];
+    if(selected!=8 || !Valid(p) || !title.advance)return g;
+    const float pad=title.Padding,width=title.advance+1+2*pad,height=16+2*pad;
+    g.Add(p.x-(title.advance*.5f+pad)*p.scale,p.y-(18+pad)*p.scale,width*p.scale,height*p.scale,
+          0,0,width*title.Scale/title.Width,height*title.Scale/title.Height);
+    return g;
+}
 inline TitleGeometry NativeNameGeometry(const Layout& l,unsigned selected) {
     TitleGeometry g;const auto p=l[BossName];if(selected>=8 || !Valid(p))return g;
     const float w=128*p.scale,h=32*p.scale;
@@ -129,7 +132,7 @@ inline HintGeometry NavigationHints(const Layout& l,float bob) {
 inline PausePrompts::Pair ButtonPrompts(const Layout& l,const PausePrompts::Assets& assets) {
     FileSelect::Layout shared;
     for(unsigned i=0;i<2;++i) {const auto p=l[SelectPrompt+i];shared.prompts[i]={p.x,p.y,p.scale};}
-    return FileSelect::Prompts(shared,assets,1);
+    return FileSelect::Prompts(shared,assets,1,false,FileSelect::PromptAnchor::Group);
 }
 inline std::optional<std::array<float,2>> MapPointer(float u,float v,float width) {
     if(!std::isfinite(u) || !std::isfinite(v) || !std::isfinite(width) || width<=0)return {};
@@ -160,7 +163,10 @@ struct Hook {
     float hint_bob=0;
     GuestUI::Hook<PausePrompts::Geometry,PausePrompts::IconWidth,PausePrompts::IconHeight,4> icons;
     GuestUI::Hook<PausePrompts::TextGeometry,PausePrompts::TextWidth,PausePrompts::TextHeight> text;
-    GuestUI::Hook<FileStatusText::Geometry,FileStatusText::Width,FileStatusText::Height> name;
+    GuestUI::Hook<TitleGeometry,HDFont::GauntletTitle::Width,HDFont::GauntletTitle::Height> name;
+    HDFont::GauntletTitle name_image;
+    HUD::RupeeDigitOutline name_outline;
+    bool name_bold=false;
     GuestUI::Hook<TitleGeometry,BossTitle::Width,BossTitle::Height> title;
     std::shared_ptr<const BossTitle::Pixels> title_assets;
     BossBorder::Hook border;
@@ -169,7 +175,6 @@ struct Hook {
     FileSelect::Layout backdrop_layout;
     FileParticles::Animation particle_animation;
     std::shared_ptr<const PausePrompts::Assets> prompt_assets;
-    std::shared_ptr<const FileStatusText::Assets> name_assets;
     PausePrompts::TextGeometry lettering;
     U32 background_source=0;
     std::optional<U32> selection_return;
@@ -278,10 +283,16 @@ struct Hook {
         if(const auto found=selector_models.find(model);found!=selector_models.end())m.Write(alpha,found->second.alpha);
     }
     float timer_opacity=0;
+    bool StatTextDraw() const {
+        return active && stage==Stage::Native && ((pane==10 && results) || ((pane==20 || pane==22) && presenting));
+    }
     bool TimerDraw() const {return stage==Stage::Native && pane>=210 && pane<=217;}
     template<class M> static float GameplayTimerOpacity(M& m,bool in_battle,float hud) {
         const U32 play=m.Read(HUDFade::UI+0xc).value_or(0);
-        if(!in_battle || !HUDFade::GameplayReady(m,play) || !std::isfinite(hud))return 0;
+        // The native clock at 41dd0c reads byte +0xd before advancing.
+        // Both victory portal paths (34ac54 and 34acb0) clear it immediately.
+        const bool running=(m.Read(Owner+0xc).value_or(0)&0xff00)!=0;
+        if(!in_battle || !running || !HUDFade::GameplayReady(m,play) || !std::isfinite(hud))return 0;
         return std::clamp(hud,0.f,1.f);
     }
     bool Drawing() const {return active && (border.Drawing() || background.Drawing() || shadow.Drawing() || vignette.Drawing() || particles.Drawing() ||
@@ -325,7 +336,7 @@ struct Hook {
     }
     struct SamplerRestore {U32 mesh=0,mag=0,min=0;};
     std::array<SamplerRestore,2> title_samplers{},draw_samplers{};
-    std::array<U32,2> failed_models{};
+    std::array<U32,2> title_models{};
     template<class M> void RestoreTitleFilter(M& m) {
         for(auto& sampler:draw_samplers)if(sampler.mesh) {
             m.Write(sampler.mesh+0x13c,sampler.mag);m.Write(sampler.mesh+0x140,sampler.min);sampler={};
@@ -333,13 +344,14 @@ struct Hook {
         for(auto& sampler:title_samplers)if(sampler.mesh) {
             m.Write(sampler.mesh+0x13c,sampler.mag);m.Write(sampler.mesh+0x140,sampler.min);sampler={};
         }
-        failed_models={};
+        title_models={};
     }
-    template<class M> void FilterFailedTitle(M& m,U32 native_pane) {
+    static constexpr bool ResultTitle(unsigned index) {return (index>=6 && index<=8) || index==12;}
+    template<class M> void FilterResultTitle(M& m,U32 native_pane) {
         for(unsigned i=0;i<2;++i) {
             const U32 model=m.Read(native_pane+0x64+i*4).value_or(0);
             if(!TitleScreen::Pointer(model,0x1e4) || m.Read(model)!=0x4ebd60)continue;
-            failed_models[i]=model;
+            title_models[i]=model;
             const U32 mesh=m.Read(model+4).value_or(0);
             if(!TitleScreen::Pointer(mesh,0x19c) || (i && mesh==title_samplers[0].mesh))continue;
             const auto mag=m.Read(mesh+0x13c),min=m.Read(mesh+0x140);
@@ -349,14 +361,14 @@ struct Hook {
         }
     }
     template<class M> void FilterTitleAtDraw(M& m,U32 model) const {
-        if(stage!=Stage::Native || pane!=7 ||
-           (model!=failed_models[0] && model!=failed_models[1]))return;
+        if(stage!=Stage::Native || !ResultTitle(pane) ||
+           (model!=title_models[0] && model!=title_models[1]))return;
         for(const auto& sampler:title_samplers)if(sampler.mesh) {
             m.Write(sampler.mesh+0x13c,1);m.Write(sampler.mesh+0x140,3);
         }
     }
     template<class M> void DrawMaterial(M& m,U32 renderer,U32 alpha) {
-        if(!active || stage!=Stage::Native || (!(pane>=6 && pane<=8) && pane!=12 && pane!=220 && !TimerDraw()))return;
+        if(!active || stage!=Stage::Native || (!ResultTitle(pane) && pane!=220 && !TimerDraw()))return;
         const U32 native=m.Read(NativeLayout+0x418+4*pane).value_or(0);
         const U32 model=m.Read(renderer+0x354).value_or(0);
         if(!model || (m.Read(native+0x64)!=model && m.Read(native+0x68)!=model))return;
@@ -391,12 +403,20 @@ struct Hook {
         if(!std::isfinite(alpha))return 0;
         if(!results)return std::clamp(alpha,0.f,1.f)*timer_opacity;
         const U32 label=m.Read(NativeLayout+0x418+220*4).value_or(0);
-        float limit=VisiblePane(m,label)?1.f:0.f;
+        if(!VisiblePane(m,label))return 0;
+        // Challenge animation 33 starts opaque at the gameplay origin. At
+        // key 52 its +128 Y translation aligns the digits with pane 220.
+        // Read the evaluated foreground matrix for both foreground and shadow.
+        const U32 model=m.Read(native+0x64).value_or(0);
+        if(!TitleScreen::Pointer(model,0x30))return 0;
+        const auto y=m.Read(model+0x28),result_y=m.Read(label+0x84);
+        if(!y || !result_y || !(std::abs(std::bit_cast<float>(*y)-
+            std::bit_cast<float>(*result_y))<=.5f))return 0;
         if(m.Read(native+0xc).value_or(0)!=0) {
             const float frame=std::bit_cast<float>(m.Read(native+0x18).value_or(0));
-            if(!std::isfinite(frame) || frame<=0)limit=0;
+            if(!std::isfinite(frame) || frame<=0)return 0;
         }
-        return std::clamp(alpha,0.f,limit);
+        return std::clamp(alpha,0.f,1.f);
     }
 
     template<class M> ScreenModels::Transform DrawTransform(M& m,U32 model) const {
@@ -528,7 +548,7 @@ struct Hook {
                 if(!TitleScreen::Pointer(p,0xb4) || m.Read(p+4)!=NativeLayout+0x18)continue;
                 SelectionPane(m,p,index+(bottom?256:0));
                 if(bottom) {routed[index]=p;++submitted;}
-                if(!bottom && index==7)FilterFailedTitle(m,p);
+                if(!bottom && ResultTitle(index))FilterResultTitle(m,p);
                 pane=index;r=saved;r[0]=p;r[14]=Sites[0].pc;r[15]=0x2f1280;return;
             }
             if(stage==Stage::Native) {
@@ -572,7 +592,7 @@ struct Hook {
         }
     }
     template<class M,class R> bool BeginOverlays(M& m,R& r) {
-        prompt_assets=PausePrompts::GetAssets();name_assets=FileStatusText::GetAssets();
+        prompt_assets=PausePrompts::GetAssets();
         title_assets=BossTitle::GetPixels();
         r=saved;stage=Stage::Hints;
         if(prompt_assets) {
@@ -606,16 +626,22 @@ struct Hook {
                 title.Begin(m,r,Sites[0].pc,NativeNameGeometry(frame_layout,selected),*title_assets,background_source);
                 if(title.Pending())return true;
             }
-            if(selected==8 && name_assets) {
-                name.Begin(m,r,Sites[0].pc,NameGeometry(frame_layout,selected,*name_assets),name_assets->pixels,background_source);
+            if(selected==8) {
+                const auto hud=HUD::GetLayout();
+                if(name_image.pixels.empty() || name_outline!=hud.rupee_digit_outline || name_bold!=hud.hd_numbers_bold) {
+                    auto image=HDFont::MakeGauntletTitle(hud.hd_numbers_bold,hud.rupee_digit_outline);
+                    if(!image.advance || (name.Owned(m) && !GuestUI::WriteTextureWords(m,name.texture,image.pixels)))return false;
+                    name_image=std::move(image);name_outline=hud.rupee_digit_outline;name_bold=hud.hd_numbers_bold;
+                }
+                name.Begin(m,r,Sites[0].pc,NameGeometry(frame_layout,selected,name_image),name_image.pixels,background_source);
                 if(name.Pending())return true;
             }
         }
         if(stage==Stage::Name) {
             if(selected<8 && title_assets) {title.Resume(m,r);if(title.Pending())return true;}
-            if(selected==8 && name_assets) {name.Resume(m,r);if(name.Pending())return true;}
+            if(selected==8) {name.Resume(m,r);if(name.Pending())return true;}
         }
-        prompt_assets.reset();name_assets.reset();title_assets.reset();return false;
+        prompt_assets.reset();title_assets.reset();return false;
     }
     template<class M,class R> void BeginShadow(M& m,R& r) {
         r=saved;

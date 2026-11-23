@@ -53,6 +53,19 @@ int main(int argc,char** argv) {
         }
         for(bool wide:{false,true}) {
             Widescreen::enabled=wide;Widescreen::supported_layout=true;
+            // An old off-edge X must respond to the first drag back into view.
+            F::Layout edited;edited.prompts[1]={400,220,.74f};
+            const auto edge=F::Prompts(edited,*image,1,true);
+            edited.prompts[1].x=F::VisiblePromptX(400,.74f)-1;
+            const auto inset=F::Prompts(edited,*image,1,true);
+            assert(std::abs(edge.icons.positions[0]-inset.icons.positions[0]-1)<.001f);
+            assert(std::abs(edge.text.positions[0]-inset.text.positions[0]-1)<.001f);
+            for(float x:{375.f,376.f,377.f}) {
+                edited.prompts[1].x=x;
+                const auto prompt=F::Prompts(edited,*image,1,true);
+                assert(std::abs(prompt.icons.positions[0]-x)<.001f);
+                for(unsigned q=0;q<prompt.text.count;++q)assert(prompt.text.positions[q*12+3]<x);
+            }
             for(float scale:{.5f,1.f,2.f,4.f})for(float offset:{-350.f,0.f,350.f}) {
                 F::Layout file;file.prompts[0]={offset,220,scale};file.prompts[1]={offset,210,scale};
                 const auto g=F::Prompts(file,*image,.4f);Safe(g.icons);Safe(g.text);

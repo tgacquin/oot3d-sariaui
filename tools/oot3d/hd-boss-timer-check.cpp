@@ -34,15 +34,23 @@ int main(int argc,char** argv) {
         assert(bold->variant!=atlas->variant && bold==StyledBossTimerAtlas(source->hash,{},true));
         assert(StyledBossTimerAtlas(source->hash,{},false)->rgba==atlas->rgba);
         const auto& out=atlas->rgba;assert(out.size()==512*256*64);
-        // Every pixel outside the twelve timer cells retains its exact color,
+        // Every pixel outside the timer and result banners retains its exact color,
         // alpha and orientation, including labels and the challenge panel.
+        std::array<unsigned,3> filtered{};
         for(unsigned y=0;y<1024;++y)for(unsigned x=0;x<2048;++x) {
             const unsigned nx=x/4,ny=y/4;
+            const unsigned banner=(nx>=208 && nx<504 && ny>=112 && ny<208)?unsigned(ny>=160):
+                (nx>=384 && nx<488 && ny<56)?2:3;
+            if(banner<3) {
+                filtered[banner]+=out[((1023-y)*2048+x)*4+3]!=source->native[(ny*512+nx)*4+3];
+                continue;
+            }
             if((ny>=208 && ny<229 && nx>=336 && nx<456) ||
                (ny>=232 && ny<253 && nx>=336 && nx<360))continue;
             for(unsigned c=0;c<4;++c)
                 assert(out[((1023-y)*2048+x)*4+c]==source->native[(ny*512+nx)*4+c]);
         }
+        for(auto changed:filtered)assert(changed>100);
         for(unsigned d=0;d<12;++d) {
             unsigned coverage=0,antialias=0;
             const unsigned cx=336+(d<10?d:d-10)*12,cy=d<10?208:232;

@@ -140,14 +140,16 @@ template<class M> bool Copy(M& m,U32 mesh,U32 dst,U32 src,U32 bytes) {
             m.Read(owner+0xc)==std::optional<U32>{0} &&
             owned(m.Read(owner+4).value_or(0),m.Read(owner+8).value_or(0),count);
     };
-    // Native 2f2448 mode 0 builds eight yellow cursor/glow corners from
-    // the same 128x128 atlas. Scope this to the dungeon-map controller.
-    const U32 cursor=m.Read(0x506cb0+0x1c).value_or(0);
-    const bool dungeon_cursor=TitleScreen::Pointer(cursor,0x38) &&
-        m.Read(cursor)==std::optional<U32>{mesh} && m.Read(cursor+0xc)==8 &&
-        m.Read(cursor+0x24)==0 &&
-        owned(m.Read(cursor+4).value_or(0),m.Read(cursor+8).value_or(0),8);
-    const bool map_sprites=map_owned(0x50,8) || map_owned(0x2c,25) || dungeon_cursor;
+    // Both map controllers construct the same eight mode-0 cursor corners
+    // (480e00 for the overworld and 481118 for dungeons).
+    const auto map_cursor=[&](U32 offset) {
+        const U32 cursor=m.Read(0x506cb0+offset).value_or(0);
+        return TitleScreen::Pointer(cursor,0x38) && m.Read(cursor)==mesh &&
+            m.Read(cursor+0xc)==8 && m.Read(cursor+0x24)==0 &&
+            owned(m.Read(cursor+4).value_or(0),m.Read(cursor+8).value_or(0),8);
+    };
+    const bool map_sprites=map_owned(0x50,8) || map_owned(0x2c,25) ||
+        map_cursor(0x1c) || map_cursor(0x4c);
     const U32 banner=m.Read(0x4fc648+0x38).value_or(0);
     const bool parchment=TitleScreen::Pointer(banner,0x18) &&
         owned(m.Read(banner+0x10).value_or(0),m.Read(banner+0x14).value_or(0),3);

@@ -61,7 +61,7 @@ template<class M> void Stationary(M& m,U32 helper,unsigned first,unsigned count)
     for(unsigned q=first;q<first+count;++q) {
         std::array<float,2> offset;
         std::array<float,12> vertices;
-        if(!TitleScreen::ReadFloats(m,offsets+q*8,offset) ||
+        if(!TitleScreen::ReadFloats(m,offsets+q*8,offset) || (offset[0]==0 && offset[1]==0) ||
            !TitleScreen::ReadFloats(m,positions+q*48,vertices))continue;
         if(std::abs(offset[0])>400 || std::abs(offset[1])>400)continue;
         for(unsigned v=0;v<4;++v)for(unsigned axis=0;axis<2;++axis)
