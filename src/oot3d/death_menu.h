@@ -33,7 +33,7 @@ inline bool Valid(const Pose& p) {
 constexpr U32 ControllerPointer=0x5c588c, LayoutOffset=0x2e0, PanesOffset=0xaf8;
 constexpr U32 PaneResourcesOffset=LayoutOffset+0x18;
 constexpr U32 FirstSVC=0xfff220;
-constexpr std::array<TitleScreen::Site,12> Sites{{
+constexpr std::array<TitleScreen::Site,13> Sites{{
     {0x300544,0xeb049d33,0xe2840dcb}, // Native top game-over draw.
     {0x2fde88,0x1bffccfc,0xe2844001}, // Bottom layout's conditional pane draw.
     {0x41c960,0xe3a03012,0xe3a02001}, // Title entrance finished: choose its next animation.
@@ -46,6 +46,7 @@ constexpr std::array<TitleScreen::Site,12> Sites{{
     {0x42755c,0xebfb3656,0xe5940004}, // Accepted Boss Challenge A/B.
     {0x4275a8,0xeafb3643,0xe28dd008}, // Boss Challenge Start/back tail call.
     {0x426fe0,0x0affffcb,0xe5940010}, // Save question: no A, allow B to decline saving.
+    {0x426ac8,0xe2865a01,0xe3500000}, // Save question setup, before testing Visions availability.
 }};
 inline U32 Instruction(U32 pc,U32 word) {
     for(unsigned i=0;i<Sites.size();++i)if(pc==Sites[i].pc && word==Sites[i].instruction)
@@ -254,6 +255,12 @@ struct Hook {
     U32 input_control=0,input_site=0,input_stage=0;
     std::array<U32,2> input_stack{};
     template<class M,class R> void Input(M& m,R& r,unsigned site,bool supported) {
+        if(site==12) {
+            r[5]=r[6]+0x1000; // Displaced ADD. The following CMP tests availability in r0.
+            // The native unavailable path hides the stone and clears its navigation flag.
+            if(supported && r[6]==Controller(m))r[0]=0;
+            return;
+        }
         if(site==10) {
             // Boss Challenge tests logical Start after HID remapping. The
             // caller has restored LR and the stack before this tail call.

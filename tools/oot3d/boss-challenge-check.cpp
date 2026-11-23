@@ -510,6 +510,27 @@ int main(int argc,char** argv) {
     cpu.ClearCache();cpu.Regs()=r;cpu.SetCpsr(0x10);e.remaining=100000;cpu.Run();r=cpu.Regs();
     assert(r[15]==Env::Stop+4 && r[13]==0x980000 && (e.Read(death+8).value()&255)==5);
     assert(e.Read(death+0x10)==1 && e.Read(death+0x24)==0);
+    // Finish native save-question setup with Visions unlocked, then navigate
+    // from either stone with the real D-pad and Circle Pad input masks.
+    constexpr U32 vision=death+0x1158;
+    e.Write(vision+0x18,0x10100);
+    for(unsigned i=0;i<4;++i) {
+        const U32 pane=0x896000+i*0x100;
+        e.Write(death+D::PanesOffset+(35+i)*4,pane);
+        e.Put<std::uint8_t>(pane+0x6c,1);
+    }
+    r={};r[0]=1;r[6]=death;r[13]=0x980000;r[15]=D::Sites[12].pc;
+    e.Write(r[13]+36,Env::Stop); // Saved LR above locals, d8 and r4-r9.
+    cpu.ClearCache();cpu.Regs()=r;cpu.SetCpsr(0x10);e.remaining=100000;cpu.Run();
+    assert(cpu.Regs()[15]==Env::Stop+4 && e.Get<std::uint8_t>(vision+0x1a)==0);
+    for(unsigned i=0;i<4;++i)assert(e.Get<std::uint8_t>(0x896000+i*0x100+0x6c)==0);
+    e.Write(death+8,0x10104);
+    for(U32 choice:{0u,1u})for(U32 down:{0x80u,0x80000000u}) {
+        e.Write(death+0x10,choice);e.Write(play+0x18,down);
+        r={};r[0]=death;r[13]=0x980000;r[14]=Env::Stop;r[15]=0x426e48;
+        cpu.Regs()=r;cpu.SetCpsr(0x10);e.remaining=100000;cpu.Run();
+        assert(cpu.Regs()[15]==Env::Stop+4 && e.Read(death+0x10)==choice);
+    }
     // A one-frame direction on either half of the render pair must reach
     // each native stone handler, including immediate reversals.
     e.Write(death+4,play);e.Write(death+0x10,1);

@@ -29,6 +29,16 @@ int main(int argc,char** argv) {
     }
     constexpr U32 owner=0x8000000,play=0x8100000,panes=0x8200000;
     m.words[D::ControllerPointer]=owner;m.words[owner+8]=0x10000;
+    // Even an unlocked Visions stone takes the native unavailable path in the
+    // single-screen layout. The original path and registers survive fallback.
+    for(bool supported:{false,true})for(U32 menu:{owner,play})for(U32 unlocked:{0u,1u}) {
+        D::Hook hook;std::array<U32,16> regs{};
+        regs[0]=unlocked;regs[6]=menu;regs[15]=D::Sites[12].pc+4;
+        auto expected=regs;expected[5]=menu+0x1000;
+        if(supported && menu==owner)expected[0]=0;
+        hook.Input(m,regs,12,supported);
+        assert(regs==expected);
+    }
     m.words[owner+D::LayoutOffset+4]=0x8300000;
     m.words[OOT3D::PauseMenu::UI+0xc]=play;m.words[OOT3D::PauseMenu::UI+0x14]=1;
     m.words[OOT3D::PauseMenu::UI+0x20]=0;m.words[OOT3D::PauseMenu::UI+0x24]=1;
