@@ -8,8 +8,8 @@ A custom version of Azahar is used as the backing engine.
 
 ## Features
 
-- Single screen HUD designed to emulate a console-like experience
 - Widescreen, increased FOV, and up to 120FPS interpolation
+- Single screen HUD designed to emulate a console-like experience
 - Gear, Items, and Map accessible all through one screen with item models and descriptions preserved
 - Built-in randomizer with presets and support for Original and Master Quest dungeon layouts. [Randomizer guide](RANDOMIZER.md)
 - Multiplayer for randomized files, with Host and Join options, shared progression, and an activity feed
