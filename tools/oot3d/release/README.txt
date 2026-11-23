@@ -20,7 +20,7 @@ Prepared targets
 Intel Mac and Linux ARM packages are not covered by this initial matrix.
 
 The oot3d-release.yml workflow has workflow_dispatch ONLY. It has read-only
-repository permissions, creates downloadable candidate artifacts, and has no
+repository permissions, creates downloadable player packages, and has no
 publishing job or tag trigger. The three inherited MM3D workflows were also
 made manual-only to prevent the first OoT repository push from running them.
 
@@ -34,15 +34,16 @@ Preparing a candidate
 3. Push the reviewed source. A push does not launch the build workflows.
 4. Enable Actions if needed. Standard GITHUB_TOKEN read access is sufficient
    for artifact builds; no signing credentials or personal access token needed.
-5. Select "SariaUI desktop release candidates" and run it when a build is
+5. Select "SariaUI desktop builds" and run it when a build is
    wanted. Choose linux-x86_64 (default), windows-x64, macos-arm64, or all in
-   the platform dropdown; no version input is needed.
+   the platform dropdown. For a public release, enable "Include the shared
+   source archive" on one run for that commit. Leave it off on test builds.
 
 Version naming
 --------------
 resources/oot3d/release-version.txt is shared by CMake and
 tools/oot3d/release/release_version.py. It controls application versions, CI
-artifact names, archive filenames, release.json and release-manifest.json.
+artifact names, archive filenames and the packaged release.json.
 Prereleases such as1.0.0-beta.1 retain their full label; numeric OS metadata
 uses1.0.0. The developer --version output also identifies its developer mode.
 Any explicit version arguments to build/preflight/package/collect must
@@ -50,8 +51,8 @@ match the shared file. Packaging rejects an app with a different version.
 
 What the workflow does
 ----------------------
-The source job verifies inputs, tests packaging rules with synthetic files,
-and archives the exact commit plus pinned submodule contents. Platform jobs
+The preparation job tests packaging rules with synthetic files. When source
+is requested, it verifies and archives the exact commit and pinned submodules. Platform jobs
 build in separate build-release-* directories with OoT enabled and MM disabled.
 They run selected checks that require no game data, bundle application
 dependencies, and include oot3d-seed alongside the executable on all platforms.
@@ -63,13 +64,10 @@ signatures. Linux checks the helper inside the extracted AppImage. Windows
 copies an allowlist of runtime files. Licenses and commit/version metadata are
 included; no local user configuration or game dump is packaged.
 
-Only the selected platforms receive build jobs. The final job requires each
-selected package plus source, verifies per-package checksums, and emits
-SHA256SUMS and release-manifest.json with the selected platforms recorded.
-The all selection still requires all three packages. Candidate artifact names
-end with the selection (for example, release-candidate-linux-x86_64).
-Failed selected jobs prevent a complete candidate. Logs are uploaded
-separately, including the resolved Linux container digest.
+Each selected platform validates its checkout and uploads one artifact containing
+the player package and its SHA-256 checksum. The optional source artifact also
+includes its checksum. Build output and the Linux image digest appear in the
+Actions job log.
 
 Limits / remaining release work
 ------------------------------

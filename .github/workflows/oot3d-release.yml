@@ -1,4 +1,4 @@
-name: SariaUI desktop release candidates
+name: SariaUI desktop builds
 run-name: SariaUI build — ${{ inputs.platform || 'linux-x86_64' }}
 
 # Preparation only: no push/tag trigger and no release publication permission.
@@ -15,6 +15,10 @@ on:
           - windows-x64
           - macos-arm64
           - all
+      include_source:
+        description: Include the shared source archive (once per release commit)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -27,7 +31,7 @@ jobs:
   hook-sites:
     uses: ./.github/workflows/oot3d-hook-sites.yml
 
-  source:
+  prepare:
     needs: hook-sites
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -38,7 +42,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
-          submodules: recursive
+          submodules: ${{ inputs.include_source && 'recursive' || 'false' }}
           persist-credentials: false
       - uses: actions/setup-python@v6
         with:
@@ -56,27 +60,35 @@ jobs:
           release_version=$(python3 tools/oot3d/release/release_version.py)
           echo "version=$release_version" >> "$GITHUB_OUTPUT"
           echo "RELEASE_VERSION=$release_version" >> "$GITHUB_ENV"
-      - name: Validate committed release inputs
+      - name: Validate committed source archive inputs
+        if: inputs.include_source
         run: python3 tools/oot3d/release/preflight.py "$RELEASE_VERSION"
       - name: Test packaging rules without a game
         run: python3 -m unittest discover -s tools/oot3d/release -p 'test_*.py'
       - name: Archive exact source and pinned submodules
-        run: python3 tools/mm3d/package_source.py "artifacts/SariaUI-$RELEASE_VERSION-Source.tar.gz"
-      - uses: actions/upload-artifact@v7
+        if: inputs.include_source
+        run: |
+          archive="SariaUI-$RELEASE_VERSION-Source.tar.gz"
+          python3 tools/mm3d/package_source.py "artifacts/$archive"
+          cd artifacts
+          sha256sum "$archive" > "$archive.sha256"
+      - name: Upload shared source archive
+        if: inputs.include_source
+        uses: actions/upload-artifact@v7
         with:
           name: SariaUI-${{ steps.release.outputs.version }}-Source
-          path: artifacts/*-Source.tar.gz
+          path: artifacts/*-Source.tar.gz*
           if-no-files-found: error
 
   desktop:
-    needs: source
+    needs: prepare
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.source.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 150
     env:
-      RELEASE_VERSION: ${{ needs.source.outputs.version }}
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
       RELEASE_PLATFORM: ${{ matrix.platform }}
       CCACHE_MAXSIZE: 2G
       CCACHE_COMPILERCHECK: content
@@ -139,20 +151,20 @@ jobs:
         run: |
           set -euo pipefail
           export PATH="$(cygpath -u "$CHECKOUT_GIT_DIR"):$PATH"
-          bash tools/oot3d/release/build.sh "$RELEASE_PLATFORM" "$RELEASE_VERSION" 2>&1 | tee release-build.log
+          bash tools/oot3d/release/build.sh "$RELEASE_PLATFORM" "$RELEASE_VERSION"
       - name: Build, check and package macOS
         if: matrix.platform == 'macos-arm64'
         shell: bash
         run: |
           set -euo pipefail
-          bash tools/oot3d/release/build.sh "$RELEASE_PLATFORM" "$RELEASE_VERSION" 2>&1 | tee release-build.log
+          bash tools/oot3d/release/build.sh "$RELEASE_PLATFORM" "$RELEASE_VERSION"
       - name: Build, check and package Linux in the existing toolchain image
         if: matrix.platform == 'linux-x86_64'
         shell: bash
         run: |
           set -euo pipefail
           docker pull "$LINUX_BUILD_IMAGE"
-          docker image inspect "$LINUX_BUILD_IMAGE" --format '{{json .RepoDigests}}' > linux-toolchain.log
+          docker image inspect "$LINUX_BUILD_IMAGE" --format '{{json .RepoDigests}}'
           df -h / "$GITHUB_WORKSPACE"
           docker run --rm --user "$(id -u):$(id -g)" \
             -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
@@ -160,57 +172,15 @@ jobs:
             -e CCACHE_MAXSIZE -e CCACHE_COMPILERCHECK \
             -e LANG=C.UTF-8 -e LC_ALL=C.UTF-8 \
             "$LINUX_BUILD_IMAGE" \
-            bash -c 'bash tools/oot3d/release/build.sh "$RELEASE_PLATFORM" "$RELEASE_VERSION"' \
-            2>&1 | tee release-build.log
+            bash -c 'bash tools/oot3d/release/build.sh "$RELEASE_PLATFORM" "$RELEASE_VERSION"'
       - name: Save compiler cache even after build failure
         if: always()
         uses: actions/cache/save@v5
         with:
           path: .ccache
           key: sariaui-${{ matrix.platform }}-ccache-v1-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Upload diagnostics
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: SariaUI-${{ needs.source.outputs.version }}-diagnostics-${{ matrix.platform }}
-          path: |
-            release-build.log
-            linux-toolchain.log
-            build-release-*/CMakeFiles/CMakeConfigureLog.yaml
-          if-no-files-found: ignore
       - uses: actions/upload-artifact@v7
         with:
-          name: SariaUI-${{ needs.source.outputs.version }}-package-${{ matrix.platform }}
+          name: SariaUI-${{ needs.prepare.outputs.version }}-package-${{ matrix.platform }}
           path: artifacts/*
           if-no-files-found: error
-
-  candidate:
-    needs: [source, desktop]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    env:
-      RELEASE_VERSION: ${{ needs.source.outputs.version }}
-      SELECTED_PLATFORM: ${{ inputs.platform || 'linux-x86_64' }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: SariaUI-${{ needs.source.outputs.version }}-package-*
-          merge-multiple: true
-          path: artifacts
-      - uses: actions/download-artifact@v4
-        with:
-          name: SariaUI-${{ needs.source.outputs.version }}-Source
-          path: artifacts
-      - name: Verify selected packages and write checksums
-        run: python3 tools/oot3d/release/collect.py artifacts "$RELEASE_VERSION" "$GITHUB_SHA" --platform "$SELECTED_PLATFORM"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: SariaUI-${{ needs.source.outputs.version }}-release-candidate-${{ inputs.platform || 'linux-x86_64' }}
-          path: artifacts/*
-          if-no-files-found: error
-      - name: Explain publication status
-        run: echo 'Candidate artifacts only. No tag or GitHub Release was created.' >> "$GITHUB_STEP_SUMMARY"
