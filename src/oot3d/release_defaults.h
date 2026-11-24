@@ -8,7 +8,7 @@
 
 namespace OOT3D::ReleaseDefaults {
 inline const QString VersionKey = QStringLiteral("SariaUI/defaults_version");
-inline constexpr int Version = 2;
+inline constexpr int Version = 3;
 
 inline bool IsUnconfiguredEditor(const QSettings& settings) {
     // The initial test build wrote only these fifteen migration placeholders.
@@ -68,6 +68,24 @@ inline bool Apply(QSettings& settings, const QString& resource, bool runtime, bo
         settings.value("PausePrompts/map_move/button/x").toDouble() == 0 &&
         settings.value("PausePrompts/map_return/button/x").toDouble() == 0) {
         settings.setValue("PausePrompts/map_return/x", 69);
+    }
+    // Adopt the corrected F1 layout only where the previous shipped value is still in use.
+    if (player && !runtime && previous_version < 3) {
+        const auto update_default = [&](const QString& key, float old_value) {
+            if (values.contains(key) && settings.value(key).toFloat() == old_value)
+                settings.setValue(key, values.value(key));
+        };
+        update_default(QStringLiteral("FileSelect/0/x"), 360.6f);
+        update_default(QStringLiteral("FileSelect/0/y"), 211.2f);
+        update_default(QStringLiteral("FileSelect/1/x"), 360.6f);
+        update_default(QStringLiteral("FileSelect/1/y"), 224.4f);
+        update_default(QStringLiteral("HUD/overall_scale"), .867184042930603f);
+        update_default(QStringLiteral("HUD/magic/height"), 2.02f);
+        update_default(QStringLiteral("HUD/magic/contour_width"), 1.09f);
+        update_default(QStringLiteral("HUD/magic/contour_height"), 1.09f);
+        update_default(QStringLiteral("HUD/carrots/opacity"), .74f);
+        update_default(QStringLiteral("HUD/carrots/shadow_opacity"), .8f);
+        update_default(QStringLiteral("PauseScreen/dungeon_floors/x"), 42.4f);
     }
     settings.setValue(VersionKey, Version);
     settings.sync();

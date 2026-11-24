@@ -58,6 +58,34 @@ int main(int argc, char** argv) {
     // actual selected values so authoring a new release never breaks this test.
     Check(Prepare(root + "/player",true));
     QSettings player_editor(root + "/player/oot3d-editor.ini",QSettings::IniFormat);
+    struct Change { const char* key; float previous; float authored; };
+    constexpr Change changes[] = {
+        {"FileSelect/0/x", 360.6f, 395.3f}, {"FileSelect/1/x", 360.6f, 395.3f},
+        {"FileSelect/0/y", 211.2f, 212.2f}, {"FileSelect/1/y", 224.4f, 224.f},
+        {"HUD/overall_scale", .867184042930603f, .944643497467041f},
+        {"HUD/magic/height", 2.02f, 2.14f},
+        {"HUD/magic/contour_width", 1.09f, 1.18f}, {"HUD/magic/contour_height", 1.09f, 1.18f},
+        {"HUD/carrots/opacity", .74f, 1.f}, {"HUD/carrots/shadow_opacity", .8f, .4f},
+        {"PauseScreen/dungeon_floors/x", 42.4f, 39.f},
+    };
+    player_editor.setValue(VersionKey, 2);
+    for (const auto& change : changes) {
+        Check(player_editor.value(change.key).toFloat() == change.authored);
+        player_editor.setValue(change.key, change.previous);
+    }
+    player_editor.sync();
+    Check(Prepare(root + "/player", true));
+    player_editor.sync();
+    for (const auto& change : changes)
+        Check(player_editor.value(change.key).toFloat() == change.authored);
+    Check(player_editor.value("FileSelect/0/scale").toFloat() == .74f);
+    Check(player_editor.value("FileSelect/1/scale").toFloat() == .74f);
+    player_editor.setValue(VersionKey, 2);
+    player_editor.setValue("FileSelect/1/x", 370);
+    player_editor.sync();
+    Check(Prepare(root + "/player", true));
+    player_editor.sync();
+    Check(player_editor.value("FileSelect/1/x").toInt() == 370);
     for (const auto& key : player_editor.allKeys()) Check(!key.startsWith("UserHUD/"));
     for (const auto& key : editor.allKeys()) {
         if (key.startsWith("HUD/") || key.startsWith("HDNumbers/"))
