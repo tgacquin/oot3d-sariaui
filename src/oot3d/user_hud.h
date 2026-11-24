@@ -24,6 +24,13 @@ constexpr std::array Labels{"Hearts", "Rupees", "Magic bar", "A button", "Loadin
 inline constexpr std::array EditableElements{DPad,Hearts,CounterGroup,Magic,Minimap,Timer,ShardAgony,Carrots};
 inline constexpr std::array ButtonElements{AButton,BButton,XButton,YButton,IButton,IIButton};
 struct Adjustment { float x=0, y=0, scale=0; }; // Scale is a percentage change.
+// The player sliders use a fixed neutral mark. Profiles and presets keep their
+// original absolute units, with zero meaning inherit the F1 artwork.
+struct MagicSlider {
+    float authored, neutral;
+    float Display(float stored) const { return stored == 0 ? neutral : stored / authored * neutral; }
+    float Override(float display) const { return display == neutral ? 0.f : display / neutral * authored; }
+};
 inline constexpr int SidePaddingLimit=100,VerticalPaddingLimit=40;
 struct Padding {
     int top=0,bottom=0,left=0,right=0;

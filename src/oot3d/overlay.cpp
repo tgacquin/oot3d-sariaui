@@ -840,11 +840,18 @@ void Overlay::Draw(vk::CommandBuffer command, vk::Framebuffer framebuffer,
                                     if(ImGui::IsItemHovered())ImGui::SetTooltip("Zero uses the default spacing. Negative brings hearts closer together. Positive moves them apart.");
                                 }
                                 if(i==UserHUD::Magic) {
-                                    float height=layout.magic_height==0 ? authored.magic_height : layout.magic_height;
-                                    float border=layout.magic_outer_thickness;
-                                    if(border==0)border=(authored.magic_contour.width+authored.magic_contour.height)*.5f;
-                                    if(DrawMagicBorderThickness(border)) {layout.magic_outer_thickness=border;changed=true;}
-                                    if(ImGui::SliderFloat("Height",&height,1,8,"%.2fx",ImGuiSliderFlags_AlwaysClamp)) {layout.magic_height=height;changed=true;}
+                                    const auto dimension = [&](const char* label, float& stored, UserHUD::MagicSlider slider, float minimum) {
+                                        float display = slider.Display(stored);
+                                        if (ImGui::SliderFloat(label, &display, slider.Display(minimum), slider.Display(8.f),
+                                                               "%.2fx", ImGuiSliderFlags_AlwaysClamp)) {
+                                            stored = slider.Override(display);
+                                            changed = true;
+                                        }
+                                    };
+                                    const auto& contour = authored.magic_contour;
+                                    dimension("Outer border thickness", layout.magic_outer_thickness,
+                                              {(contour.width + contour.height) * .5f, 1.f}, .25f);
+                                    dimension("Height", layout.magic_height, {authored.magic_height, 2.f}, 1.f);
                                     changed|=ImGui::SliderFloat("Width",&layout.magic_width,.5f,4,"%.2fx",ImGuiSliderFlags_AlwaysClamp);
                                 }
                                 if(ImGui::Button("Reset")) {

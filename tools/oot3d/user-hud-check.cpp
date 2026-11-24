@@ -37,6 +37,13 @@ int main() {
                d.scale_x==dpad.group.scale_x && d.scale_y==dpad.group.scale_y);
     };
     unchanged();
+    for (const UserHUD::MagicSlider slider : {UserHUD::MagicSlider{1.18f, 1.f}, {2.14f, 2.f}}) {
+        assert(slider.Display(0) == slider.neutral);
+        assert(slider.Override(slider.neutral) == 0);
+        assert(Near(slider.Override(slider.neutral * 1.5f), slider.authored * 1.5f));
+        for (float saved : {1.09f, 2.02f, 4.f, 8.f})
+            assert(Near(slider.Override(slider.Display(saved)), saved));
+    }
     // Epona race layout: the HD digits rise above the clock and the carrot
     // shadow extends below the 24px sprites. Check both edges after scaling.
     {
