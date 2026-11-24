@@ -138,6 +138,7 @@
 #include "citra_qt/game_list.h"
 #include "citra_qt/hotkeys.h"
 #include "citra_qt/fullscreen_shortcut.h"
+#include "citra_qt/game_window_geometry.h"
 #include "citra_qt/loading_screen.h"
 #include "citra_qt/movie/movie_play_dialog.h"
 #include "citra_qt/movie/movie_record_dialog.h"
@@ -206,6 +207,14 @@ Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin);
 #endif
 
 constexpr int default_mouse_timeout = 2500;
+
+static bool UseWindowsPlayerWindow() {
+#if defined(Q_OS_WIN) && defined(ENABLE_OOT3D_PRESENTATION)
+    return OOT3D::IsPlayerBuild();
+#else
+    return false;
+#endif
+}
 
 /**
  * "Callouts" are one-time instructional messages shown to the user. In the config settings, there
@@ -369,7 +378,11 @@ GMainWindow::GMainWindow(Core::System& system_)
 #ifdef ENABLE_OOT3D_PRESENTATION
     UISettings::values.single_window_mode = true;
     UISettings::values.show_status_bar = false;
-    if (UISettings::values.first_start) UISettings::values.fullscreen = true;
+    if (UseWindowsPlayerWindow()) {
+        UISettings::values.fullscreen = false; // --fullscreen can still override this launch.
+    } else if (UISettings::values.first_start) {
+        UISettings::values.fullscreen = true;
+    }
 #endif
     QStringList args = QApplication::arguments();
 #ifdef ENABLE_MM3D_GAME_FOLDER
@@ -557,7 +570,8 @@ GMainWindow::GMainWindow(Core::System& system_)
     InitializeSaveStateMenuActions();
     InitializeHotkeys();
 
-    SetDefaultUIGeometry();
+    if (!UseWindowsPlayerWindow())
+        SetDefaultUIGeometry();
     RestoreUIState();
 
     ui->action_Dump_Video->setChecked(video_dumping_on_start);
@@ -1237,12 +1251,7 @@ void GMainWindow::InitializeHotkeys() {
 
 void GMainWindow::SetDefaultUIGeometry() {
 #ifdef ENABLE_MM3D_GAME_FOLDER
-    const QRect available = screen()->availableGeometry();
-    const int unit = std::max(1, std::min(available.width() * 4 / 5 / 16,
-                                         available.height() * 4 / 5 / 9));
-    const QSize size(16 * unit, 9 * unit);
-    setGeometry(QRect(available.center() - QPoint(size.width() / 2, size.height() / 2),
-                      size));
+    setGeometry(GameWindowGeometry::Centered(screen()->availableGeometry()));
 #else
     // geometry: 55% of the window contents are in the upper screen half, 45% in the lower half
     const QRect screenRect = screen()->geometry();
@@ -1258,10 +1267,16 @@ void GMainWindow::SetDefaultUIGeometry() {
 
 void GMainWindow::RestoreUIState() {
 #ifndef ENABLE_MM3D_GAME_FOLDER
-    restoreGeometry(UISettings::values.geometry);
+    if (UseWindowsPlayerWindow())
+        GameWindowGeometry::RestoreWindowed(*this, UISettings::values.geometry);
+    else
+        restoreGeometry(UISettings::values.geometry);
 #endif
     restoreState(UISettings::values.state);
-    render_window->restoreGeometry(UISettings::values.renderwindow_geometry);
+    // The embedded renderer follows its parent layout. A saved standalone
+    // window rectangle can displace it until the next layout update.
+    if (!UseWindowsPlayerWindow())
+        render_window->restoreGeometry(UISettings::values.renderwindow_geometry);
     secondary_window->restoreGeometry(UISettings::values.secondarywindow_geometry);
 #if MICROPROFILE_ENABLED
     microProfileDialog->restoreGeometry(UISettings::values.microprofile_geometry);
@@ -2468,8 +2483,7 @@ void GMainWindow::ConnectWidgetEvents() {
             else if(OOT3D::configure_fullscreen_shortcut.exchange(false))
                 OnConfigurePresentationShortcut(false);
             if(OOT3D::fullscreen_requested.exchange(false)) {
-                ui->action_Fullscreen->setChecked(!ui->action_Fullscreen->isChecked());
-                ToggleFullscreen();
+                ui->action_Fullscreen->trigger();
                 UpdateUISettings();config->Save();
             }
         }
@@ -5067,6 +5081,14 @@ void GMainWindow::ToggleFullscreen() {
         ui->action_Fullscreen->toggle();
         ToggleSecondaryFullscreen();
     } else {
+        if (UseWindowsPlayerWindow()) {
+            const QWidget* window = ui->action_Single_Window_Mode->isChecked() ? static_cast<QWidget*>(this) : render_window;
+            ui->action_Fullscreen->setChecked(!window->isFullScreen());
+            const QRect frame = window->frameGeometry();
+            LOG_INFO(Frontend, "Windows player fullscreen toggle from {} at ({}, {}) {}x{}",
+                     window->isFullScreen() ? "fullscreen" : "windowed", frame.x(), frame.y(),
+                     frame.width(), frame.height());
+        }
         if (ui->action_Fullscreen->isChecked()) {
             ShowFullscreen();
         } else {
@@ -5097,7 +5119,8 @@ void GMainWindow::ToggleSecondaryFullscreen() {
 
 void GMainWindow::ShowFullscreen() {
     if (ui->action_Single_Window_Mode->isChecked()) {
-        UISettings::values.geometry = saveGeometry();
+        if (!isFullScreen())
+            UISettings::values.geometry = saveGeometry();
 #if !defined(ENABLE_OOT3D_PRESENTATION) || !defined(__APPLE__)
         ui->menubar->hide();
 #endif
@@ -5130,7 +5153,10 @@ void GMainWindow::HideFullscreen() {
         WindowCornerManager::instance().blockRoundedCorners(this, false);
 #endif
         showNormal();
-        restoreGeometry(UISettings::values.geometry);
+        if (UseWindowsPlayerWindow())
+            GameWindowGeometry::RestoreWindowed(*this, UISettings::values.geometry);
+        else
+            restoreGeometry(UISettings::values.geometry);
     } else {
 #ifdef NEEDS_ROUND_CORNERS_FIX
         WindowCornerManager::instance().blockRoundedCorners(render_window, false);
@@ -6799,7 +6825,7 @@ void GMainWindow::UpdateWindowTitle() {
 }
 
 void GMainWindow::UpdateUISettings() {
-    if (!ui->action_Fullscreen->isChecked()) {
+    if (!ui->action_Fullscreen->isChecked() && !isFullScreen()) {
         UISettings::values.geometry = saveGeometry();
         UISettings::values.renderwindow_geometry = render_window->saveGeometry();
     }
